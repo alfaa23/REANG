@@ -1,30 +1,26 @@
 import 'package:flutter/material.dart';
+// PERUBAHAN: Import halaman InfoYuScreen untuk navigasi
+import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // PERBAIKAN: Ambil data tema saat ini untuk digunakan di seluruh widget
     final theme = Theme.of(context);
 
     return Scaffold(
-      // PERBAIKAN: Gunakan warna latar dari tema
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        // PERBAIKAN: Gunakan warna AppBar dari tema
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          // Warna ikon akan otomatis mengikuti tema AppBar
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // PERBAIKAN: Kirim 'theme' ke helper widget
         title: _buildSearchBar(theme),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
-          // PERBAIKAN: Gunakan warna divider dari tema
           child: Container(color: theme.dividerColor, height: 1.0),
         ),
       ),
@@ -34,36 +30,42 @@ class SemuaLayananScreen extends StatelessWidget {
           _buildCategorySection(context, 'Laporan dan Kedaruratan', [
             _buildLayananItem(
               context,
-              theme: theme, // PERBAIKAN: Kirim 'theme'
+              theme: theme,
               icon: Icons.campaign_outlined,
               nama: 'Dumas-Yu',
               deskripsi: 'Lapor masalah di sekitar Anda jadi mudah',
             ),
+            // PERUBAHAN: Menambahkan aksi onTap untuk Info-Yu
             _buildLayananItem(
               context,
-              theme: theme, // PERBAIKAN: Kirim 'theme'
+              theme: theme,
               icon: Icons.info_outline,
               nama: 'Info-Yu',
               deskripsi: 'Informasi penting dan darurat',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InfoYuScreen()),
+                );
+              },
             ),
           ]),
           _buildCategorySection(context, 'Kesehatan & Pendidikan', [
             _buildLayananItem(
               context,
-              theme: theme, // PERBAIKAN: Kirim 'theme'
+              theme: theme,
               icon: Icons.health_and_safety_outlined,
               nama: 'Sehat-Yu',
               deskripsi: 'Akses layanan kesehatan terdekat',
             ),
             _buildLayananItem(
               context,
-              theme: theme, // PERBAIKAN: Kirim 'theme'
+              theme: theme,
               icon: Icons.school_outlined,
               nama: 'Sekolah-Yu',
               deskripsi: 'Informasi seputar pendidikan',
             ),
           ]),
-          // ... (Ulangi untuk semua _buildLayananItem lainnya)
           _buildCategorySection(context, 'Sosial dan Ekonomi', [
             _buildLayananItem(
               context,
@@ -138,21 +140,18 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget untuk search bar
+  // Helper widget untuk search bar (tidak ada perubahan)
   Widget _buildSearchBar(ThemeData theme) {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        // PERBAIKAN: Gunakan warna yang lebih adaptif untuk background search bar
         color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
         borderRadius: BorderRadius.circular(20),
       ),
       child: TextField(
-        // PERBAIKAN: Warna teks akan otomatis mengikuti tema
         style: TextStyle(color: theme.colorScheme.onSurface),
         decoration: InputDecoration(
           hintText: 'Cari Layanan di Reang',
-          // PERBAIKAN: Gunakan warna hint dari tema
           hintStyle: TextStyle(color: theme.hintColor),
           prefixIcon: Icon(Icons.search, color: theme.hintColor),
           border: InputBorder.none,
@@ -165,7 +164,7 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget untuk satu seksi kategori
+  // Helper widget untuk satu seksi kategori (tidak ada perubahan)
   Widget _buildCategorySection(
     BuildContext context,
     String title,
@@ -178,7 +177,6 @@ class SemuaLayananScreen extends StatelessWidget {
         children: [
           Text(
             title,
-            // PERBAIKAN: Warna teks dan style akan otomatis dari tema
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -193,10 +191,12 @@ class SemuaLayananScreen extends StatelessWidget {
   // Helper widget untuk satu item layanan
   Widget _buildLayananItem(
     BuildContext context, {
-    required ThemeData theme, // PERBAIKAN: Terima 'theme'
+    required ThemeData theme,
     required IconData icon,
     required String nama,
     required String deskripsi,
+    // PERUBAHAN: Tambahkan parameter onTap
+    VoidCallback? onTap,
   }) {
     return Column(
       children: [
@@ -206,25 +206,16 @@ class SemuaLayananScreen extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              // PERBAIKAN: Gunakan warna primer dari tema untuk aksen
               color: theme.colorScheme.primary.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            // PERBAIKAN: Gunakan warna primer dari tema untuk ikon
             child: Icon(icon, color: theme.colorScheme.primary, size: 28),
           ),
-          // PERBAIKAN: Warna teks akan otomatis mengikuti tema
           title: Text(nama),
-          subtitle: Text(
-            deskripsi,
-            // PERBAIKAN: Gunakan warna hint dari tema untuk deskripsi
-            style: TextStyle(color: theme.hintColor),
-          ),
-          onTap: () {
-            // TODO: Tambahkan navigasi untuk setiap fitur
-          },
+          subtitle: Text(deskripsi, style: TextStyle(color: theme.hintColor)),
+          // PERUBAHAN: Gunakan parameter onTap di sini
+          onTap: onTap,
         ),
-        // PERBAIKAN: Gunakan warna divider dari tema
         Divider(color: theme.dividerColor, height: 1),
       ],
     );

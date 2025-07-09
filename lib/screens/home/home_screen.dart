@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
+import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
@@ -172,9 +173,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 childAspectRatio: 0.75,
                 children: [
                   _MenuItem(icon: Icons.campaign_outlined, label: 'Dumas-yu'),
+                  // PERUBAHAN: Menambahkan onTap ke item Sehat-yu
                   _MenuItem(
                     icon: Icons.health_and_safety_outlined,
                     label: 'Sehat-yu',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SehatYuScreen(),
+                        ),
+                      );
+                    },
                   ),
                   _MenuItem(icon: Icons.school_outlined, label: 'Sekolah-yu'),
                   _MenuItem(
@@ -225,15 +235,13 @@ class _MenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // PERUBAHAN: Menghilangkan .withOpacity(0.8) agar warna solid
     final textColor = theme.colorScheme.onSurface;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.start, // <-- Diubah dari center ke start
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
