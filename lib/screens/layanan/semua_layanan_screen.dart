@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import halaman InfoYuScreen untuk navigasi
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
+import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -35,7 +35,6 @@ class SemuaLayananScreen extends StatelessWidget {
               nama: 'Dumas-Yu',
               deskripsi: 'Lapor masalah di sekitar Anda jadi mudah',
             ),
-            // PERUBAHAN: Menambahkan aksi onTap untuk Info-Yu
             _buildLayananItem(
               context,
               theme: theme,
@@ -90,12 +89,21 @@ class SemuaLayananScreen extends StatelessWidget {
             ),
           ]),
           _buildCategorySection(context, 'Pariwisata & Keagamaan', [
+            // PERUBAHAN: Menambahkan onTap ke Plesir-Yu
             _buildLayananItem(
               context,
               theme: theme,
               icon: Icons.beach_access_outlined,
               nama: 'Plesir-Yu',
               deskripsi: 'Temukan destinasi wisata menarik',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PlesirYuScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,
@@ -140,7 +148,6 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget untuk search bar (tidak ada perubahan)
   Widget _buildSearchBar(ThemeData theme) {
     return Container(
       height: 40,
@@ -164,7 +171,6 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget untuk satu seksi kategori (tidak ada perubahan)
   Widget _buildCategorySection(
     BuildContext context,
     String title,
@@ -188,14 +194,12 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget untuk satu item layanan
   Widget _buildLayananItem(
     BuildContext context, {
     required ThemeData theme,
     required IconData icon,
     required String nama,
     required String deskripsi,
-    // PERUBAHAN: Tambahkan parameter onTap
     VoidCallback? onTap,
   }) {
     return Column(
@@ -213,7 +217,6 @@ class SemuaLayananScreen extends StatelessWidget {
           ),
           title: Text(nama),
           subtitle: Text(deskripsi, style: TextStyle(color: theme.hintColor)),
-          // PERUBAHAN: Gunakan parameter onTap di sini
           onTap: onTap,
         ),
         Divider(color: theme.dividerColor, height: 1),
