@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
+import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
+import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
+import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
@@ -44,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
       if (_pageController.hasClients && _pageController.page != null) {
         int nextPage = _pageController.page!.round() + 1;
         _pageController.animateToPage(
@@ -144,7 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                    128,
+                  ),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: TextField(
@@ -152,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: InputDecoration(
                     icon: Icon(
                       Icons.search,
-                      color: theme.iconTheme.color?.withOpacity(0.7),
+                      color: theme.iconTheme.color?.withAlpha(178),
                     ),
                     hintText: 'Cari Layanan di Reang',
                     hintStyle: TextStyle(color: theme.hintColor),
@@ -172,8 +177,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.75,
                 children: [
-                  _MenuItem(icon: Icons.campaign_outlined, label: 'Dumas-yu'),
-                  // PERUBAHAN: Menambahkan onTap ke item Sehat-yu
+                  // PERUBAHAN: Menambahkan onTap ke item Dumas-yu
+                  _MenuItem(
+                    icon: Icons.campaign_outlined,
+                    label: 'Dumas-yu',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DumasYuHomeScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _MenuItem(
+                    icon: Icons.info_outline,
+                    label: 'Info-yu',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const InfoYuScreen(),
+                        ),
+                      );
+                    },
+                  ),
                   _MenuItem(
                     icon: Icons.health_and_safety_outlined,
                     label: 'Sehat-yu',
@@ -199,9 +227,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
-                  _MenuItem(icon: Icons.storefront_outlined, label: 'Pasar-yu'),
+                  _MenuItem(
+                    icon: Icons.beach_access_outlined,
+                    label: 'Plesir-yu',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PlesirYuScreen(),
+                        ),
+                      );
+                    },
+                  ),
                   _MenuItem(icon: Icons.work_outline, label: 'Kerja-yu'),
-                  _MenuItem(icon: Icons.badge_outlined, label: 'Adminduk-yu'),
                   _MenuItem(
                     icon: Icons.grid_view,
                     label: 'Semua',
@@ -248,7 +286,7 @@ class _MenuItem extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.15),
+              color: theme.colorScheme.primary.withAlpha(38),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: theme.colorScheme.primary, size: 35),
