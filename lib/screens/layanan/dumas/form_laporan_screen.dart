@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -25,19 +26,38 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   String? _selectedKategori;
 
   File? _pickedImage;
+  // PERBAIKAN: Tambahkan variabel untuk mencegah panggilan ganda
+  bool _isPickingImage = false;
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? img = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 80,
-    );
-    if (img != null) {
+    // Jika proses memilih gambar sudah berjalan, hentikan fungsi
+    if (_isPickingImage) return;
+
+    try {
+      // Tandai bahwa proses dimulai
       setState(() {
-        _pickedImage = File(img.path);
+        _isPickingImage = true;
       });
+
+      final picker = ImagePicker();
+      final XFile? img = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+      if (img != null) {
+        setState(() {
+          _pickedImage = File(img.path);
+        });
+      }
+    } finally {
+      // Pastikan untuk selalu menandai bahwa proses telah selesai
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
+      }
     }
   }
 
@@ -53,7 +73,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Membuat InputDecoration umum untuk TextField
+    // Membuat InputDecoration umum untuk TextField dan Dropdown
     final inputDecoration = InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       filled: true,
@@ -101,7 +121,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
           // Kategori
           Text('Kategori', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          // PERUBAHAN: Menggunakan DropdownMenu untuk stabilitas dan tampilan
           DropdownMenu<String>(
             initialSelection: _selectedKategori,
             onSelected: (String? value) {
@@ -109,10 +128,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 _selectedKategori = value;
               });
             },
-            // Membuat dropdown mengisi lebar yang tersedia
             expandedInsets: EdgeInsets.zero,
             hintText: 'Pilih kategori',
-            // Menerapkan style yang konsisten
             inputDecorationTheme: InputDecorationTheme(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -133,7 +150,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 borderSide: BorderSide(color: theme.colorScheme.primary),
               ),
             ),
-            // Membuat daftar item untuk menu
             dropdownMenuEntries: _kategoriList.map<DropdownMenuEntry<String>>((
               String value,
             ) {

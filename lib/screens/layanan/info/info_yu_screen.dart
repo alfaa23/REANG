@@ -1,12 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/berita_model.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-class InfoYuScreen extends StatelessWidget {
+class InfoYuScreen extends StatefulWidget {
   const InfoYuScreen({super.key});
+
+  @override
+  State<InfoYuScreen> createState() => _InfoYuScreenState();
+}
+
+class _InfoYuScreenState extends State<InfoYuScreen> {
+  // State untuk API Berita
+  final ApiService _apiService = ApiService();
+  late Future<List<Berita>> _beritaFuture;
+
+  // State untuk WebView CCTV
+  final WebViewController _cctvController = WebViewController();
+  bool _isCctvLoading = true;
+
+  // State untuk mengontrol tab yang aktif
+  int _selectedTabIndex = 0; // 0 untuk Berita, 1 untuk CCTV
+
+  @override
+  void initState() {
+    super.initState();
+    // Inisialisasi untuk Berita
+    timeago.setLocaleMessages('id', timeago.IdMessages());
+    _beritaFuture = _apiService.fetchBerita();
+
+    // Konfigurasi controller CCTV
+    _cctvController
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            if (mounted) {
+              setState(() => _isCctvLoading = true);
+            }
+          },
+          onPageFinished: (String url) {
+            if (mounted) {
+              setState(() => _isCctvLoading = false);
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            if (request.url.startsWith('https://cctv.indramayukab.go.id/')) {
+              return NavigationDecision.navigate;
+            }
+            return NavigationDecision.prevent;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse('https://cctv.indramayukab.go.id/'));
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -16,7 +70,7 @@ class InfoYuScreen extends StatelessWidget {
           children: [
             const Text('Info-yu'),
             Text(
-              'Update terbaru hari ini',
+              'Update terbaru dari Indramayu',
               style: TextStyle(fontSize: 12, color: theme.hintColor),
             ),
           ],
@@ -24,197 +78,229 @@ class InfoYuScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 8),
+          // PERUBAHAN: Membuat baris untuk tombol filter yang lebih besar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FilterChip(
-                label: const Text('Semua'),
-                avatar: Icon(Icons.newspaper, size: 24, color: Colors.white),
-                selected: true,
-                onSelected: (_) {},
-                showCheckmark: false,
-                backgroundColor: primary.withOpacity(0.1),
-                selectedColor: const Color(0xFF1C3A6A),
-                labelStyle: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildFilterChip(
+                    context,
+                    label: 'Berita',
+                    icon: Icons.newspaper,
+                    index: 0,
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildFilterChip(
+                    context,
+                    label: 'CCTV',
+                    icon: Icons.videocam,
+                    index: 1,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
+          // Menampilkan konten berdasarkan tab yang aktif
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: const [
-                InfoCard(
-                  category: 'Infrastruktur',
-                  time: '2 jam lalu',
-                  title:
-                      'Pembangunan Jalan Tol Baru Menghubungkan Jakarta-Bandung Segera',
-                  description:
-                      'Proyek pembangunan jalan tol baru yang akan menghubungkan Jakarta dan Bandung direncanakan akan dimulai pada bulan depan...',
-                  author: 'Admin Desa',
-                ),
-                SizedBox(height: 16),
-                InfoCard(
-                  category: 'Kesehatan',
-                  time: '4 jam lalu',
-                  title:
-                      'Program Vaksinasi COVID-19 Tahap Ketiga Dimulai Minggu Depan',
-                  description:
-                      'Pemerintah mengumumkan dimulainya program vaksinasi COVID-19 tahap ketiga yang akan menyasar kelompok usia...',
-                  author: 'Admin Desa',
-                ),
-                SizedBox(height: 16),
-                InfoCard(
-                  category: 'Pendidikan',
-                  time: '1 hari lalu',
-                  title:
-                      'Pembukaan Pendaftaran Siswa Baru Tahun Ajaran 2025/2026',
-                  description:
-                      'Dinas Pendidikan mengumumkan jadwal dan prosedur pendaftaran siswa baru untuk jenjang SD, SMP, dan SMA...',
-                  author: 'Dinas Pendidikan',
-                ),
-              ],
+            child: IndexedStack(
+              index: _selectedTabIndex,
+              children: [_buildBeritaView(), _buildCctvView()],
             ),
           ),
         ],
       ),
     );
   }
+
+  // PERUBAHAN: Widget untuk tombol filter diubah menjadi custom agar ukurannya lebih besar
+  Widget _buildFilterChip(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required int index,
+  }) {
+    final theme = Theme.of(context);
+    final bool isSelected = _selectedTabIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTabIndex = index;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isSelected
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget untuk menampilkan daftar berita
+  Widget _buildBeritaView() {
+    return FutureBuilder<List<Berita>>(
+      future: _beritaFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
+        }
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          final beritaList = snapshot.data!;
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _beritaFuture = _apiService.fetchBerita();
+              });
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: beritaList.length,
+              itemBuilder: (context, index) {
+                final berita = beritaList[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: InfoCard(berita: berita),
+                );
+              },
+            ),
+          );
+        }
+        return const Center(child: Text('Tidak ada berita tersedia.'));
+      },
+    );
+  }
+
+  // Widget untuk menampilkan WebView CCTV
+  Widget _buildCctvView() {
+    return Stack(
+      children: [
+        WebViewWidget(controller: _cctvController),
+        if (_isCctvLoading) const Center(child: CircularProgressIndicator()),
+      ],
+    );
+  }
 }
 
+// Widget InfoCard (diperbarui untuk navigasi)
 class InfoCard extends StatelessWidget {
-  final String category;
-  final String time;
-  final String title;
-  final String description;
-  final String author;
+  final Berita berita;
 
-  const InfoCard({
-    super.key,
-    required this.category,
-    required this.time,
-    required this.title,
-    required this.description,
-    required this.author,
-  });
+  const InfoCard({super.key, required this.berita});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return Card(
-      clipBehavior: Clip.hardEdge,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Stack(
-            children: [
-              Container(
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailBeritaScreen(berita: berita),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Card(
+        clipBehavior: Clip.hardEdge,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (berita.featuredImageUrl.isNotEmpty)
+              Image.network(
+                berita.featuredImageUrl,
                 height: 180,
                 width: double.infinity,
-                color: theme.colorScheme.surfaceVariant,
-                alignment: Alignment.center,
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
-                  ),
-                ),
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 180,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 180,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: theme.hintColor,
+                      size: 48,
+                    ),
+                  );
+                },
               ),
-              // Ikon bookmark telah dihapus
-            ],
-          ),
-
-          // Tag waktu
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(20),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: Text(
-                time,
+                timeago.format(berita.date, locale: 'id'),
                 style: TextStyle(
-                  color: theme.colorScheme.onPrimary,
+                  color: theme.colorScheme.primary,
                   fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-          ),
-
-          // Judul
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Text(
+                berita.title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-
-          // Deskripsi
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 48),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                description,
+                berita.excerpt,
                 style: TextStyle(color: theme.hintColor),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Footer
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Row(
-              children: [
-                Icon(Icons.person, size: 18, color: theme.colorScheme.primary),
-                const SizedBox(width: 4),
-                Text(
-                  author,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.hintColor,
-                    fontSize: 13,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.primary,
-                  ),
-                  child: const Text(
-                    'Baca selengkapnya >',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
