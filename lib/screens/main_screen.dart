@@ -47,10 +47,10 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: color, size: 28),
-              // PERBAIKAN: SizedBox dihapus untuk mengatasi overflow
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
+                  color: color,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -67,6 +67,8 @@ class _MainScreenState extends State<MainScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      // PERBAIKAN: Menambahkan properti ini agar FAB tidak terangkat oleh keyboard
+      resizeToAvoidBottomInset: false,
       body: SafeArea(child: _pages.elementAt(_selectedIndex)),
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),

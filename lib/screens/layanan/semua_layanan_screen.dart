@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+// PERUBAHAN: Import semua halaman fitur yang sudah dibuat
+import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
+import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
+import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
+import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -34,6 +39,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.campaign_outlined,
               nama: 'Dumas-Yu',
               deskripsi: 'Lapor masalah di sekitar Anda jadi mudah',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DumasYuHomeScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,
@@ -56,6 +69,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.health_and_safety_outlined,
               nama: 'Sehat-Yu',
               deskripsi: 'Akses layanan kesehatan terdekat',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SehatYuScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,
@@ -79,6 +100,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.storefront_outlined,
               nama: 'Pasar-Yu',
               deskripsi: 'Cek harga pangan di pasar terdekat',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PasarYuScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,
@@ -89,7 +118,6 @@ class SemuaLayananScreen extends StatelessWidget {
             ),
           ]),
           _buildCategorySection(context, 'Pariwisata & Keagamaan', [
-            // PERUBAHAN: Menambahkan onTap ke Plesir-Yu
             _buildLayananItem(
               context,
               theme: theme,
@@ -111,6 +139,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.mosque_outlined,
               nama: 'Ibadah-Yu',
               deskripsi: 'Cari lokasi tempat ibadah terdekat',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const IbadahLandingScreen(),
+                  ),
+                );
+              },
             ),
           ]),
           _buildCategorySection(context, 'Layanan Publik Lainnya', [
@@ -152,7 +188,7 @@ class SemuaLayananScreen extends StatelessWidget {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
       ),
       child: TextField(
@@ -210,7 +246,7 @@ class SemuaLayananScreen extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.15),
+              color: theme.colorScheme.primary.withAlpha(38),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: theme.colorScheme.primary, size: 28),
