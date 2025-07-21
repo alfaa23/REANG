@@ -6,6 +6,7 @@ import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
+import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -157,12 +158,21 @@ class SemuaLayananScreen extends StatelessWidget {
               nama: 'Adminduk-Yu',
               deskripsi: 'Urus dokumen kependudukan Anda',
             ),
+            // PERUBAHAN: Menambahkan onTap ke Renbang-Yu
             _buildLayananItem(
               context,
               theme: theme,
               icon: Icons.construction_outlined,
               nama: 'Renbang-Yu',
               deskripsi: 'Partisipasi dalam rencana pembangunan',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RenbangYuScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,

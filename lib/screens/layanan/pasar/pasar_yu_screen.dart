@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// PERUBAHAN: Import halaman UpdateHargaPanganScreen
+import 'package:reang_app/screens/layanan/pasar/update_harga_pangan_screen.dart';
 
 class PasarYuScreen extends StatefulWidget {
   const PasarYuScreen({Key? key}) : super(key: key);
@@ -42,7 +44,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
             _buildActionButtons(),
             const SizedBox(height: 24),
             Text(
-              'Lokasi Pasar & Vendor Terdekat',
+              'Rekomendasi Pasar & Toko Oleh-oleh',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -66,6 +68,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
               vendorCount: 89,
               distanceKm: 8.5,
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -154,7 +157,6 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            // PERBAIKAN: Menampilkan loading hanya saat ditekan
             icon: _isUpdatingHarga
                 ? const SizedBox(
                     width: 16,
@@ -173,16 +175,16 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            // Menonaktifkan tombol saat loading
+            // PERUBAHAN: Menambahkan navigasi ke halaman Update Harga Pangan
             onPressed: _isUpdatingHarga
                 ? null
-                : () async {
-                    setState(() => _isUpdatingHarga = true);
-                    // Simulasi proses update
-                    await Future.delayed(const Duration(seconds: 2));
-                    if (mounted) {
-                      setState(() => _isUpdatingHarga = false);
-                    }
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UpdateHargaPanganScreen(),
+                      ),
+                    );
                   },
           ),
         ),
@@ -191,7 +193,6 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   }
 }
 
-// PERUBAHAN: Desain kartu dirombak total agar seimbang
 class _PasarCard extends StatelessWidget {
   final String imagePath;
   final String jenis;
@@ -218,10 +219,9 @@ class _PasarCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bagian gambar yang lebih besar dan proporsional
           Image.asset(
             imagePath,
-            height: 140, // Tinggi gambar dibuat lebih proporsional
+            height: 140,
             width: double.infinity,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
@@ -238,7 +238,6 @@ class _PasarCard extends StatelessWidget {
               );
             },
           ),
-          // Bagian deskripsi yang lebih ringkas dan rapi
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
