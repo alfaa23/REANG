@@ -1,0 +1,308 @@
+import 'package:flutter/material.dart';
+import 'package:reang_app/models/jdih_model.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/screens/layanan/info/dokumen_viewer_screen.dart';
+
+class JdihScreen extends StatefulWidget {
+  const JdihScreen({super.key});
+
+  @override
+  State<JdihScreen> createState() => _JdihScreenState();
+}
+
+class _JdihScreenState extends State<JdihScreen> {
+  final ApiService _apiService = ApiService();
+  late Future<List<PeraturanHukum>> _jdihFuture;
+
+  List<PeraturanHukum> _allPeraturan = [];
+  int _selectedFilter = 0;
+  // PERUBAHAN: Tambahkan controller dan state untuk pencarian
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  final List<String> _filters = ['Semua', 'Perbup', 'Perda'];
+
+  @override
+  void initState() {
+    super.initState();
+    _jdihFuture = _apiService.fetchJdih();
+  }
+
+  @override
+  void dispose() {
+    // Jangan lupa dispose controller
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<PeraturanHukum>>(
+      future: _jdihFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
+        }
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          _allPeraturan = snapshot.data!;
+
+          // --- LOGIKA FILTER GABUNGAN (KATEGORI + PENCARIAN) ---
+          List<PeraturanHukum> displayedPeraturan = _allPeraturan;
+
+          // 1. Filter berdasarkan kategori (Perbup/Perda)
+          if (_selectedFilter != 0) {
+            String filterText = _filters[_selectedFilter].toLowerCase();
+            displayedPeraturan = displayedPeraturan
+                .where((p) => p.singkatanJenis.toLowerCase() == filterText)
+                .toList();
+          }
+
+          // 2. Filter berdasarkan teks pencarian
+          if (_searchQuery.isNotEmpty) {
+            displayedPeraturan = displayedPeraturan
+                .where(
+                  (p) => p.judul.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  ),
+                )
+                .toList();
+          }
+
+          return _buildContentView(context, displayedPeraturan);
+        }
+        return const Center(child: Text('Tidak ada dokumen tersedia.'));
+      },
+    );
+  }
+
+  Widget _buildContentView(
+    BuildContext context,
+    List<PeraturanHukum> peraturanList,
+  ) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          'Peraturan Perundang-undangan',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Temukan dan akses dokumen hukum resmi Kabupaten Indramayu',
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+        ),
+        const SizedBox(height: 16),
+        // PERUBAHAN: Menghubungkan TextField dengan controller dan onChanged
+        TextField(
+          controller: _searchController,
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+          decoration: InputDecoration(
+            hintText: 'Cari peraturan...',
+            prefixIcon: const Icon(Icons.search),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _filters.length,
+            separatorBuilder: (c, i) => const SizedBox(width: 8),
+            itemBuilder: (c, i) {
+              final selected = i == _selectedFilter;
+              return ChoiceChip(
+                label: Text(_filters[i]),
+                selected: selected,
+                onSelected: (val) {
+                  setState(() {
+                    _selectedFilter = i;
+                  });
+                },
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                selectedColor: theme.colorScheme.primary,
+                labelStyle: TextStyle(
+                  color: selected
+                      ? theme.colorScheme.onPrimary
+                      : theme.colorScheme.onSurface,
+                ),
+                showCheckmark: false,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Menampilkan daftar yang sudah difilter
+        ...peraturanList
+            .map((item) => _PeraturanCard(peraturan: item))
+            .toList(),
+      ],
+    );
+  }
+}
+
+class _PeraturanCard extends StatelessWidget {
+  final PeraturanHukum peraturan;
+  const _PeraturanCard({required this.peraturan});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        onTap: () {
+          if (peraturan.urlDownload.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DokumenViewerScreen(
+                  url: peraturan.urlDownload,
+                  title: peraturan.judul,
+                ),
+              ),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    peraturan.icon,
+                    size: 22,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      peraturan.jenis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'No. ${peraturan.nomor} Tahun ${peraturan.tahun}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: peraturan.statusColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      peraturan.status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: peraturan.statusColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                peraturan.judul,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  height: 1.5,
+                  fontSize: 16,
+                ),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "• Instansi: ${peraturan.pemrakarsa}",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                  Text(
+                    "• Ditetapkan: ${peraturan.tanggalPenetapan}",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                  Text(
+                    "• Penandatangan: ${peraturan.penandatangan}",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.verified_outlined,
+                        size: 16,
+                        color: theme.hintColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Dokumen Resmi',
+                        style: TextStyle(fontSize: 14, color: theme.hintColor),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Lihat Dokumen ›',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

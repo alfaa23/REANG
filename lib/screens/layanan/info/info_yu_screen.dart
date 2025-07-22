@@ -4,6 +4,7 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
 
 class InfoYuScreen extends StatefulWidget {
   const InfoYuScreen({super.key});
@@ -13,25 +14,21 @@ class InfoYuScreen extends StatefulWidget {
 }
 
 class _InfoYuScreenState extends State<InfoYuScreen> {
-  // State untuk API Berita
+  // --- State untuk semua tab ---
   final ApiService _apiService = ApiService();
   late Future<List<Berita>> _beritaFuture;
-
-  // State untuk WebView CCTV
   final WebViewController _cctvController = WebViewController();
   bool _isCctvLoading = true;
-
-  // State untuk mengontrol tab yang aktif
-  int _selectedTabIndex = 0; // 0 untuk Berita, 1 untuk CCTV
+  int _selectedTabIndex = 0; // 0: Berita, 1: CCTV, 2: JDIH
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi untuk Berita
+    // Inisialisasi Berita
     timeago.setLocaleMessages('id', timeago.IdMessages());
     _beritaFuture = _apiService.fetchBerita();
 
-    // Konfigurasi controller CCTV
+    // Inisialisasi CCTV
     _cctvController
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
@@ -78,7 +75,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
       ),
       body: Column(
         children: [
-          // PERUBAHAN: Membuat baris untuk tombol filter yang lebih besar
+          // Baris untuk tombol filter
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -100,6 +97,15 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
                     index: 1,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildFilterChip(
+                    context,
+                    label: 'JDIH',
+                    icon: Icons.balance,
+                    index: 2,
+                  ),
+                ),
               ],
             ),
           ),
@@ -108,7 +114,12 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
           Expanded(
             child: IndexedStack(
               index: _selectedTabIndex,
-              children: [_buildBeritaView(), _buildCctvView()],
+              children: [
+                _buildBeritaView(),
+                _buildCctvView(),
+                // PERUBAHAN: Memanggil JdihScreen sebagai salah satu anak IndexedStack
+                const JdihScreen(),
+              ],
             ),
           ),
         ],
@@ -116,7 +127,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     );
   }
 
-  // PERUBAHAN: Widget untuk tombol filter diubah menjadi custom agar ukurannya lebih besar
+  // Widget untuk tombol filter utama
   Widget _buildFilterChip(
     BuildContext context, {
     required String label,
@@ -125,40 +136,31 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
   }) {
     final theme = Theme.of(context);
     final bool isSelected = _selectedTabIndex == index;
+    final Color backgroundColor = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.surfaceContainerHighest;
+    final Color foregroundColor = isSelected
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurfaceVariant;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTabIndex = index;
-        });
-      },
+      onTap: () => setState(() => _selectedTabIndex = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceContainerHighest,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
+            Icon(icon, size: 18, color: foregroundColor),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: isSelected
-                    ? theme.colorScheme.onPrimary
-                    : theme.colorScheme.onSurfaceVariant,
+                color: foregroundColor,
               ),
             ),
           ],
@@ -167,7 +169,8 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     );
   }
 
-  // Widget untuk menampilkan daftar berita
+  // --- WIDGET UNTUK SETIAP TAB ---
+
   Widget _buildBeritaView() {
     return FutureBuilder<List<Berita>>(
       future: _beritaFuture,
@@ -181,21 +184,15 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           final beritaList = snapshot.data!;
           return RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _beritaFuture = _apiService.fetchBerita();
-              });
-            },
+            onRefresh: () async =>
+                setState(() => _beritaFuture = _apiService.fetchBerita()),
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: beritaList.length,
-              itemBuilder: (context, index) {
-                final berita = beritaList[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: InfoCard(berita: berita),
-                );
-              },
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: InfoCard(berita: beritaList[index]),
+              ),
             ),
           );
         }
@@ -204,7 +201,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     );
   }
 
-  // Widget untuk menampilkan WebView CCTV
   Widget _buildCctvView() {
     return Stack(
       children: [
@@ -215,24 +211,22 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
   }
 }
 
-// Widget InfoCard (diperbarui untuk navigasi)
+// --- KARTU-KARTU ---
+
 class InfoCard extends StatelessWidget {
   final Berita berita;
-
   const InfoCard({super.key, required this.berita});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetailBeritaScreen(berita: berita),
-          ),
-        );
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DetailBeritaScreen(berita: berita),
+        ),
+      ),
       borderRadius: BorderRadius.circular(12),
       child: Card(
         clipBehavior: Clip.hardEdge,
