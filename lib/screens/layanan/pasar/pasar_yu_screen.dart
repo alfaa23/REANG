@@ -23,7 +23,13 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Pasar-Yu'),
+            const Text(
+              'Pasar-yu',
+              style: TextStyle(
+                fontWeight: FontWeight
+                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
+              ),
+            ),
             const SizedBox(height: 2),
             Text(
               'Jelajahi pasar dan produk lokal Indramayu',

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/jdih_model.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:reang_app/screens/layanan/info/dokumen_viewer_screen.dart';
+import 'package:reang_app/screens/layanan/info/detail_jdih_screen.dart';
 
 class JdihScreen extends StatefulWidget {
   const JdihScreen({super.key});
@@ -16,7 +16,6 @@ class _JdihScreenState extends State<JdihScreen> {
 
   List<PeraturanHukum> _allPeraturan = [];
   int _selectedFilter = 0;
-  // PERUBAHAN: Tambahkan controller dan state untuk pencarian
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -30,7 +29,6 @@ class _JdihScreenState extends State<JdihScreen> {
 
   @override
   void dispose() {
-    // Jangan lupa dispose controller
     _searchController.dispose();
     super.dispose();
   }
@@ -49,10 +47,9 @@ class _JdihScreenState extends State<JdihScreen> {
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           _allPeraturan = snapshot.data!;
 
-          // --- LOGIKA FILTER GABUNGAN (KATEGORI + PENCARIAN) ---
           List<PeraturanHukum> displayedPeraturan = _allPeraturan;
 
-          // 1. Filter berdasarkan kategori (Perbup/Perda)
+          // Filter kategori
           if (_selectedFilter != 0) {
             String filterText = _filters[_selectedFilter].toLowerCase();
             displayedPeraturan = displayedPeraturan
@@ -60,7 +57,7 @@ class _JdihScreenState extends State<JdihScreen> {
                 .toList();
           }
 
-          // 2. Filter berdasarkan teks pencarian
+          // Filter pencarian
           if (_searchQuery.isNotEmpty) {
             displayedPeraturan = displayedPeraturan
                 .where(
@@ -100,7 +97,6 @@ class _JdihScreenState extends State<JdihScreen> {
           style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
         ),
         const SizedBox(height: 16),
-        // PERUBAHAN: Menghubungkan TextField dengan controller dan onChanged
         TextField(
           controller: _searchController,
           onChanged: (value) {
@@ -149,7 +145,6 @@ class _JdihScreenState extends State<JdihScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Menampilkan daftar yang sudah difilter
         ...peraturanList
             .map((item) => _PeraturanCard(peraturan: item))
             .toList(),
@@ -171,17 +166,13 @@ class _PeraturanCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         onTap: () {
-          if (peraturan.urlDownload.isNotEmpty) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DokumenViewerScreen(
-                  url: peraturan.urlDownload,
-                  title: peraturan.judul,
-                ),
-              ),
-            );
-          }
+          // --> Buka halaman detail dulu
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailJdihScreen(peraturan: peraturan),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(14),
         child: Padding(
@@ -290,7 +281,7 @@ class _PeraturanCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    'Lihat Dokumen ›',
+                    'Detail ›',
                     style: TextStyle(
                       fontSize: 14,
                       color: theme.colorScheme.primary,

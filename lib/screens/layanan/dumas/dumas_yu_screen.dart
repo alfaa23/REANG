@@ -26,7 +26,13 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Dumas-Yu'),
+            const Text(
+              'Dumas-yu',
+              style: TextStyle(
+                fontWeight: FontWeight
+                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
+              ),
+            ),
             const SizedBox(height: 2),
             Text(
               'Layanan Pengaduan Masyarakat',

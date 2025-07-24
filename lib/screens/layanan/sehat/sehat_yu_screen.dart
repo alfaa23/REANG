@@ -9,7 +9,15 @@ class SehatYuScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Sehat-yu')),
+      appBar: AppBar(
+        title: const Text(
+          'Sehat-yu',
+          style: TextStyle(
+            fontWeight: FontWeight
+                .bold, // <-- Bagian ini yang membuat teks menjadi tebal
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

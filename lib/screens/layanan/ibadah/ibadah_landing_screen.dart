@@ -77,7 +77,13 @@ class _IbadahLandingScreenState extends State<IbadahLandingScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Ibadah-yu'),
+        title: const Text(
+          'Ibadah-yu',
+          style: TextStyle(
+            fontWeight: FontWeight
+                .bold, // <-- Bagian ini yang membuat teks menjadi tebal
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {

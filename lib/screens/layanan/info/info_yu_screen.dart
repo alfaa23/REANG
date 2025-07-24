@@ -65,7 +65,13 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Info-yu'),
+            const Text(
+              'Info-yu',
+              style: TextStyle(
+                fontWeight: FontWeight
+                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
+              ),
+            ),
             Text(
               'Update terbaru dari Indramayu',
               style: TextStyle(fontSize: 12, color: theme.hintColor),
@@ -117,7 +123,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
               children: [
                 _buildBeritaView(),
                 _buildCctvView(),
-                // PERUBAHAN: Memanggil JdihScreen sebagai salah satu anak IndexedStack
                 const JdihScreen(),
               ],
             ),
@@ -146,19 +151,24 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedTabIndex = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        // PERUBAHAN 1: Padding vertikal diperbesar agar tombol lebih tinggi
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
+          // PERUBAHAN 2: Radius diperbesar agar lebih membulat (modern)
+          borderRadius: BorderRadius.circular(30),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: foregroundColor),
+            // PERUBAHAN 3: Ukuran ikon disesuaikan
+            Icon(icon, size: 20, color: foregroundColor),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
+                // PERUBAHAN 4: Ukuran font diperbesar
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: foregroundColor,
               ),
