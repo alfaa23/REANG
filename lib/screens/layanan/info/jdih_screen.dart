@@ -19,7 +19,7 @@ class _JdihScreenState extends State<JdihScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  final List<String> _filters = ['Semua', 'Perbup', 'Perda'];
+  final List<String> _filters = ['Semua', 'Perbup', 'Perda', 'Perdes'];
 
   @override
   void initState() {

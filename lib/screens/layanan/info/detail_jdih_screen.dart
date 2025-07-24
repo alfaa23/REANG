@@ -23,9 +23,22 @@ class _DetailJdihScreenState extends State<DetailJdihScreen> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      // PERBAIKAN: Menambahkan onNavigationRequest untuk membatasi navigasi
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (progress) => setState(() => _loadingProgress = progress),
+          onProgress: (progress) {
+            if (mounted) {
+              setState(() => _loadingProgress = progress);
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            // "Penjaga Pintu": Hanya izinkan navigasi jika URL-nya
+            // masih di dalam website jdih.indramayukab.go.id
+            if (request.url.startsWith('https://jdih.indramayukab.go.id/')) {
+              return NavigationDecision.navigate; // Izinkan
+            }
+            return NavigationDecision.prevent; // Tolak
+          },
         ),
       )
       ..loadRequest(Uri.parse(url));
@@ -37,9 +50,7 @@ class _DetailJdihScreenState extends State<DetailJdihScreen> {
       appBar: AppBar(
         title: Text(
           widget.peraturan.jenis,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold, // Ini untuk membuat teks menjadi tebal
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

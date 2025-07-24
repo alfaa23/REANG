@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import halaman FormLaporanScreen untuk navigasi
 import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
 
 class DumasYuHomeScreen extends StatefulWidget {
@@ -28,15 +27,12 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
           children: [
             const Text(
               'Dumas-yu',
-              style: TextStyle(
-                fontWeight: FontWeight
-                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
             Text(
               'Layanan Pengaduan Masyarakat',
-              style: TextStyle(color: theme.hintColor, fontSize: 12),
+              style: TextStyle(color: theme.hintColor, fontSize: 13),
             ),
           ],
         ),
@@ -144,7 +140,6 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        // PERUBAHAN: Menambahkan navigasi ke FormLaporanScreen
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -176,30 +171,38 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Report Cards
-              _buildReportCard(
-                context: context,
+              // Kartu laporan dengan desain baru
+              _ReportCard(
+                imagePath:
+                    'assets/images/jalan_rusak.png', // Ganti dengan path gambar Anda
                 title: 'Jalan Rusak di Malioboro',
                 category: 'Infrastruktur',
-                timeAgo: '2 hari lalu',
+                address: 'Jl. Malioboro, dekat Tugu',
                 status: 'Dalam Proses',
                 statusColor: Colors.orange,
+                timeAgo: '2 hari yang lalu', // Data waktu ditambahkan
               ),
-              _buildReportCard(
-                context: context,
+              const SizedBox(height: 16),
+              _ReportCard(
+                imagePath:
+                    'assets/images/lampu_mati.png', // Ganti dengan path gambar Anda
                 title: 'Lampu Jalan Mati',
                 category: 'Fasilitas Umum',
-                timeAgo: '1 minggu lalu',
+                address: 'Area Alun-alun Indramayu',
                 status: 'Selesai',
                 statusColor: Colors.green,
+                timeAgo: '5 hari yang lalu', // Data waktu ditambahkan
               ),
-              _buildReportCard(
-                context: context,
+              const SizedBox(height: 16),
+              _ReportCard(
+                imagePath:
+                    'assets/images/pelayanan.png', // Ganti dengan path gambar Anda
                 title: 'Pelayanan Lambat di Kelurahan',
                 category: 'Pelayanan Publik',
-                timeAgo: '3 hari lalu',
+                address: 'Kantor Kelurahan Paoman',
                 status: 'Ditolak',
                 statusColor: Colors.red,
+                timeAgo: '1 minggu yang lalu', // Data waktu ditambahkan
               ),
 
               const SizedBox(height: 24),
@@ -209,38 +212,97 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
       ),
     );
   }
+}
 
-  Widget _buildReportCard({
-    required BuildContext context,
-    required String title,
-    required String category,
-    required String timeAgo,
-    required String status,
-    required Color statusColor,
-  }) {
+// Widget kartu laporan didesain ulang
+class _ReportCard extends StatelessWidget {
+  final String imagePath;
+  final String title;
+  final String category;
+  final String address;
+  final String status;
+  final Color statusColor;
+  final String timeAgo; // PERUBAHAN: Menambahkan parameter timeAgo
+
+  const _ReportCard({
+    required this.imagePath,
+    required this.title,
+    required this.category,
+    required this.address,
+    required this.status,
+    required this.statusColor,
+    required this.timeAgo, // PERUBAHAN: Menambahkan parameter timeAgo
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withAlpha(13),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Card(
+      clipBehavior: Clip.hardEdge,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          // Gambar Laporan
+          Image.asset(
+            imagePath,
+            height: 140,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                height: 140,
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Center(
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 48,
+                    color: theme.hintColor,
+                  ),
+                ),
+              );
+            },
+          ),
+          // Konten Teks
+          Padding(
+            padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Baris Kategori dan Status
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      category.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.hintColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Judul Laporan
                 Text(
                   title,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -248,34 +310,27 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  category,
-                  style: TextStyle(fontSize: 12, color: theme.hintColor),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  timeAgo,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.hintColor.withAlpha(204),
-                  ),
+                // PERUBAHAN: Menambahkan informasi waktu di samping alamat
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: theme.hintColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '$address • $timeAgo',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: statusColor.withAlpha(51),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: statusColor,
-              ),
             ),
           ),
         ],

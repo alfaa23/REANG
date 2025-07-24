@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/screens/layanan/adminduk/adminduk_screen.dart';
 // PERUBAHAN: Import semua halaman fitur yang sudah dibuat
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
@@ -157,6 +158,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.badge_outlined,
               nama: 'Adminduk-Yu',
               deskripsi: 'Urus dokumen kependudukan Anda',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdmindukScreen(),
+                  ),
+                );
+              },
             ),
             // PERUBAHAN: Menambahkan onTap ke Renbang-Yu
             _buildLayananItem(
