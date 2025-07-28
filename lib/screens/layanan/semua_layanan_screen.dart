@@ -8,6 +8,7 @@ import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
+import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -86,6 +87,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.school_outlined,
               nama: 'Sekolah-Yu',
               deskripsi: 'Informasi seputar pendidikan',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SekolahYuScreen(),
+                  ),
+                );
+              },
             ),
           ]),
           _buildCategorySection(context, 'Sosial dan Ekonomi', [

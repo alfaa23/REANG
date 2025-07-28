@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
+// PERUBAHAN: Import halaman detail laporan
+import 'package:reang_app/screens/layanan/dumas/detail_laporan_screen.dart';
 
 class DumasYuHomeScreen extends StatefulWidget {
   const DumasYuHomeScreen({Key? key}) : super(key: key);
@@ -10,6 +12,37 @@ class DumasYuHomeScreen extends StatefulWidget {
 
 class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
   bool isBerandaSelected = true;
+
+  // Data dummy dipindahkan ke sini agar bisa diakses oleh _ReportCard
+  final List<Map<String, dynamic>> _laporanTerbaru = const [
+    {
+      'imagePath': 'assets/images/jalan_rusak.png',
+      'title': 'Jalan Rusak di Malioboro',
+      'category': 'Infrastruktur',
+      'address': 'Jl. Malioboro, dekat Tugu',
+      'status': 'Dalam Proses',
+      'statusColor': Colors.orange,
+      'timeAgo': '2 hari lalu',
+    },
+    {
+      'imagePath': 'assets/images/lampu_mati.png',
+      'title': 'Lampu Jalan Mati',
+      'category': 'Fasilitas Umum',
+      'address': 'Area Alun-alun Indramayu',
+      'status': 'Selesai',
+      'statusColor': Colors.green,
+      'timeAgo': '5 hari lalu',
+    },
+    {
+      'imagePath': 'assets/images/pelayanan.png',
+      'title': 'Pelayanan Lambat di Kelurahan',
+      'category': 'Pelayanan Publik',
+      'address': 'Kantor Kelurahan Paoman',
+      'status': 'Ditolak',
+      'statusColor': Colors.red,
+      'timeAgo': '1 minggu lalu',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -171,39 +204,10 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Kartu laporan dengan desain baru
-              _ReportCard(
-                imagePath:
-                    'assets/images/jalan_rusak.png', // Ganti dengan path gambar Anda
-                title: 'Jalan Rusak di Malioboro',
-                category: 'Infrastruktur',
-                address: 'Jl. Malioboro, dekat Tugu',
-                status: 'Dalam Proses',
-                statusColor: Colors.orange,
-                timeAgo: '2 hari yang lalu', // Data waktu ditambahkan
-              ),
-              const SizedBox(height: 16),
-              _ReportCard(
-                imagePath:
-                    'assets/images/lampu_mati.png', // Ganti dengan path gambar Anda
-                title: 'Lampu Jalan Mati',
-                category: 'Fasilitas Umum',
-                address: 'Area Alun-alun Indramayu',
-                status: 'Selesai',
-                statusColor: Colors.green,
-                timeAgo: '5 hari yang lalu', // Data waktu ditambahkan
-              ),
-              const SizedBox(height: 16),
-              _ReportCard(
-                imagePath:
-                    'assets/images/pelayanan.png', // Ganti dengan path gambar Anda
-                title: 'Pelayanan Lambat di Kelurahan',
-                category: 'Pelayanan Publik',
-                address: 'Kantor Kelurahan Paoman',
-                status: 'Ditolak',
-                statusColor: Colors.red,
-                timeAgo: '1 minggu yang lalu', // Data waktu ditambahkan
-              ),
+              // Menampilkan daftar laporan dari data di atas
+              ..._laporanTerbaru
+                  .map((laporan) => _ReportCard(data: laporan))
+                  .toList(),
 
               const SizedBox(height: 24),
             ],
@@ -216,23 +220,8 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
 
 // Widget kartu laporan didesain ulang
 class _ReportCard extends StatelessWidget {
-  final String imagePath;
-  final String title;
-  final String category;
-  final String address;
-  final String status;
-  final Color statusColor;
-  final String timeAgo; // PERUBAHAN: Menambahkan parameter timeAgo
-
-  const _ReportCard({
-    required this.imagePath,
-    required this.title,
-    required this.category,
-    required this.address,
-    required this.status,
-    required this.statusColor,
-    required this.timeAgo, // PERUBAHAN: Menambahkan parameter timeAgo
-  });
+  final Map<String, dynamic> data;
+  const _ReportCard({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -241,99 +230,112 @@ class _ReportCard extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Gambar Laporan
-          Image.asset(
-            imagePath,
-            height: 140,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 140,
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Center(
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 48,
-                    color: theme.hintColor,
-                  ),
-                ),
-              );
-            },
-          ),
-          // Konten Teks
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Baris Kategori dan Status
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      category.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.hintColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Judul Laporan
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // PERUBAHAN: Menambahkan informasi waktu di samping alamat
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
+      // PERUBAHAN: Membungkus dengan InkWell untuk navigasi
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailLaporanScreen(data: data),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Gambar Laporan
+            Image.asset(
+              data['imagePath'],
+              height: 140,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 140,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 48,
                       color: theme.hintColor,
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '$address • $timeAgo',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                );
+              },
             ),
-          ),
-        ],
+            // Konten Teks
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Baris Kategori dan Status
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        data['category'].toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.hintColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (data['statusColor'] as Color).withOpacity(
+                            0.2,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          data['status'],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: data['statusColor'],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Judul Laporan
+                  Text(
+                    data['title'],
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Alamat dan Waktu
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: theme.hintColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${data['address']} • ${data['timeAgo']}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
