@@ -68,7 +68,11 @@ class _JdihScreenState extends State<JdihScreen> {
                 .toList();
           }
 
-          return _buildContentView(context, displayedPeraturan);
+          final String searchHint = _selectedFilter == 0
+              ? 'Cari semua peraturan...'
+              : 'Cari di ${_filters[_selectedFilter]}...';
+
+          return _buildContentView(context, displayedPeraturan, searchHint);
         }
         return const Center(child: Text('Tidak ada dokumen tersedia.'));
       },
@@ -78,6 +82,7 @@ class _JdihScreenState extends State<JdihScreen> {
   Widget _buildContentView(
     BuildContext context,
     List<PeraturanHukum> peraturanList,
+    String searchHint,
   ) {
     final theme = Theme.of(context);
     return ListView(
@@ -105,7 +110,7 @@ class _JdihScreenState extends State<JdihScreen> {
             });
           },
           decoration: InputDecoration(
-            hintText: 'Cari peraturan...',
+            hintText: searchHint,
             prefixIcon: const Icon(Icons.search),
             filled: true,
             fillColor: theme.colorScheme.surfaceContainerHighest,
@@ -166,7 +171,6 @@ class _PeraturanCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         onTap: () {
-          // --> Buka halaman detail dulu
           Navigator.push(
             context,
             MaterialPageRoute(

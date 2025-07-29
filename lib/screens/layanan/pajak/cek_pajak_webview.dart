@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-/// Widget ini hanya berisi konten WebView untuk CCTV.
+/// Widget ini hanya berisi konten WebView untuk Cek Pajak.
 /// Dibuat terpisah agar bisa "lazy load" (dimuat saat dibutuhkan).
-class CctvView extends StatefulWidget {
-  const CctvView({super.key});
+class CekPajakWebView extends StatefulWidget {
+  const CekPajakWebView({super.key});
 
   @override
-  State<CctvView> createState() => _CctvViewState();
+  State<CekPajakWebView> createState() => _CekPajakWebViewState();
 }
 
-class _CctvViewState extends State<CctvView> {
+class _CekPajakWebViewState extends State<CekPajakWebView> {
   late final WebViewController _controller;
   bool _isLoading = true;
 
@@ -21,21 +21,21 @@ class _CctvViewState extends State<CctvView> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (url) {
-            if (mounted) setState(() => _isLoading = true);
-          },
-          onPageFinished: (url) {
-            if (mounted) setState(() => _isLoading = false);
-          },
+          onPageStarted: (url) => setState(() => _isLoading = true),
+          onPageFinished: (url) => setState(() => _isLoading = false),
           onNavigationRequest: (request) {
-            if (request.url.startsWith('https://cctv.indramayukab.go.id/')) {
+            if (request.url.startsWith(
+              'https://cekpajak.indramayukab.go.id/',
+            )) {
               return NavigationDecision.navigate;
             }
             return NavigationDecision.prevent;
           },
         ),
       )
-      ..loadRequest(Uri.parse('https://cctv.indramayukab.go.id/'));
+      ..loadRequest(
+        Uri.parse('https://cekpajak.indramayukab.go.id/portlet.php'),
+      );
   }
 
   @override

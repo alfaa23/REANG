@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/adminduk/adminduk_screen.dart';
-// PERUBAHAN: Import semua halaman fitur yang sudah dibuat
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
+import 'package:reang_app/screens/layanan/pajak/pajak_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
+import 'package:reang_app/screens/layanan/kerja/kerja_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -104,6 +105,14 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.receipt_long_outlined,
               nama: 'Pajak-Yu',
               deskripsi: 'Cek dan bayar tagihan pajak Anda',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PajakYuScreen(),
+                  ),
+                );
+              },
             ),
             _buildLayananItem(
               context,
@@ -126,6 +135,10 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.work_outline,
               nama: 'Kerja-Yu',
               deskripsi: 'Informasi lowongan pekerjaan',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const KerjaYuScreen()),
+              ),
             ),
           ]),
           _buildCategorySection(context, 'Pariwisata & Keagamaan', [

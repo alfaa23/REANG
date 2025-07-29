@@ -3,8 +3,8 @@ import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
+import 'package:reang_app/screens/layanan/info/cctv_screen.dart';
 
 class InfoYuScreen extends StatefulWidget {
   const InfoYuScreen({super.key});
@@ -14,45 +14,20 @@ class InfoYuScreen extends StatefulWidget {
 }
 
 class _InfoYuScreenState extends State<InfoYuScreen> {
-  // --- State untuk semua tab ---
   final ApiService _apiService = ApiService();
   late Future<List<Berita>> _beritaFuture;
-  final WebViewController _cctvController = WebViewController();
-  bool _isCctvLoading = true;
+
   int _selectedTabIndex = 0; // 0: Berita, 1: CCTV, 2: JDIH
+  // PERUBAHAN: State untuk melacak apakah tab sudah pernah dibuka
+  bool _isCctvInitiated = false;
+  bool _isJdihInitiated = false;
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi Berita
+    // Inisialisasi Berita (satu-satunya yang dimuat di awal)
     timeago.setLocaleMessages('id', timeago.IdMessages());
     _beritaFuture = _apiService.fetchBerita();
-
-    // Inisialisasi CCTV
-    _cctvController
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) {
-              setState(() => _isCctvLoading = true);
-            }
-          },
-          onPageFinished: (String url) {
-            if (mounted) {
-              setState(() => _isCctvLoading = false);
-            }
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            if (request.url.startsWith('https://cctv.indramayukab.go.id/')) {
-              return NavigationDecision.navigate;
-            }
-            return NavigationDecision.prevent;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse('https://cctv.indramayukab.go.id/'));
   }
 
   @override
@@ -67,10 +42,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
           children: [
             const Text(
               'Info-yu',
-              style: TextStyle(
-                fontWeight: FontWeight
-                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             Text(
               'Update terbaru dari Indramayu',
@@ -81,7 +53,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
       ),
       body: Column(
         children: [
-          // Baris untuk tombol filter
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -116,14 +87,15 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // Menampilkan konten berdasarkan tab yang aktif
           Expanded(
             child: IndexedStack(
               index: _selectedTabIndex,
               children: [
                 _buildBeritaView(),
-                _buildCctvView(),
-                const JdihScreen(),
+                // WebView hanya akan dibuat jika _isCctvInitiated true
+                _isCctvInitiated ? const CctvView() : Container(),
+                // JDIH hanya akan dibuat jika _isJdihInitiated true
+                _isJdihInitiated ? const JdihScreen() : Container(),
               ],
             ),
           ),
@@ -132,7 +104,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     );
   }
 
-  // Widget untuk tombol filter utama
   Widget _buildFilterChip(
     BuildContext context, {
     required String label,
@@ -149,25 +120,31 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
         : theme.colorScheme.onSurfaceVariant;
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedTabIndex = index),
+      onTap: () {
+        setState(() {
+          _selectedTabIndex = index;
+          // PERUBAHAN: Logika untuk "lazy load"
+          if (index == 1 && !_isCctvInitiated) {
+            _isCctvInitiated = true;
+          } else if (index == 2 && !_isJdihInitiated) {
+            _isJdihInitiated = true;
+          }
+        });
+      },
       child: Container(
-        // PERUBAHAN 1: Padding vertikal diperbesar agar tombol lebih tinggi
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: backgroundColor,
-          // PERUBAHAN 2: Radius diperbesar agar lebih membulat (modern)
           borderRadius: BorderRadius.circular(30),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // PERUBAHAN 3: Ukuran ikon disesuaikan
             Icon(icon, size: 20, color: foregroundColor),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                // PERUBAHAN 4: Ukuran font diperbesar
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: foregroundColor,
@@ -178,8 +155,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
       ),
     );
   }
-
-  // --- WIDGET UNTUK SETIAP TAB ---
 
   Widget _buildBeritaView() {
     return FutureBuilder<List<Berita>>(
@@ -210,18 +185,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
       },
     );
   }
-
-  Widget _buildCctvView() {
-    return Stack(
-      children: [
-        WebViewWidget(controller: _cctvController),
-        if (_isCctvLoading) const Center(child: CircularProgressIndicator()),
-      ],
-    );
-  }
 }
-
-// --- KARTU-KARTU ---
 
 class InfoCard extends StatelessWidget {
   final Berita berita;
