@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// PERUBAHAN: Import halaman detail lowongan
+import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
 
 class KerjaYuScreen extends StatefulWidget {
   const KerjaYuScreen({super.key});
@@ -99,7 +101,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
           .toList();
     }
 
-    // PERUBAHAN: Menentukan teks hint untuk search bar secara dinamis
     final String searchHint = _selectedTab == 0
         ? 'Cari semua...'
         : 'Cari di ${_tabs[_selectedTab]['label']}...';
@@ -125,7 +126,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
       body: Column(
         children: [
           const SizedBox(height: 12),
-          // PERUBAHAN: Mengirim teks hint yang dinamis ke widget search bar
           _buildSearchBar(theme, searchHint),
           const SizedBox(height: 16),
           _buildFilterTabs(theme),
@@ -144,7 +144,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
     );
   }
 
-  // PERUBAHAN: Widget search bar sekarang menerima parameter hintText
   Widget _buildSearchBar(ThemeData theme, String hintText) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -156,7 +155,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
           });
         },
         decoration: InputDecoration(
-          // Menggunakan hintText dari parameter
           hintText: hintText,
           prefixIcon: const Icon(Icons.search),
           filled: true,
@@ -233,7 +231,6 @@ class _JobCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Menentukan warna kartu dan teks berdasarkan tema
     final cardColor = isDark ? const Color(0xFF2E2E2E) : theme.cardColor;
     final textColor = isDark ? Colors.white : theme.textTheme.bodyLarge!.color;
     final subtleTextColor = isDark ? Colors.white70 : theme.hintColor;
@@ -243,8 +240,14 @@ class _JobCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: cardColor,
       child: InkWell(
+        // PERUBAHAN: Menambahkan navigasi ke halaman detail lowongan
         onTap: () {
-          // TODO: Navigasi ke halaman detail lowongan
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailLowonganScreen(data: data),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
