@@ -10,6 +10,7 @@ import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
 import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/kerja_yu_screen.dart';
+import 'package:reang_app/screens/layanan/wifi/wifi_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -218,6 +219,12 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.wifi_outlined,
               nama: 'WiFi-Yu',
               deskripsi: 'Temukan titik WiFi publik gratis',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const WifiYuScreen()),
+                );
+              },
             ),
           ]),
         ],
