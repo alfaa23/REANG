@@ -24,6 +24,11 @@ class _JdihScreenState extends State<JdihScreen> {
   @override
   void initState() {
     super.initState();
+    _loadJdihData();
+  }
+
+  // PERUBAHAN: Fungsi untuk memuat atau memuat ulang data JDIH
+  void _loadJdihData() {
     _jdihFuture = _apiService.fetchJdih();
   }
 
@@ -41,15 +46,18 @@ class _JdihScreenState extends State<JdihScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        // PERUBAHAN: Menampilkan tampilan error yang lebih baik
         if (snapshot.hasError) {
-          return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
+          return _buildErrorView(
+            context,
+            'Gagal terhubung ke server. Silakan coba lagi nanti.',
+          );
         }
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           _allPeraturan = snapshot.data!;
 
           List<PeraturanHukum> displayedPeraturan = _allPeraturan;
 
-          // Filter kategori
           if (_selectedFilter != 0) {
             String filterText = _filters[_selectedFilter].toLowerCase();
             displayedPeraturan = displayedPeraturan
@@ -57,7 +65,6 @@ class _JdihScreenState extends State<JdihScreen> {
                 .toList();
           }
 
-          // Filter pencarian
           if (_searchQuery.isNotEmpty) {
             displayedPeraturan = displayedPeraturan
                 .where(
@@ -74,7 +81,7 @@ class _JdihScreenState extends State<JdihScreen> {
 
           return _buildContentView(context, displayedPeraturan, searchHint);
         }
-        return const Center(child: Text('Tidak ada dokumen tersedia.'));
+        return _buildErrorView(context, 'Tidak ada dokumen tersedia saat ini.');
       },
     );
   }
@@ -154,6 +161,40 @@ class _JdihScreenState extends State<JdihScreen> {
             .map((item) => _PeraturanCard(peraturan: item))
             .toList(),
       ],
+    );
+  }
+
+  // PERUBAHAN: Widget baru untuk menampilkan pesan error dan tombol coba lagi
+  Widget _buildErrorView(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _loadJdihData();
+                });
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

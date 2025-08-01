@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
+import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const IbadahLandingScreen(),
+                          builder: (context) => const IbadahYuScreen(),
                         ),
                       );
                     },

@@ -1,32 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-class PpdbWebviewScreen extends StatefulWidget {
-  const PpdbWebviewScreen({super.key});
+/// Widget ini hanya berisi konten WebView untuk PPDB.
+/// Dibuat terpisah agar bisa "lazy load" (dimuat saat dibutuhkan).
+class PpdbWebView extends StatefulWidget {
+  const PpdbWebView({super.key});
 
   @override
-  State<PpdbWebviewScreen> createState() => _PpdbWebviewScreenState();
+  State<PpdbWebView> createState() => _PpdbWebViewState();
 }
 
-class _PpdbWebviewScreenState extends State<PpdbWebviewScreen> {
+class _PpdbWebViewState extends State<PpdbWebView> {
   late final WebViewController _controller;
-  int _loadingProgress = 0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (progress) {
-            if (mounted) {
-              setState(() => _loadingProgress = progress);
-            }
+          onPageStarted: (String url) {
+            if (mounted) setState(() => _isLoading = true);
           },
-          // Mencegah pengguna keluar dari halaman PPDB
-          onNavigationRequest: (request) {
+          onPageFinished: (String url) {
+            if (mounted) setState(() => _isLoading = false);
+          },
+          onNavigationRequest: (NavigationRequest request) {
             if (request.url.startsWith(
               'https://spmb-smp.disdik.indramayukab.go.id/',
             )) {
@@ -41,17 +42,11 @@ class _PpdbWebviewScreenState extends State<PpdbWebviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('PPDB Indramayu'),
-        bottom: _loadingProgress < 100
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(4.0),
-                child: LinearProgressIndicator(value: _loadingProgress / 100),
-              )
-            : null,
-      ),
-      body: WebViewWidget(controller: _controller),
+    return Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_isLoading) const Center(child: CircularProgressIndicator()),
+      ],
     );
   }
 }

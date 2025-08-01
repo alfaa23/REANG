@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart'; // Diperlukan untuk format tanggal
 import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/models/jdih_model.dart';
 
@@ -37,7 +38,6 @@ class ApiService {
     try {
       final response = await _dio.get(_baseUrlJdih);
       if (response.statusCode == 200) {
-        // PERBAIKAN: Mengambil list dari dalam key 'data'
         if (response.data is Map<String, dynamic> &&
             response.data.containsKey('data')) {
           final List<dynamic> data = response.data['data'];
@@ -46,7 +46,6 @@ class ApiService {
               .toList();
           return peraturanList;
         } else {
-          // Jika formatnya tidak sesuai harapan, lempar error
           throw Exception('Format data tidak sesuai');
         }
       } else {
@@ -54,6 +53,32 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data JDIH: $e');
+    }
+  }
+
+  // =======================================================================
+  // API WAKTU IBADAH (JADWAL SHOLAT)
+  // Mengambil data dari Aladhan API berdasarkan kota dan tanggal.
+  // =======================================================================
+  Future<Map<String, String>> fetchJadwalSholat() async {
+    try {
+      // Mendapatkan tanggal hari ini dalam format dd-MM-yyyy
+      final String today = DateFormat('dd-MM-yyyy').format(DateTime.now());
+      final String url =
+          'http://api.aladhan.com/v1/timingsByCity/$today?city=Indramayu&country=Indonesia&method=3';
+
+      final response = await _dio.get(url);
+      if (response.statusCode == 200 && response.data['data'] != null) {
+        // Langsung mengembalikan map 'timings'
+        final timings =
+            response.data['data']['timings'] as Map<String, dynamic>;
+        // Mengonversi semua value menjadi String untuk keamanan
+        return timings.map((key, value) => MapEntry(key, value.toString()));
+      } else {
+        throw Exception('Gagal memuat jadwal sholat');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil jadwal sholat: $e');
     }
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import webview_flutter untuk menampilkan konten PPDB
-import 'package:webview_flutter/webview_flutter.dart';
+// PERUBAHAN: Import file ppdb_webview_screen.dart yang berisi konten WebView
+import 'package:reang_app/screens/layanan/sekolah/ppdb_webview_screen.dart';
 
 class SekolahYuScreen extends StatefulWidget {
   const SekolahYuScreen({super.key});
@@ -17,9 +17,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
     {'label': 'Info Beasiswa', 'icon': Icons.card_giftcard_outlined},
   ];
 
-  // PERBAIKAN: Inisialisasi controller langsung saat deklarasi untuk menghindari LateInitializationError.
-  final WebViewController _ppdbController = WebViewController();
-  bool _isPpdbLoading = true;
+  // PERUBAHAN: Menambahkan state untuk melacak inisialisasi WebView
+  bool _isPpdbInitiated = false;
 
   // Data kartu sekolah (tidak ada perubahan)
   final List<Map<String, dynamic>> _schools = const [
@@ -71,34 +70,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-
-    // PERBAIKAN: Konfigurasi controller yang sudah diinisialisasi.
-    _ppdbController
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) setState(() => _isPpdbLoading = true);
-          },
-          onPageFinished: (String url) {
-            if (mounted) setState(() => _isPpdbLoading = false);
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            if (request.url.startsWith(
-              'https://spmb-smp.disdik.indramayukab.go.id/',
-            )) {
-              return NavigationDecision.navigate;
-            }
-            return NavigationDecision.prevent;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse('https://spmb-smp.disdik.indramayukab.go.id/'));
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -129,8 +100,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
               index: _selectedTab,
               children: [
                 _buildCariSekolahView(theme),
-                // Menampilkan konten WebView PPDB di sini
-                _buildPpdbView(),
+                // PERUBAHAN: WebView hanya akan dibuat jika _isPpdbInitiated true.
+                _isPpdbInitiated ? const PpdbWebView() : Container(),
                 _buildPlaceholderView(_tabs[2]['label'] as String),
                 _buildPlaceholderView(_tabs[3]['label'] as String),
               ],
@@ -154,7 +125,13 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
           final sel = i == _selectedTab;
           return GestureDetector(
             onTap: () {
-              setState(() => _selectedTab = i);
+              setState(() {
+                _selectedTab = i;
+                // PERUBAHAN: Logika untuk "lazy load"
+                if (i == 1 && !_isPpdbInitiated) {
+                  _isPpdbInitiated = true;
+                }
+              });
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -212,15 +189,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
         ),
         const SizedBox(height: 16),
         ..._schools.map((s) => _SchoolCard(data: s)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildPpdbView() {
-    return Stack(
-      children: [
-        WebViewWidget(controller: _ppdbController),
-        if (_isPpdbLoading) const Center(child: CircularProgressIndicator()),
       ],
     );
   }

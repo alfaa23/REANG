@@ -14,7 +14,6 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
     _Category('Kuliner', Icons.restaurant_outlined),
     _Category('Hotel', Icons.hotel_outlined),
     _Category('Festival', Icons.celebration_outlined),
-    _Category('Religi', Icons.mosque_outlined),
   ];
   int _selectedCategory = 0;
 

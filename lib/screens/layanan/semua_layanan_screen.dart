@@ -6,7 +6,7 @@ import 'package:reang_app/screens/layanan/pajak/pajak_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
-import 'package:reang_app/screens/layanan/ibadah/ibadah_landing_screen.dart';
+import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/kerja_yu_screen.dart';
@@ -168,7 +168,7 @@ class SemuaLayananScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const IbadahLandingScreen(),
+                    builder: (context) => const IbadahYuScreen(),
                   ),
                 );
               },

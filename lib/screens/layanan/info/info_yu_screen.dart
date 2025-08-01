@@ -3,8 +3,8 @@ import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
-import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
 import 'package:reang_app/screens/layanan/info/cctv_screen.dart';
+import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
 
 class InfoYuScreen extends StatefulWidget {
   const InfoYuScreen({super.key});
@@ -17,15 +17,18 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
   final ApiService _apiService = ApiService();
   late Future<List<Berita>> _beritaFuture;
 
-  int _selectedTabIndex = 0; // 0: Berita, 1: CCTV, 2: JDIH
-  // PERUBAHAN: State untuk melacak apakah tab sudah pernah dibuka
+  int _selectedTabIndex = 0;
   bool _isCctvInitiated = false;
   bool _isJdihInitiated = false;
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi Berita (satu-satunya yang dimuat di awal)
+    _loadBerita();
+  }
+
+  // PERUBAHAN: Fungsi untuk memuat atau memuat ulang data berita
+  void _loadBerita() {
     timeago.setLocaleMessages('id', timeago.IdMessages());
     _beritaFuture = _apiService.fetchBerita();
   }
@@ -92,9 +95,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
               index: _selectedTabIndex,
               children: [
                 _buildBeritaView(),
-                // WebView hanya akan dibuat jika _isCctvInitiated true
                 _isCctvInitiated ? const CctvView() : Container(),
-                // JDIH hanya akan dibuat jika _isJdihInitiated true
                 _isJdihInitiated ? const JdihScreen() : Container(),
               ],
             ),
@@ -123,7 +124,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
       onTap: () {
         setState(() {
           _selectedTabIndex = index;
-          // PERUBAHAN: Logika untuk "lazy load"
           if (index == 1 && !_isCctvInitiated) {
             _isCctvInitiated = true;
           } else if (index == 2 && !_isJdihInitiated) {
@@ -163,14 +163,21 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        // PERUBAHAN: Menampilkan tampilan error yang lebih baik
         if (snapshot.hasError) {
-          return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
+          return _buildErrorView(
+            context,
+            'Gagal terhubung ke server. Silakan coba lagi nanti.',
+          );
         }
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           final beritaList = snapshot.data!;
           return RefreshIndicator(
-            onRefresh: () async =>
-                setState(() => _beritaFuture = _apiService.fetchBerita()),
+            onRefresh: () async {
+              setState(() {
+                _loadBerita();
+              });
+            },
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: beritaList.length,
@@ -181,8 +188,42 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
             ),
           );
         }
-        return const Center(child: Text('Tidak ada berita tersedia.'));
+        return _buildErrorView(context, 'Tidak ada berita tersedia saat ini.');
       },
+    );
+  }
+
+  // PERUBAHAN: Widget baru untuk menampilkan pesan error dan tombol coba lagi
+  Widget _buildErrorView(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _loadBerita();
+                });
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
