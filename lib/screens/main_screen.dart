@@ -67,7 +67,6 @@ class _MainScreenState extends State<MainScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      // PERBAIKAN: Menambahkan properti ini agar FAB tidak terangkat oleh keyboard
       resizeToAvoidBottomInset: false,
       body: SafeArea(child: _pages.elementAt(_selectedIndex)),
       bottomNavigationBar: BottomAppBar(
@@ -105,7 +104,11 @@ class _MainScreenState extends State<MainScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {},
         backgroundColor: theme.colorScheme.primary,
-        child: const Icon(Icons.add_a_photo_outlined, color: Colors.white),
+        // PERBAIKAN: Menggunakan warna onPrimary dari tema agar dinamis
+        child: Icon(
+          Icons.add_a_photo_outlined,
+          color: theme.colorScheme.onPrimary,
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );

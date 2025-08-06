@@ -12,24 +12,13 @@ class WaktuIbadahView extends StatefulWidget {
 
 class _WaktuIbadahViewState extends State<WaktuIbadahView> {
   final ApiService _apiService = ApiService();
-
-  /// Future yang pertama-tama menginisialisasi locale 'id_ID'
-  /// lalu memanggil API jadwal sholat.
   late Future<Map<String, String>> _jadwalFuture;
 
   @override
   void initState() {
     super.initState();
-
-    // Buat Future gabungan: inisialisasi locale, baru fetch jadwal
     _jadwalFuture = (() async {
-      // Pastikan binding Flutter sudah siap jika dipanggil di luar main()
-      // WidgetsFlutterBinding.ensureInitialized();
-
-      // Inisialisasi data locale untuk 'id_ID'
       await initializeDateFormatting('id_ID', null);
-
-      // Setelah locale siap, panggil API
       return await _apiService.fetchJadwalSholat();
     })();
   }
@@ -45,11 +34,10 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
         if (snapshot.hasError) {
           return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
         }
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text('Tidak ada jadwal tersedia.'));
         }
 
-        // Data sudah ada
         final jadwal = snapshot.data!;
         final List<Map<String, dynamic>> jadwalSholat = [
           {
@@ -89,8 +77,6 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
     List<Map<String, dynamic>> jadwalSholat,
   ) {
     final theme = Theme.of(context);
-
-    // Sekarang locale 'id_ID' sudah ter-initialize
     final String tanggalHariIni = DateFormat(
       'EEEE, d MMMM yyyy',
       'id_ID',
@@ -101,6 +87,7 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
       physics: const BouncingScrollPhysics(),
       children: [
         Card(
+          color: const Color(0xFF2E7D32),
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -113,24 +100,30 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
                   "Jadwal Sholat Hari Ini",
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   tanggalHariIni,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.hintColor,
+                    color: Colors.white.withOpacity(0.8),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.location_on, size: 16, color: theme.hintColor),
+                    // PERBAIKAN: Warna ikon diubah menjadi putih agar kontras
+                    Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       "Indramayu, Indonesia",
-                      style: TextStyle(color: theme.hintColor),
+                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
                     ),
                   ],
                 ),

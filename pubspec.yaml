@@ -111,7 +111,15 @@ flutter:
     - assets/reang.jpg
     - assets/banner.png
     - assets/logo.png
-    - assets/splash.jpg
+    - assets/splash.webp
+    #icon aplikasi
+    - assets/icons/info_yu.webp
+    - assets/icons/sehat_yu.webp
+    - assets/icons/dumas_yu.webp
+    - assets/icons/pasar_yu.webp
+    - assets/icons/sekolah_yu.webp
+    - assets/icons/plesir_yu.webp
+    - assets/icons/ibadah_yu.webp
                           
 
 

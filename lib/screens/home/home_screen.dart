@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
+import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
+import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
@@ -30,24 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Inisialisasi PageController dengan viewportFraction
     _pageController = PageController(
       initialPage: _initialPage,
       viewportFraction: 0.9,
     );
-    // Perbaiki inisialisasi current page
     _current = _initialPage % imgList.length;
-
-    // Mulai auto-scroll setelah frame pertama digambar
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _startAutoScroll();
-      }
+      if (mounted) _startAutoScroll();
     });
   }
 
   void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_pageController.hasClients && _pageController.page != null) {
         int nextPage = _pageController.page!.round() + 1;
         _pageController.animateToPage(
@@ -81,14 +77,14 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 230,
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: null, // Infinite scroll
-                onPageChanged: (int index) {
+                itemCount: null,
+                onPageChanged: (index) {
                   setState(() {
                     _current = index % imgList.length;
                   });
                 },
                 itemBuilder: (context, index) {
-                  final int realIndex = index % imgList.length;
+                  final realIndex = index % imgList.length;
                   return AnimatedBuilder(
                     animation: _pageController,
                     builder: (context, child) {
@@ -130,9 +126,9 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: imgList.asMap().entries.map((entry) {
                 return Container(
-                  width: 8.0,
-                  height: 8.0,
-                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: (isDarkMode ? Colors.white : Colors.black)
@@ -143,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
@@ -168,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GridView.count(
                 crossAxisCount: 4,
                 shrinkWrap: true,
@@ -177,69 +173,90 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.75,
                 children: [
-                  // PERUBAHAN: Menambahkan onTap ke item Dumas-yu
                   _MenuItem(
-                    icon: Icons.campaign_outlined,
+                    assetIcon: 'assets/icons/dumas_yu.webp',
                     label: 'Dumas-yu',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const DumasYuHomeScreen(),
+                          builder: (_) => const DumasYuHomeScreen(),
                         ),
                       );
                     },
                   ),
                   _MenuItem(
-                    icon: Icons.info_outline,
+                    assetIcon: 'assets/icons/info_yu.webp',
                     label: 'Info-yu',
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const InfoYuScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const InfoYuScreen()),
                       );
                     },
                   ),
                   _MenuItem(
-                    icon: Icons.health_and_safety_outlined,
+                    assetIcon: 'assets/icons/sehat_yu.webp',
                     label: 'Sehat-yu',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const SehatYuScreen(),
+                          builder: (_) => const SehatYuScreen(),
                         ),
                       );
                     },
                   ),
-                  _MenuItem(icon: Icons.school_outlined, label: 'Sekolah-yu'),
                   _MenuItem(
-                    icon: Icons.mosque_outlined,
-                    label: 'Ibadah-yu',
+                    assetIcon: 'assets/icons/sekolah_yu.webp',
+                    label: 'Sekolah-yu',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const IbadahYuScreen(),
+                          builder: (_) => const SekolahYuScreen(),
                         ),
                       );
                     },
                   ),
                   _MenuItem(
-                    icon: Icons.beach_access_outlined,
+                    assetIcon: 'assets/icons/ibadah_yu.webp',
+                    label: 'Ibadah-yu',
+                    // PERUBAHAN: Menambahkan imagePadding yang lebih kecil
+                    imagePadding: const EdgeInsets.all(0.0),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const IbadahYuScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _MenuItem(
+                    assetIcon: 'assets/icons/plesir_yu.webp',
                     label: 'Plesir-yu',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const PlesirYuScreen(),
+                          builder: (_) => const PlesirYuScreen(),
                         ),
                       );
                     },
                   ),
-                  _MenuItem(icon: Icons.work_outline, label: 'Kerja-yu'),
+                  _MenuItem(
+                    assetIcon: 'assets/icons/pasar_yu.webp',
+                    label: 'Pasar-yu',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PasarYuScreen(),
+                        ),
+                      );
+                    },
+                  ),
                   _MenuItem(
                     icon: Icons.grid_view,
                     label: 'Semua',
@@ -247,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const SemuaLayananScreen(),
+                          builder: (_) => const SemuaLayananScreen(),
                         ),
                       );
                     },
@@ -264,11 +281,24 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _MenuItem extends StatelessWidget {
-  final IconData icon;
+  final String? assetIcon;
+  final IconData? icon;
   final String label;
   final VoidCallback? onTap;
+  // PERUBAHAN: Menambahkan parameter padding
+  final EdgeInsets? imagePadding;
 
-  const _MenuItem({required this.icon, required this.label, this.onTap});
+  const _MenuItem({
+    this.assetIcon,
+    this.icon,
+    required this.label,
+    this.onTap,
+    // PERUBAHAN: Menambahkan parameter padding
+    this.imagePadding,
+  }) : assert(
+         assetIcon != null || icon != null,
+         'Either assetIcon or icon must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
@@ -283,13 +313,19 @@ class _MenuItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withAlpha(38),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 35),
+            child: assetIcon != null
+                ? Padding(
+                    // PERUBAHAN: Menggunakan imagePadding jika ada, jika tidak, pakai default 8.0
+                    padding: imagePadding ?? const EdgeInsets.all(1.5),
+                    child: Image.asset(assetIcon!, fit: BoxFit.contain),
+                  )
+                : Icon(icon, color: theme.colorScheme.primary, size: 35),
           ),
           const SizedBox(height: 8),
           Text(

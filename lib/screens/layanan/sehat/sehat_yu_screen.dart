@@ -72,11 +72,11 @@ class SehatYuScreen extends StatelessWidget {
             'Temukan informasi dan lokasi fasilitas kesehatan seperti rumah sakit, puskesmas, dan apotek di sekitar Anda. Dapatkan juga edukasi seputar gaya hidup sehat dengan mudah di sini.',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: isDark
-                  ? Colors.white
+                  ? Colors.white.withOpacity(0.9)
                   : theme.colorScheme.onPrimaryContainer,
             ),
           ),
-          // PERUBAHAN: Bagian "Lokasi Anda" dihapus dari sini
+          // Bagian "Lokasi Anda" sudah dihapus sesuai permintaan sebelumnya
         ],
       ),
     );
@@ -319,10 +319,11 @@ class _LayananCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
+        // PERBAIKAN: Menggunakan warna primer dengan opacity agar lebih pekat
+        color: theme.colorScheme.primary.withOpacity(0.15),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 24, color: theme.colorScheme.onPrimaryContainer),
+      child: Icon(icon, size: 24, color: theme.colorScheme.primary),
     );
   }
 

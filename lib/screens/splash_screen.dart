@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: Colors.white,
       body: Center(
         child: Image.asset(
-          'assets/splash.jpg', // Pastikan path ini benar
+          'assets/splash.webp', // Pastikan path ini benar
           width: 300,
         ),
       ),
