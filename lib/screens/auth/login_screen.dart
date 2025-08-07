@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset('assets/reang.jpg', height: 150),
+                Image.asset('assets/wongreang.jpg', height: 150),
                 const SizedBox(height: 2),
                 const Text(
                   'selamat datang di Reang',
@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     // TODO: Google Sign-In
                   },
-                  icon: Image.asset('assets/google_icon.png', height: 24),
+                  icon: Image.asset('assets/google_icon.webp', height: 24),
                   label: const Text('Google'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F2F3),

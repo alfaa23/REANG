@@ -57,12 +57,12 @@ class SehatYuScreen extends StatelessWidget {
   }
 
   Widget _buildInfoLokasi(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
+        // PERBAIKAN: Warna biru pekat digunakan untuk mode terang dan gelap.
+        color: Colors.blue.shade800,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -71,12 +71,10 @@ class SehatYuScreen extends StatelessWidget {
           Text(
             'Temukan informasi dan lokasi fasilitas kesehatan seperti rumah sakit, puskesmas, dan apotek di sekitar Anda. Dapatkan juga edukasi seputar gaya hidup sehat dengan mudah di sini.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: isDark
-                  ? Colors.white.withOpacity(0.9)
-                  : theme.colorScheme.onPrimaryContainer,
+              // PERBAIKAN: Warna teks dibuat putih agar selalu kontras.
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
-          // Bagian "Lokasi Anda" sudah dihapus sesuai permintaan sebelumnya
         ],
       ),
     );
@@ -108,6 +106,7 @@ class SehatYuScreen extends StatelessWidget {
                     icon: Icons.local_hospital_outlined,
                     title: 'Rumah Sakit Terdekat',
                     subtitle: '24 tersedia',
+                    color: Colors.blue,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -116,6 +115,7 @@ class SehatYuScreen extends StatelessWidget {
                     icon: Icons.sports_soccer_outlined,
                     title: 'Tempat Olahraga',
                     subtitle: '12 tersedia',
+                    color: Colors.orange,
                   ),
                 ),
               ],
@@ -127,6 +127,7 @@ class SehatYuScreen extends StatelessWidget {
             title: 'Konsultasi Dokter Berdasarkan Puskesmas',
             subtitle: '8 tersedia',
             isFullWidth: true,
+            color: Colors.teal,
             onTap: () {
               Navigator.push(
                 context,
@@ -275,6 +276,7 @@ class _LayananCard extends StatelessWidget {
   final String subtitle;
   final bool isFullWidth;
   final VoidCallback? onTap;
+  final Color? color;
 
   const _LayananCard({
     required this.icon,
@@ -282,12 +284,19 @@ class _LayananCard extends StatelessWidget {
     required this.subtitle,
     this.isFullWidth = false,
     this.onTap,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cardColor = color ?? theme.cardColor;
+    final contentColor = cardColor.computeLuminance() > 0.5
+        ? Colors.black
+        : Colors.white;
+
     return Card(
+      color: cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: onTap,
@@ -297,17 +306,17 @@ class _LayananCard extends StatelessWidget {
           child: isFullWidth
               ? Row(
                   children: [
-                    _buildIcon(theme),
+                    _buildIcon(theme, contentColor),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildText(theme)),
+                    Expanded(child: _buildText(theme, contentColor)),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildIcon(theme),
+                    _buildIcon(theme, contentColor),
                     const SizedBox(height: 12),
-                    _buildText(theme),
+                    _buildText(theme, contentColor),
                   ],
                 ),
         ),
@@ -315,19 +324,18 @@ class _LayananCard extends StatelessWidget {
     );
   }
 
-  Widget _buildIcon(ThemeData theme) {
+  Widget _buildIcon(ThemeData theme, Color iconColor) {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        // PERBAIKAN: Menggunakan warna primer dengan opacity agar lebih pekat
-        color: theme.colorScheme.primary.withOpacity(0.15),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 24, color: theme.colorScheme.primary),
+      child: Icon(icon, size: 24, color: iconColor),
     );
   }
 
-  Widget _buildText(ThemeData theme) {
+  Widget _buildText(ThemeData theme, Color textColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -336,12 +344,15 @@ class _LayananCard extends StatelessWidget {
           title,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: textColor.withOpacity(0.7),
+          ),
         ),
       ],
     );

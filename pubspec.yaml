@@ -69,26 +69,26 @@ dev_dependencies:
 
 
 
-
+#icon untuk aplikasi
 flutter_launcher_icons:
   android: "launcher_icon" # Nama ikon untuk Android
   ios: true                # Aktifkan untuk iOS
   image_path: "assets/logo.png" # Ganti dengan path logo Anda
   min_sdk_android: 21 # (Opsional) pastikan sesuai dengan minSdk Anda
   
-
+#splash screen
   # Letakkan ini di level paling luar (sejajar dengan name, flutter, dll)
 flutter_native_splash:
   # Warna background untuk splash screen native
   color: "#FFFFFF" # Kode hex untuk warna putih
 
   # Path ke gambar logo Anda
-  image: assets/splash.jpg # Pastikan path ini benar
+  image: assets/wongreang.webp # Pastikan path ini benar
 
   # (Opsional) Mengatur agar ikon status bar (baterai, sinyal) berwarna gelap
   android_12:
     color: "#FFFFFF"
-    image: assets/splash.jpg
+    image: assets/wongreang.webp
     icon_background_color: "#FFFFFF"
 
   # Konfigurasi untuk iOS
@@ -107,11 +107,10 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/google_icon.png
-    - assets/reang.jpg
+    - assets/google_icon.webp
     - assets/banner.png
     - assets/logo.png
-    - assets/splash.webp
+    - assets/wongreang.webp
     #icon aplikasi
     - assets/icons/info_yu.webp
     - assets/icons/sehat_yu.webp

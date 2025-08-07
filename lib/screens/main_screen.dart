@@ -103,12 +103,9 @@ class _MainScreenState extends State<MainScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {},
-        backgroundColor: theme.colorScheme.primary,
+        backgroundColor: const Color(0xFFF08519),
         // PERBAIKAN: Menggunakan warna onPrimary dari tema agar dinamis
-        child: Icon(
-          Icons.add_a_photo_outlined,
-          color: theme.colorScheme.onPrimary,
-        ),
+        child: Icon(Icons.add_a_photo_outlined, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );

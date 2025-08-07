@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
-import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
+import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
@@ -222,7 +222,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   _MenuItem(
                     assetIcon: 'assets/icons/ibadah_yu.webp',
                     label: 'Ibadah-yu',
-                    // PERUBAHAN: Menambahkan imagePadding yang lebih kecil
                     imagePadding: const EdgeInsets.all(0.0),
                     onTap: () {
                       Navigator.push(
@@ -285,7 +284,6 @@ class _MenuItem extends StatelessWidget {
   final IconData? icon;
   final String label;
   final VoidCallback? onTap;
-  // PERUBAHAN: Menambahkan parameter padding
   final EdgeInsets? imagePadding;
 
   const _MenuItem({
@@ -293,7 +291,6 @@ class _MenuItem extends StatelessWidget {
     this.icon,
     required this.label,
     this.onTap,
-    // PERUBAHAN: Menambahkan parameter padding
     this.imagePadding,
   }) : assert(
          assetIcon != null || icon != null,
@@ -313,15 +310,15 @@ class _MenuItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 60,
-            height: 60,
+            // PERBAIKAN: Ukuran lingkaran diperkecil
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withAlpha(38),
               shape: BoxShape.circle,
             ),
             child: assetIcon != null
                 ? Padding(
-                    // PERUBAHAN: Menggunakan imagePadding jika ada, jika tidak, pakai default 8.0
                     padding: imagePadding ?? const EdgeInsets.all(1.5),
                     child: Image.asset(assetIcon!, fit: BoxFit.contain),
                   )
@@ -331,7 +328,12 @@ class _MenuItem extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(color: textColor, fontSize: 14),
+            style: TextStyle(
+              color: textColor,
+              fontSize: 14,
+              // PERBAIKAN: Menggunakan fontWeight.w600 untuk efek "semi-bold"
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
