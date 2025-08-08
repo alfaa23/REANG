@@ -1,31 +1,55 @@
 import 'package:flutter/material.dart';
 
 class DetailEventScreen extends StatelessWidget {
-  const DetailEventScreen({super.key});
+  // final Map<String, dynamic> eventData; // Nanti akan menerima data event
+  const DetailEventScreen({super.key /*, required this.eventData*/});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Data dummy untuk contoh, nanti akan diganti dari eventData
+    const String title = "Kajian Tafsir Al-Quran";
+    const String author = "Kementerian Agama";
+    const String timeAgo = "2 jam lalu";
+    const String date = "Senin, 15 Januari 2024";
+    const String time = "19:30 WIB s/d selesai";
+    const String placeName = "Masjid Al-Ikhlas";
+    const String address = "KAB. Indramayu KEC. Balongan Desa Tegal Lurung";
+    const String description =
+        "- Kajian rutin setiap Senin malam tentang tafsir Al-Qur’an.\n- Terbuka untuk umum, membawa Al-Qur’an pribadi sangat dianjurkan.\n- Disampaikan oleh Ustadz pembimbing dari Kemenag.";
+    const String imagePath =
+        'assets/images/kajian_banner.png'; // Ganti dengan path gambar Anda
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
+          // Header dengan gambar event
           SliverAppBar(
             expandedHeight: 220.0,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                "Kajian Tafsir Al-Quran",
-                style: TextStyle(fontSize: 16),
-              ),
-              background: Container(
-                color:
-                    theme.colorScheme.primary, // Ganti dengan gambar jika ada
-                child: const Center(
-                  child: Icon(Icons.event, color: Colors.white, size: 80),
+              // PERBAIKAN: Judul dihapus dari FlexibleSpaceBar
+              background: Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(
+                  color: theme.colorScheme.primary,
+                  child: Center(
+                    child: Icon(
+                      Icons.event,
+                      color: theme.colorScheme.onPrimary,
+                      size: 80,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
+
+          // Konten utama
           SliverList(
             delegate: SliverChildListDelegate([
               Padding(
@@ -33,80 +57,93 @@ class DetailEventScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.article, size: 18, color: theme.hintColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          "2 jam lalu",
-                          style: TextStyle(color: theme.hintColor),
-                        ),
-                      ],
+                    // PERBAIKAN: Judul dipindahkan ke sini
+                    Text(
+                      title,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
+
+                    // Info Penyelenggara
                     Row(
                       children: [
                         CircleAvatar(
-                          radius: 12,
+                          radius: 20,
                           backgroundColor:
                               theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.corporate_fare,
+                            size: 22,
+                            color: theme.hintColor,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Kementrian Agama",
-                          style: theme.textTheme.bodyMedium,
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              author,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              timeAgo,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.hintColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: theme.dividerColor),
+                    const SizedBox(height: 24),
+
+                    // Kotak Informasi Waktu & Lokasi
+                    Card(
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDetailRow(
-                            theme,
-                            Icons.calendar_month,
-                            "Waktu:",
-                            "Senin, 15 Januari 2024",
-                          ),
-                          _buildDetailRow(
-                            theme,
-                            Icons.access_time,
-                            "",
-                            "19:30 WIB s/d selesai",
-                          ),
-                          const SizedBox(height: 16),
-                          _buildDetailRow(
-                            theme,
-                            Icons.mosque,
-                            "Lokasi:",
-                            "Masjid Al-Ikhlas",
-                          ),
-                          _buildDetailRow(
-                            theme,
-                            Icons.location_on,
-                            "",
-                            "KAB. Indramayu KEC. Balongan Desa Tegal Lurung",
-                          ),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            _buildDetailRow(
+                              theme,
+                              Icons.calendar_month_outlined,
+                              "Waktu",
+                              "$date\n$time",
+                            ),
+                            const Divider(height: 24),
+                            _buildDetailRow(
+                              theme,
+                              Icons.location_on_outlined,
+                              "Lokasi",
+                              "$placeName\n$address",
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+
+                    // Deskripsi
                     Text(
-                      "Deskripsi:",
+                      "Deskripsi",
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "- Kajian rutin setiap Senin malam tentang tafsir Al-Qur’an.\n- Terbuka untuk umum, membawa Al-Qur’an pribadi sangat dianjurkan.\n- Disampaikan oleh Ustadz pembimbing dari Kemenag.",
-                      style: TextStyle(height: 1.5),
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        height: 1.6,
+                        fontSize: 15,
+                      ),
                     ),
                   ],
                 ),
@@ -118,27 +155,38 @@ class DetailEventScreen extends StatelessWidget {
     );
   }
 
+  // Widget helper untuk membuat baris detail yang lebih rapi
   Widget _buildDetailRow(
     ThemeData theme,
     IconData icon,
     String title,
     String value,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: theme.hintColor),
-          const SizedBox(width: 8),
-          if (title.isNotEmpty)
-            Text(
-              "$title ",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          Expanded(child: Text(value)),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: theme.hintColor),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                // PERBAIKAN: Warna diubah dari hintColor dan ukuran disesuaikan
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

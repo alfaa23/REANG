@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-/// Widget ini hanya berisi konten WebView untuk Cek Pajak.
-/// Dibuat terpisah agar bisa "lazy load" (dimuat saat dibutuhkan).
-class CekPajakWebView extends StatefulWidget {
-  const CekPajakWebView({super.key});
+class IzinYuScreen extends StatefulWidget {
+  const IzinYuScreen({super.key});
 
   @override
-  State<CekPajakWebView> createState() => _CekPajakWebViewState();
+  State<IzinYuScreen> createState() => _IzinYuScreenState();
 }
 
-class _CekPajakWebViewState extends State<CekPajakWebView> {
+class _IzinYuScreenState extends State<IzinYuScreen> {
   late final WebViewController _controller;
-  bool _isLoading = true;
+  int _loadingProgress = 0;
   // PERUBAHAN: Menambahkan state untuk menangani error
   bool _hasError = false;
   String _errorMessage = '';
 
-  final String _url = 'https://cekpajak.indramayukab.go.id/portlet.php';
+  final String _url = 'https://simpan-ayu.indramayukab.go.id/';
 
   @override
   void initState() {
@@ -30,24 +28,24 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (url) {
+          onProgress: (progress) {
             if (mounted) {
-              setState(() {
-                _isLoading = true;
-                _hasError = false; // Reset error saat mencoba memuat ulang
-              });
+              setState(() => _loadingProgress = progress);
             }
           },
-          onPageFinished: (url) {
+          onPageStarted: (url) {
             if (mounted) {
-              setState(() => _isLoading = false);
+              // Reset status error setiap kali halaman baru mulai dimuat
+              setState(() {
+                _hasError = false;
+                _loadingProgress = 0;
+              });
             }
           },
           // PERUBAHAN: Menambahkan onWebResourceError untuk menangkap error
           onWebResourceError: (WebResourceError error) {
             if (mounted) {
               setState(() {
-                _isLoading = false;
                 _hasError = true;
                 _errorMessage =
                     'Gagal memuat halaman. Periksa koneksi internet Anda.';
@@ -56,7 +54,7 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
           },
           onNavigationRequest: (request) {
             if (request.url.startsWith(
-              'https://cekpajak.indramayukab.go.id/',
+              'https://simpan-ayu.indramayukab.go.id/',
             )) {
               return NavigationDecision.navigate;
             }
@@ -69,16 +67,45 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
 
   @override
   Widget build(BuildContext context) {
-    // PERUBAHAN: Jika ada error, tampilkan view error. Jika tidak, tampilkan WebView.
-    if (_hasError) {
-      return _buildErrorView(context, _errorMessage);
-    }
-
-    return Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading) const Center(child: CircularProgressIndicator()),
-      ],
+    final theme = Theme.of(context);
+    return WillPopScope(
+      onWillPop: () async {
+        if (await _controller.canGoBack()) {
+          await _controller.goBack();
+          return false;
+        } else {
+          return true;
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Izin-Yu',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Layanan Perizinan Online',
+                style: TextStyle(fontSize: 12, color: theme.hintColor),
+              ),
+            ],
+          ),
+          // Jangan tampilkan progress bar jika ada error
+          bottom: _loadingProgress < 100 && !_hasError
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(4.0),
+                  child: LinearProgressIndicator(value: _loadingProgress / 100),
+                )
+              : null,
+        ),
+        // PERUBAHAN: Tampilkan error view jika _hasError true, jika tidak, tampilkan WebView
+        body: _hasError
+            ? _buildErrorView(context, _errorMessage)
+            : WebViewWidget(controller: _controller),
+      ),
     );
   }
 
@@ -105,7 +132,7 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
               onPressed: () {
                 setState(() {
                   _hasError = false;
-                  _isLoading = true;
+                  _loadingProgress = 0;
                 });
                 _controller.loadRequest(Uri.parse(_url));
               },

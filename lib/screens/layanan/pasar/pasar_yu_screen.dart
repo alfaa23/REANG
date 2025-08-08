@@ -86,7 +86,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
       'Semua',
       'Pasar',
       'Warung',
-      'UKM',
+      'UMKM',
       'Petani',
       'Peternak',
     ];

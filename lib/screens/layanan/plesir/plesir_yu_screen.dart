@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// PERUBAHAN: Import halaman detail plesir
+import 'package:reang_app/screens/layanan/plesir/detail_plesir_screen.dart';
 
 class PlesirYuScreen extends StatefulWidget {
   const PlesirYuScreen({super.key});
@@ -14,6 +16,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
     _Category('Kuliner', Icons.restaurant_outlined),
     _Category('Hotel', Icons.hotel_outlined),
     _Category('Festival', Icons.celebration_outlined),
+    _Category('Religi', Icons.self_improvement_outlined),
   ];
   int _selectedCategory = 0;
 
@@ -207,120 +210,145 @@ class DestinationCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
       color: theme.cardColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            color: color,
-            height: 200,
-            child: Center(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+      child: InkWell(
+        onTap: () {
+          final Map<String, dynamic> destinationData = {
+            'title': title,
+            'name': name,
+            'category': category,
+            'description': description,
+            'admin': admin,
+            'price': price,
+            'location': location,
+            'rating': rating,
+            'color': color.value,
+          };
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              // PERBAIKAN: Mengirim data ke DetailPlesirScreen
+              builder: (context) =>
+                  DetailPlesirScreen(destinationData: destinationData),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              color: color,
+              height: 200,
+              child: Center(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, size: 18, color: Colors.amber),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating.toStringAsFixed(1),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  category,
-                  style: TextStyle(color: theme.hintColor, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 50),
-                  child: Text(
-                    description,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.star, size: 18, color: Colors.amber),
+                          const SizedBox(width: 4),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                const Divider(height: 24),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 9,
-                      backgroundColor: theme.colorScheme.surfaceVariant,
+                  const SizedBox(height: 4),
+                  Text(
+                    category,
+                    style: TextStyle(color: theme.hintColor, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 50),
+                    child: Text(
+                      description,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(admin, style: theme.textTheme.bodyMedium),
-                    ),
-                    if (price.isNotEmpty)
-                      Text(
-                        price,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 9,
+                        backgroundColor: theme.colorScheme.surfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(admin, style: theme.textTheme.bodyMedium),
+                      ),
+                      if (price.isNotEmpty)
+                        Text(
+                          price,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: theme.hintColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          location,
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 18,
-                      color: theme.hintColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(location, style: theme.textTheme.bodyMedium),
-                    ),
-                    TextButton(
-                      onPressed: () {},
-                      style: TextButton.styleFrom(
-                        minimumSize: Size.zero,
-                        padding: EdgeInsets.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      TextButton(
+                        onPressed: () {},
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          "Lihat Detail ›",
+                          style: TextStyle(fontSize: 14),
+                        ),
                       ),
-                      child: const Text(
-                        "Lihat lokasi ›",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

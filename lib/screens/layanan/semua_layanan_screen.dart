@@ -11,6 +11,7 @@ import 'package:reang_app/screens/layanan/renbang/renbang_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/kerja_yu_screen.dart';
 import 'package:reang_app/screens/layanan/wifi/wifi_yu_screen.dart';
+import 'package:reang_app/screens/layanan/izin/izin_yu_screen.dart';
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -212,6 +213,12 @@ class SemuaLayananScreen extends StatelessWidget {
               icon: Icons.description_outlined,
               nama: 'Izin-Yu',
               deskripsi: 'Pengajuan perizinan jadi lebih mudah',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const IzinYuScreen()),
+                );
+              },
             ),
             _buildLayananItem(
               context,
