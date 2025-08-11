@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
-// PERUBAHAN: Import halaman detail laporan
 import 'package:reang_app/screens/layanan/dumas/detail_laporan_screen.dart';
 
 class DumasYuHomeScreen extends StatefulWidget {
-  const DumasYuHomeScreen({Key? key}) : super(key: key);
+  // PERUBAHAN: Menambahkan parameter untuk navigasi langsung
+  final bool bukaLaporanSaya;
+
+  const DumasYuHomeScreen({
+    Key? key,
+    this.bukaLaporanSaya = false, // Defaultnya adalah false (membuka Beranda)
+  }) : super(key: key);
 
   @override
   DumasYuHomeScreenState createState() => DumasYuHomeScreenState();
 }
 
 class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
-  bool isBerandaSelected = true;
+  late bool isBerandaSelected;
 
-  // Data dummy dipindahkan ke sini agar bisa diakses oleh _ReportCard
+  // Data dummy untuk Laporan Terbaru
   final List<Map<String, dynamic>> _laporanTerbaru = const [
     {
       'imagePath': 'assets/images/jalan_rusak.png',
@@ -33,16 +38,31 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
       'statusColor': Colors.green,
       'timeAgo': '5 hari lalu',
     },
-    {
-      'imagePath': 'assets/images/pelayanan.png',
-      'title': 'Pelayanan Lambat di Kelurahan',
-      'category': 'Pelayanan Publik',
-      'address': 'Kantor Kelurahan Paoman',
-      'status': 'Ditolak',
-      'statusColor': Colors.red,
-      'timeAgo': '1 minggu lalu',
-    },
   ];
+
+  // Data dummy untuk Laporan Saya (dibuat bisa diubah)
+  List<Map<String, dynamic>> _laporanSaya = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // PERUBAHAN: Mengatur tab awal berdasarkan parameter
+    isBerandaSelected = !widget.bukaLaporanSaya;
+
+    // Contoh: Isi _laporanSaya dengan data jika ada, atau biarkan kosong
+    // _laporanSaya = []; // Untuk mengetes tampilan kosong
+    _laporanSaya = const [
+      {
+        'imagePath': 'assets/images/laporan_lampu.png',
+        'title': 'Lampu jalan di depan rumah mati total',
+        'category': 'Fasilitas Umum',
+        'address': 'Depan rumah, Jl. Kenanga No. 5',
+        'status': 'Diproses',
+        'statusColor': Colors.orange,
+        'timeAgo': '5 hari lalu',
+      },
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,154 +91,208 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
         ),
         centerTitle: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Toggle Buttons
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isBerandaSelected = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isBerandaSelected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '🏠 Beranda',
-                            style: TextStyle(
-                              color: isBerandaSelected
-                                  ? theme.colorScheme.onPrimary
-                                  : theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => isBerandaSelected = true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isBerandaSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '🏠 Beranda',
+                          style: TextStyle(
+                            color: isBerandaSelected
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isBerandaSelected = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: !isBerandaSelected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '🗒️ Laporan Saya',
-                            style: TextStyle(
-                              color: !isBerandaSelected
-                                  ? theme.colorScheme.onPrimary
-                                  : theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Welcome Card
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                    128,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Selamat Datang di Dumas-Yu',
-                      style: theme.textTheme.titleLarge?.copyWith(
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => isBerandaSelected = false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: !isBerandaSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '🗒️ Laporan Saya',
+                          style: TextStyle(
+                            color: !isBerandaSelected
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: isBerandaSelected ? 0 : 1,
+              children: [
+                _buildBerandaView(theme),
+                _buildLaporanSayaView(theme),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBerandaView(ThemeData theme) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selamat Datang di Dumas-Yu',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Platform pengaduan masyarakat untuk meningkatkan kualitas pelayanan publik dan infrastruktur kota',
+                  style: TextStyle(fontSize: 14, color: theme.hintColor),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FormLaporanScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      '+ Buat Laporan Baru',
+                      style: TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Platform pengaduan masyarakat untuk meningkatkan kualitas pelayanan publik dan infrastruktur kota',
-                      style: TextStyle(fontSize: 14, color: theme.hintColor),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const FormLaporanScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          '+ Buat Laporan Baru',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Laporan Terbaru',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._laporanTerbaru
+              .map((laporan) => _ReportCard(data: laporan))
+              .toList(),
+        ],
+      ),
+    );
+  }
 
-              // Latest Reports
-              const SizedBox(height: 24),
+  // PERUBAHAN: Widget ini sekarang memiliki alternatif jika kosong
+  Widget _buildLaporanSayaView(ThemeData theme) {
+    if (_laporanSaya.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.folder_off_outlined, size: 80, color: theme.hintColor),
+              const SizedBox(height: 16),
               Text(
-                'Laporan Terbaru',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                'Anda belum memiliki laporan',
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
-
-              // Menampilkan daftar laporan dari data di atas
-              ..._laporanTerbaru
-                  .map((laporan) => _ReportCard(data: laporan))
-                  .toList(),
-
+              const SizedBox(height: 8),
+              Text(
+                'Ayo buat laporan pertama Anda untuk membantu meningkatkan layanan publik.',
+                style: TextStyle(color: theme.hintColor),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FormLaporanScreen(),
+                    ),
+                  );
+                },
+                child: const Text('Buat Laporan'),
+              ),
             ],
           ),
         ),
-      ),
+      );
+    }
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        const SizedBox(height: 8),
+        ..._laporanSaya.map((laporan) => _ReportCard(data: laporan)).toList(),
+      ],
     );
   }
 }
 
-// Widget kartu laporan didesain ulang
 class _ReportCard extends StatelessWidget {
   final Map<String, dynamic> data;
   const _ReportCard({required this.data});
@@ -230,7 +304,6 @@ class _ReportCard extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      // PERUBAHAN: Membungkus dengan InkWell untuk navigasi
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -243,7 +316,6 @@ class _ReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gambar Laporan
             Image.asset(
               data['imagePath'],
               height: 140,
@@ -263,13 +335,11 @@ class _ReportCard extends StatelessWidget {
                 );
               },
             ),
-            // Konten Teks
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Baris Kategori dan Status
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -303,7 +373,6 @@ class _ReportCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Judul Laporan
                   Text(
                     data['title'],
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -311,7 +380,6 @@ class _ReportCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Alamat dan Waktu
                   Row(
                     children: [
                       Icon(

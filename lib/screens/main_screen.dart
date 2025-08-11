@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/home/home_screen.dart';
 import 'package:reang_app/screens/profile/profile_screen.dart';
+import 'package:reang_app/screens/notifikasi/notifikasi_screen.dart';
+import 'package:reang_app/screens/aktivitas/aktivitas_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,8 +16,8 @@ class _MainScreenState extends State<MainScreen> {
 
   static final List<Widget> _pages = <Widget>[
     const HomeScreen(),
-    const Center(child: Text('Halaman Aktivitas')),
-    const Center(child: Text('Halaman Notifikasi')),
+    const AktivitasScreen(),
+    const NotifikasiScreen(),
     const ProfileScreen(),
   ];
 

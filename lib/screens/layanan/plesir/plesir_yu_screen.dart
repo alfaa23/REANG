@@ -135,7 +135,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
           category: "Wisata Religi",
           description:
               "Candi Buddha terbesar di dunia dengan arsitektur yang menakjubkan",
-          admin: "Admin Desa",
+          admin: "Dinas Pariwisata",
           price: "Rp 50.000",
           location: "Magelang, Jawa Tengah",
           rating: 4.8,
@@ -148,7 +148,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
           category: "Kuliner Tradisional",
           description:
               "Nikmati kelezatan gudeg khas Yogyakarta yang legendaris",
-          admin: "Admin Desa",
+          admin: "Dinas Pariwisata",
           price: "Rp 30.000",
           location: "Yogyakarta",
           rating: 4.7,
@@ -160,7 +160,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
           name: "Festival Sekaten",
           category: "Festival Budaya",
           description: "Festival tradisional Walisongo di Yogyakarta",
-          admin: "Panitia Sekaten",
+          admin: "Dinas Pariwisata",
           price: "Gratis",
           location: "Alun-alun Utara, Yogyakarta",
           rating: 4.6,
