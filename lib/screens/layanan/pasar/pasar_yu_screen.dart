@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import halaman UpdateHargaPanganScreen
+// Asumsi path ini benar, sesuaikan jika perlu
 import 'package:reang_app/screens/layanan/pasar/update_harga_pangan_screen.dart';
 
 class PasarYuScreen extends StatefulWidget {
@@ -11,11 +11,25 @@ class PasarYuScreen extends StatefulWidget {
 
 class _PasarYuScreenState extends State<PasarYuScreen> {
   int _selectedCategoryIndex = 0;
-  bool _isUpdatingHarga = false; // State untuk loading update harga
+  bool _isUpdatingHarga = false;
+
+  final List<String> _categories = const [
+    'Semua',
+    'Pasar',
+    'Warung',
+    'UMKM',
+    'Petani',
+    'Peternak',
+  ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // PERUBAHAN: Membuat judul rekomendasi menjadi dinamis
+    final String rekomendasiTitle = _selectedCategoryIndex == 0
+        ? 'Rekomendasi untuk Anda'
+        : 'Rekomendasi ${_categories[_selectedCategoryIndex]}';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -25,10 +39,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
           children: [
             const Text(
               'Pasar-yu',
-              style: TextStyle(
-                fontWeight: FontWeight
-                    .bold, // <-- Bagian ini yang membuat teks menjadi tebal
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
             Text(
@@ -43,23 +54,37 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           physics: const BouncingScrollPhysics(),
           children: [
-            _buildCategoryChips(),
+            // PERBAIKAN: Menambahkan kembali judul dan deskripsi "Akses Cepat"
             const SizedBox(height: 16),
-            _buildSearchField(),
+            Text(
+              'Akses Cepat',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Temukan pasar terdekat atau lihat harga pangan terbaru.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
             const SizedBox(height: 16),
             _buildActionButtons(),
             const SizedBox(height: 24),
+            _buildCategoryChips(),
+            const SizedBox(height: 16),
+            _buildSearchField(),
+            const SizedBox(height: 24),
             Text(
-              'Rekomendasi Pasar & Toko Oleh-oleh',
+              rekomendasiTitle, // Menggunakan judul dinamis
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
-            // List pasar dengan desain kartu baru
             _PasarCard(
-              imagePath:
-                  'assets/images/pasar_indramayu.png', // Ganti dengan path gambar Anda
+              imagePath: 'assets/images/pasar_indramayu.png',
               jenis: 'Pasar Daerah',
               name: 'Pasar Indramayu',
               vendorCount: 156,
@@ -67,8 +92,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
             ),
             const SizedBox(height: 16),
             _PasarCard(
-              imagePath:
-                  'assets/images/pasar_sukra.png', // Ganti dengan path gambar Anda
+              imagePath: 'assets/images/pasar_sukra.png',
               jenis: 'Pasar Desa',
               name: 'Pasar Desa Sukra',
               vendorCount: 89,
@@ -82,24 +106,16 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   }
 
   Widget _buildCategoryChips() {
-    final items = const [
-      'Semua',
-      'Pasar',
-      'Warung',
-      'UMKM',
-      'Petani',
-      'Peternak',
-    ];
     return SizedBox(
       height: 36,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: items.length,
+        itemCount: _categories.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final isSelected = i == _selectedCategoryIndex;
           return ChoiceChip(
-            label: Text(items[i]),
+            label: Text(_categories[i]),
             selected: isSelected,
             onSelected: (selected) {
               if (selected) {
@@ -125,9 +141,13 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   }
 
   Widget _buildSearchField() {
+    final String searchHint = _selectedCategoryIndex == 0
+        ? 'Cari di Semua...'
+        : 'Cari di ${_categories[_selectedCategoryIndex]}...';
+
     return TextField(
       decoration: InputDecoration(
-        hintText: 'Cari produk atau vendor...',
+        hintText: searchHint,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         prefixIcon: const Icon(Icons.search),
@@ -181,7 +201,6 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            // PERUBAHAN: Menambahkan navigasi ke halaman Update Harga Pangan
             onPressed: _isUpdatingHarga
                 ? null
                 : () {
