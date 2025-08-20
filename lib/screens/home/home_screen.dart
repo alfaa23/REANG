@@ -315,8 +315,8 @@ class _MenuItem extends StatelessWidget {
         children: [
           Container(
             // KOMENTAR: Ubah nilai width dan height di bawah ini untuk menyesuaikan ukuran lingkaran
-            width: 56,
-            height: 56,
+            width: 55,
+            height: 55,
             decoration: BoxDecoration(
               // KOMENTAR: Ubah warna latar belakang lingkaran di sini
               color: const Color.fromARGB(255, 229, 236, 251),

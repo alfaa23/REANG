@@ -14,7 +14,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  // PERBAIKAN: Menggunakan 'final' karena daftar halaman tidak akan berubah.
   final List<Widget> _pages = <Widget>[
     const HomeScreen(),
     const AktivitasScreen(),
@@ -28,8 +27,10 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  // PERUBAHAN: Menambahkan parameter 'selectedIcon'
   Widget _buildBottomNavItem({
     required IconData icon,
+    required IconData selectedIcon,
     required String label,
     required int index,
   }) {
@@ -49,7 +50,8 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 28),
+              // PERUBAHAN: Menggunakan ikon yang berbeda saat terpilih
+              Icon(isSelected ? selectedIcon : icon, color: color, size: 28),
               Text(
                 label,
                 style: TextStyle(
@@ -71,8 +73,6 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      // PERBAIKAN: Mengganti _pages.elementAt(_selectedIndex) dengan IndexedStack
-      // untuk menjaga state setiap halaman tetap hidup.
       body: SafeArea(
         child: IndexedStack(index: _selectedIndex, children: _pages),
       ),
@@ -87,20 +87,28 @@ class _MainScreenState extends State<MainScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
-              _buildBottomNavItem(icon: Icons.home, label: 'Beranda', index: 0),
+              _buildBottomNavItem(
+                icon: Icons.home_outlined, // Ikon saat tidak aktif
+                selectedIcon: Icons.home, // Ikon saat aktif
+                label: 'Beranda',
+                index: 0,
+              ),
               _buildBottomNavItem(
                 icon: Icons.article_outlined,
+                selectedIcon: Icons.article,
                 label: 'Aktivitas',
                 index: 1,
               ),
               const Expanded(child: SizedBox()), // Placeholder FAB
               _buildBottomNavItem(
                 icon: Icons.notifications_outlined,
+                selectedIcon: Icons.notifications,
                 label: 'Notifikasi',
                 index: 2,
               ),
               _buildBottomNavItem(
                 icon: Icons.person_outline,
+                selectedIcon: Icons.person,
                 label: 'Profil',
                 index: 3,
               ),
