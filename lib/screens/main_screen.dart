@@ -14,7 +14,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  static final List<Widget> _pages = <Widget>[
+  // PERBAIKAN: Menggunakan 'final' karena daftar halaman tidak akan berubah.
+  final List<Widget> _pages = <Widget>[
     const HomeScreen(),
     const AktivitasScreen(),
     const NotifikasiScreen(),
@@ -70,7 +71,11 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: SafeArea(child: _pages.elementAt(_selectedIndex)),
+      // PERBAIKAN: Mengganti _pages.elementAt(_selectedIndex) dengan IndexedStack
+      // untuk menjaga state setiap halaman tetap hidup.
+      body: SafeArea(
+        child: IndexedStack(index: _selectedIndex, children: _pages),
+      ),
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
@@ -106,8 +111,7 @@ class _MainScreenState extends State<MainScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {},
         backgroundColor: const Color(0xFFF08519),
-        // PERBAIKAN: Menggunakan warna onPrimary dari tema agar dinamis
-        child: Icon(Icons.add_a_photo_outlined, color: Colors.white),
+        child: const Icon(Icons.add_a_photo_outlined, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );

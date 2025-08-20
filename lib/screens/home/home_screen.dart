@@ -34,7 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _pageController = PageController(
       initialPage: _initialPage,
-      viewportFraction: 0.9,
+      // PERBAIKAN: Nilai viewportFraction diubah agar gambar slider lebih lebar
+      viewportFraction: 0.95,
     );
     _current = _initialPage % imgList.length;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -98,7 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Transform.scale(scale: scale, child: child);
                     },
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                      // PERBAIKAN: Margin diperkecil agar slider lebih lebar
+                      margin: const EdgeInsets.symmetric(horizontal: 0.0),
                       child: ClipRRect(
                         borderRadius: const BorderRadius.all(
                           Radius.circular(12.0),
@@ -140,13 +142,19 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
+              // PERBAIKAN: Container untuk search bar diubah
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                    128,
-                  ),
+                  color: theme.cardColor, // Dibuat putih/gelap sesuai tema
                   borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: TextField(
                   style: TextStyle(color: theme.textTheme.bodyLarge?.color),
@@ -156,7 +164,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: theme.iconTheme.color?.withAlpha(178),
                     ),
                     hintText: 'Cari Layanan di Reang',
-                    hintStyle: TextStyle(color: theme.hintColor),
+                    // Tulisan dibuat lebih pudar
+                    hintStyle: TextStyle(
+                      color: theme.hintColor.withOpacity(0.4),
+                    ),
                     border: InputBorder.none,
                   ),
                 ),
@@ -174,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 childAspectRatio: 0.75,
                 children: [
                   _MenuItem(
-                    assetIcon: 'assets/icons/dumas_yu.webp',
+                    assetIcon: 'assets/icons/dumas_yu.png',
                     label: 'Dumas-yu',
                     onTap: () {
                       Navigator.push(
@@ -186,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/info_yu.webp',
+                    assetIcon: 'assets/icons/info_yu.png',
                     label: 'Info-yu',
                     onTap: () {
                       Navigator.push(
@@ -196,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/sehat_yu.webp',
+                    assetIcon: 'assets/icons/sehat_yu.png',
                     label: 'Sehat-yu',
                     onTap: () {
                       Navigator.push(
@@ -208,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/sekolah_yu.webp',
+                    assetIcon: 'assets/icons/sekolah_yu.png',
                     label: 'Sekolah-yu',
                     onTap: () {
                       Navigator.push(
@@ -220,9 +231,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/ibadah_yu.webp',
+                    assetIcon: 'assets/icons/ibadah_yu.png',
                     label: 'Ibadah-yu',
-                    imagePadding: const EdgeInsets.all(0.0),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -233,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/plesir_yu.webp',
+                    assetIcon: 'assets/icons/plesir_yu.png',
                     label: 'Plesir-yu',
                     onTap: () {
                       Navigator.push(
@@ -245,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   _MenuItem(
-                    assetIcon: 'assets/icons/pasar_yu.webp',
+                    assetIcon: 'assets/icons/pasar_yu.png',
                     label: 'Pasar-yu',
                     onTap: () {
                       Navigator.push(
@@ -284,18 +294,12 @@ class _MenuItem extends StatelessWidget {
   final IconData? icon;
   final String label;
   final VoidCallback? onTap;
-  final EdgeInsets? imagePadding;
 
-  const _MenuItem({
-    this.assetIcon,
-    this.icon,
-    required this.label,
-    this.onTap,
-    this.imagePadding,
-  }) : assert(
-         assetIcon != null || icon != null,
-         'Either assetIcon or icon must be provided',
-       );
+  const _MenuItem({this.assetIcon, this.icon, required this.label, this.onTap})
+    : assert(
+        assetIcon != null || icon != null,
+        'Either assetIcon or icon must be provided',
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -310,19 +314,21 @@ class _MenuItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            // PERBAIKAN: Ukuran lingkaran diperkecil
-            width: 58,
-            height: 58,
+            // KOMENTAR: Ubah nilai width dan height di bawah ini untuk menyesuaikan ukuran lingkaran
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withAlpha(38),
+              // KOMENTAR: Ubah warna latar belakang lingkaran di sini
+              color: const Color.fromARGB(255, 229, 236, 251),
               shape: BoxShape.circle,
             ),
             child: assetIcon != null
                 ? Padding(
-                    padding: imagePadding ?? const EdgeInsets.all(1.5),
+                    // KOMENTAR: Ubah nilai padding di bawah ini untuk menyesuaikan ukuran gambar di dalam lingkaran
+                    padding: const EdgeInsets.all(5.0),
                     child: Image.asset(assetIcon!, fit: BoxFit.contain),
                   )
-                : Icon(icon, color: theme.colorScheme.primary, size: 35),
+                : Icon(icon, color: Colors.blue.shade800, size: 35),
           ),
           const SizedBox(height: 8),
           Text(
@@ -331,7 +337,6 @@ class _MenuItem extends StatelessWidget {
             style: TextStyle(
               color: textColor,
               fontSize: 14,
-              // PERBAIKAN: Menggunakan fontWeight.w600 untuk efek "semi-bold"
               fontWeight: FontWeight.w500,
             ),
             maxLines: 2,

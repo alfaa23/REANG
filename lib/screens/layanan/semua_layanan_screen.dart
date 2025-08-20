@@ -42,7 +42,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.campaign_outlined,
+              assetIcon: 'assets/icons/dumas_yu.png',
               nama: 'Dumas-Yu',
               deskripsi: 'Lapor masalah di sekitar Anda jadi mudah',
               onTap: () {
@@ -57,7 +57,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.info_outline,
+              assetIcon: 'assets/icons/info_yu.png',
               nama: 'Info-Yu',
               deskripsi: 'Informasi penting dan darurat',
               onTap: () {
@@ -72,7 +72,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.health_and_safety_outlined,
+              assetIcon: 'assets/icons/sehat_yu.png',
               nama: 'Sehat-Yu',
               deskripsi: 'Akses layanan kesehatan terdekat',
               onTap: () {
@@ -87,7 +87,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.school_outlined,
+              assetIcon: 'assets/icons/sekolah_yu.png',
               nama: 'Sekolah-Yu',
               deskripsi: 'Informasi seputar pendidikan',
               onTap: () {
@@ -104,7 +104,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.receipt_long_outlined,
+              assetIcon: 'assets/icons/pajak_yu.png',
               nama: 'Pajak-Yu',
               deskripsi: 'Cek dan bayar tagihan pajak Anda',
               onTap: () {
@@ -119,7 +119,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.storefront_outlined,
+              assetIcon: 'assets/icons/pasar_yu.png',
               nama: 'Pasar-Yu',
               deskripsi: 'Cek harga pangan di pasar terdekat',
               onTap: () {
@@ -134,7 +134,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.work_outline,
+              assetIcon: 'assets/icons/kerja_yu.png',
               nama: 'Kerja-Yu',
               deskripsi: 'Informasi lowongan pekerjaan',
               onTap: () => Navigator.push(
@@ -147,7 +147,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.beach_access_outlined,
+              assetIcon: 'assets/icons/plesir_yu.png',
               nama: 'Plesir-Yu',
               deskripsi: 'Temukan destinasi wisata menarik',
               onTap: () {
@@ -162,7 +162,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.mosque_outlined,
+              assetIcon: 'assets/icons/ibadah_yu.png',
               nama: 'Ibadah-Yu',
               deskripsi: 'Cari lokasi tempat ibadah terdekat',
               onTap: () {
@@ -179,7 +179,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.badge_outlined,
+              assetIcon: 'assets/icons/adminduk_yu.png',
               nama: 'Adminduk-Yu',
               deskripsi: 'Urus dokumen kependudukan Anda',
               onTap: () {
@@ -191,11 +191,10 @@ class SemuaLayananScreen extends StatelessWidget {
                 );
               },
             ),
-            // PERUBAHAN: Menambahkan onTap ke Renbang-Yu
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.construction_outlined,
+              assetIcon: 'assets/icons/renbang_yu.png',
               nama: 'Renbang-Yu',
               deskripsi: 'Partisipasi dalam rencana pembangunan',
               onTap: () {
@@ -210,7 +209,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.description_outlined,
+              assetIcon: 'assets/icons/izin_yu.png',
               nama: 'Izin-Yu',
               deskripsi: 'Pengajuan perizinan jadi lebih mudah',
               onTap: () {
@@ -223,7 +222,7 @@ class SemuaLayananScreen extends StatelessWidget {
             _buildLayananItem(
               context,
               theme: theme,
-              icon: Icons.wifi_outlined,
+              assetIcon: 'assets/icons/wifi_yu.png',
               nama: 'WiFi-Yu',
               deskripsi: 'Temukan titik WiFi publik gratis',
               onTap: () {
@@ -288,23 +287,37 @@ class SemuaLayananScreen extends StatelessWidget {
   Widget _buildLayananItem(
     BuildContext context, {
     required ThemeData theme,
-    required IconData icon,
+    IconData? icon,
+    String? assetIcon,
     required String nama,
     required String deskripsi,
     VoidCallback? onTap,
   }) {
+    assert(
+      icon != null || assetIcon != null,
+      'Either icon or assetIcon must be provided.',
+    );
+
     return Column(
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Container(
-            width: 48,
-            height: 48,
+            // KOMENTAR: Ubah nilai width dan height di bawah ini untuk menyesuaikan ukuran lingkaran
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withAlpha(38),
+              // KOMENTAR: Ubah warna latar belakang lingkaran di sini
+              color: const Color.fromARGB(255, 229, 236, 251),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 28),
+            child: assetIcon != null
+                ? Padding(
+                    // KOMENTAR: Ubah nilai padding di bawah ini untuk menyesuaikan ukuran gambar di dalam lingkaran
+                    padding: const EdgeInsets.all(3.0),
+                    child: Image.asset(assetIcon),
+                  )
+                : Icon(icon, color: theme.colorScheme.primary, size: 28),
           ),
           title: Text(nama),
           subtitle: Text(deskripsi, style: TextStyle(color: theme.hintColor)),

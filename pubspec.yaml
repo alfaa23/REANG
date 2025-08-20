@@ -112,13 +112,24 @@ flutter:
     - assets/logo.png
     - assets/wongreang.webp
     #icon aplikasi
-    - assets/icons/info_yu.webp
-    - assets/icons/sehat_yu.webp
-    - assets/icons/dumas_yu.webp
-    - assets/icons/pasar_yu.webp
-    - assets/icons/sekolah_yu.webp
-    - assets/icons/plesir_yu.webp
-    - assets/icons/ibadah_yu.webp
+    - assets/icons/info_yu.png
+    - assets/icons/sehat_yu.png
+    - assets/icons/dumas_yu.png
+    - assets/icons/pasar_yu.png
+    - assets/icons/sekolah_yu.png
+    - assets/icons/plesir_yu.png
+    - assets/icons/ibadah_yu.png
+    - assets/icons/adminduk_yu.png
+    - assets/icons/izin_yu.png
+    - assets/icons/wifi_yu.png
+    - assets/icons/renbang_yu.png
+    - assets/icons/plesir_yu.png
+    - assets/icons/kerja_yu.png
+    - assets/icons/pajak_yu.png
+
+
+
+
     - assets/aktivitas_laporan.webp
                           
 

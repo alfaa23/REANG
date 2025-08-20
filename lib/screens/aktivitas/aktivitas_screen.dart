@@ -24,7 +24,7 @@ class AktivitasScreen extends StatelessWidget {
               // PERBAIKAN: Ukuran gambar diperbesar
               Image.asset(
                 'assets/aktivitas_laporan.webp', // Pastikan path gambar ini benar
-                width: 230, // Ukuran diperbesar
+                width: 250, // Ukuran diperbesar
                 errorBuilder: (c, e, s) => Icon(
                   Icons.folder_copy_outlined,
                   size: 120,

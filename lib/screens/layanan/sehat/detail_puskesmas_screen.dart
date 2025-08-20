@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import halaman detail dokter
 import 'package:reang_app/screens/layanan/sehat/detail_dokter_screen.dart';
 
 class DetailPuskesmasScreen extends StatefulWidget {
@@ -11,8 +10,8 @@ class DetailPuskesmasScreen extends StatefulWidget {
 }
 
 class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
-  // Data dummy untuk daftar dokter
-  final List<Map<String, dynamic>> _doctorList = const [
+  // Data dummy untuk semua dokter yang ada di puskesmas ini
+  final List<Map<String, dynamic>> _allDoctors = const [
     {
       'nama': 'dr. Sarah Wijaya',
       'spesialis': 'Dokter Umum',
@@ -24,16 +23,39 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
       'spesialis': 'Dokter Gigi',
       'pasienHariIni': 5,
     },
+    {'nama': 'Amelia, S.Gz', 'spesialis': 'Ahli Gizi', 'pasienHariIni': 10},
+    {'nama': 'Siti Aminah, Amd.Keb', 'spesialis': 'Bidan', 'pasienHariIni': 15},
   ];
+
+  // Daftar kategori filter
+  final List<String> _categories = [
+    'Semua',
+    'Dokter Umum',
+    'Dokter Gigi',
+    'Bidan',
+    'Ahli Gizi',
+    'Kesehatan Lingkungan', // Contoh spesialis lain
+  ];
+  int _selectedCategoryIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Logika untuk memfilter dokter berdasarkan kategori yang dipilih
+    final List<Map<String, dynamic>> filteredDoctors;
+    if (_selectedCategoryIndex == 0) {
+      filteredDoctors = _allDoctors; // Tampilkan semua jika 'Semua' dipilih
+    } else {
+      final selectedCategory = _categories[_selectedCategoryIndex];
+      filteredDoctors = _allDoctors
+          .where((doctor) => doctor['spesialis'] == selectedCategory)
+          .toList();
+    }
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        // PERBAIKAN: Menghapus warna header agar mengikuti tema default
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -65,7 +87,7 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
         physics: const BouncingScrollPhysics(),
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -79,46 +101,90 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
                       ),
                     ),
                     Text(
-                      '${_doctorList.length} dokter tersedia',
+                      '${_allDoctors.length} total dokter',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.hintColor,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _buildDropdownFilter(theme),
+                const SizedBox(height: 16),
+                _buildCategoryChips(theme),
               ],
             ),
           ),
-          // Daftar Dokter
-          ..._doctorList.map((doctor) => _DokterCard(data: doctor)).toList(),
+          // PERUBAHAN: Padding ditambahkan di sini agar ada jarak antara filter dan kartu pertama
+          const SizedBox(height: 8),
+          if (filteredDoctors.isEmpty)
+            _buildEmptyDoctorView(theme)
+          else
+            ...filteredDoctors.map((doctor) => _DokterCard(data: doctor)),
 
-          // Informasi Puskesmas
+          const SizedBox(height: 16),
           _buildInfoPuskesmas(theme),
         ],
       ),
     );
   }
 
-  Widget _buildDropdownFilter(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+  // Widget baru untuk filter chips yang bisa di-scroll
+  Widget _buildCategoryChips(ThemeData theme) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _categories.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final isSelected = i == _selectedCategoryIndex;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedCategoryIndex = i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: Text(
+                  _categories[i],
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? theme.colorScheme.onPrimary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: 'Semua Spesialis',
-          isExpanded: true,
-          icon: const Icon(Icons.unfold_more),
-          items: ['Semua Spesialis', 'Dokter Umum', 'Dokter Gigi'].map((
-            String value,
-          ) {
-            return DropdownMenuItem<String>(value: value, child: Text(value));
-          }).toList(),
-          onChanged: (_) {},
+    );
+  }
+
+  // Widget baru untuk tampilan alternatif jika dokter tidak ditemukan
+  Widget _buildEmptyDoctorView(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 16.0),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.person_off_outlined, size: 64, color: theme.hintColor),
+            const SizedBox(height: 16),
+            Text('Dokter tidak ditemukan', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Saat ini tidak ada dokter dengan spesialisasi "${_categories[_selectedCategoryIndex]}" yang tersedia.',
+              style: TextStyle(color: theme.hintColor),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
@@ -214,6 +280,8 @@ class _DokterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -234,7 +302,6 @@ class _DokterCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  // Foto Dokter (placeholder)
                   Container(
                     width: 64,
                     height: 64,
@@ -256,19 +323,23 @@ class _DokterCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
+                        // PERBAIKAN: Mengganti Chip dengan Container agar lebih kecil
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
+                            color: Colors.green.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             data['spesialis'],
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: isDark
+                                  ? Colors.green.shade200
+                                  : Colors.green.shade800,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),

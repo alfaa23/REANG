@@ -427,7 +427,7 @@ class _ArtikelCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        'Baca ›',
+                        'Lihat Selengkapnya ›',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,

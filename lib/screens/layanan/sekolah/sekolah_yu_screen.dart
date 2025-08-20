@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-// PERUBAHAN: Import file view, bukan screen
+
+// Import halaman PPDB
 import 'package:reang_app/screens/layanan/sekolah/ppdb_webview_screen.dart';
+
+// Import halaman Berita Pendidikan
+import 'package:reang_app/screens/layanan/sekolah/berita_pendidikan_view.dart';
 
 class SekolahYuScreen extends StatefulWidget {
   const SekolahYuScreen({super.key});
@@ -11,15 +15,15 @@ class SekolahYuScreen extends StatefulWidget {
 
 class _SekolahYuScreenState extends State<SekolahYuScreen> {
   int _selectedTab = 0;
+
+  // Hapus tab Beasiswa
   final List<Map<String, dynamic>> _tabs = const [
     {'label': 'Cari Sekolah', 'icon': Icons.search},
     {'label': 'PPDB Indramayu', 'icon': Icons.assignment_ind_outlined},
     {'label': 'Berita Pendidikan', 'icon': Icons.article_outlined},
-    {'label': 'Info Beasiswa', 'icon': Icons.card_giftcard_outlined},
   ];
 
   bool _isPpdbInitiated = false;
-  // PERUBAHAN: Menambahkan variabel untuk menyimpan controller dari child
   WebViewController? _ppdbWebViewController;
 
   final List<Map<String, dynamic>> _schools = const [
@@ -73,18 +77,14 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // PERUBAHAN: Membungkus Scaffold dengan WillPopScope
     return WillPopScope(
       onWillPop: () async {
-        // Jika tab PPDB yang aktif dan WebView bisa kembali
         if (_selectedTab == 1 && _ppdbWebViewController != null) {
           if (await _ppdbWebViewController!.canGoBack()) {
-            // Kembali di dalam WebView, dan jangan keluar dari halaman
             await _ppdbWebViewController!.goBack();
             return false;
           }
         }
-        // Jika tidak, izinkan untuk keluar dari halaman
         return true;
       },
       child: Scaffold(
@@ -116,15 +116,13 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                 children: [
                   _buildCariSekolahView(theme),
                   _isPpdbInitiated
-                      // PERUBAHAN: Mengirim callback untuk menerima controller
                       ? PpdbWebView(
                           onControllerCreated: (controller) {
                             _ppdbWebViewController = controller;
                           },
                         )
                       : Container(),
-                  _buildPlaceholderView(_tabs[2]['label'] as String),
-                  _buildPlaceholderView(_tabs[3]['label'] as String),
+                  const BeritaPendidikanView(), // ✅ Panggil view dari file terpisah
                 ],
               ),
             ),
@@ -211,25 +209,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
         const SizedBox(height: 16),
         ..._schools.map((s) => _SchoolCard(data: s)).toList(),
       ],
-    );
-  }
-
-  Widget _buildPlaceholderView(String title) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.construction, size: 64, color: theme.hintColor),
-          const SizedBox(height: 16),
-          Text("Halaman $title", style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            "Fitur ini sedang dalam pengembangan.",
-            style: TextStyle(color: theme.hintColor),
-          ),
-        ],
-      ),
     );
   }
 }
