@@ -4,13 +4,26 @@ class RekomendasiFiturWidget extends StatelessWidget {
   const RekomendasiFiturWidget({super.key});
 
   // Data dummy untuk item rekomendasi
+  // PERUBAHAN: 'icon' diubah menjadi 'imagePath' untuk memanggil gambar dari assets
   final List<Map<String, dynamic>> _rekomendasiItems = const [
-    {'label': 'Pelajar/\nMahasiswa', 'icon': Icons.school_outlined},
-    {'label': 'Pekerja\nKantoran', 'icon': Icons.work_outline_rounded},
-    {'label': 'Pencari\nKerja', 'icon': Icons.person_search_outlined},
-    {'label': 'Wirausaha', 'icon': Icons.storefront_outlined},
-    {'label': 'Ibu Rumah\nTangga', 'icon': Icons.woman_2_outlined},
-    {'label': 'Wisatawan', 'icon': Icons.luggage_outlined},
+    {
+      'label': 'Pelajar/\nMahasiswa',
+      'imagePath': 'assets/rekomendasi/pelajar.webp',
+    },
+    {
+      'label': 'Pekerja\nKantoran',
+      'imagePath': 'assets/rekomendasi/pekerja.webp',
+    },
+    {
+      'label': 'Pencari\nKerja',
+      'imagePath': 'assets/rekomendasi/pencari_kerja.webp',
+    },
+    {'label': 'Wirausaha', 'imagePath': 'assets/rekomendasi/wirausaha.webp'},
+    {
+      'label': 'pengelola Rumah\nTangga',
+      'imagePath': 'assets/rekomendasi/irt.webp',
+    },
+    {'label': 'Wisatawan', 'imagePath': 'assets/rekomendasi/wisatawan.webp'},
   ];
 
   @override
@@ -27,11 +40,17 @@ class RekomendasiFiturWidget extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                // PERBAIKAN: Gradasi biru dibuat lebih terlihat
-                Colors.blue.shade200.withOpacity(0.3),
-                Colors.blue.shade200.withOpacity(0.09),
-              ],
+              colors: theme.brightness == Brightness.dark
+                  ? [
+                      // PERBAIKAN: Pengaturan gradasi untuk MODE GELAP
+                      Colors.white.withOpacity(0.03),
+                      Colors.white.withOpacity(0.02),
+                    ]
+                  : [
+                      // PERBAIKAN: Pengaturan gradasi untuk MODE TERANG
+                      Colors.blue.shade200.withOpacity(0.18),
+                      Colors.blue.shade200.withOpacity(0.05),
+                    ],
             ),
           ),
           child: Padding(
@@ -69,15 +88,25 @@ class RekomendasiFiturWidget extends StatelessWidget {
                             Container(
                               width: 70,
                               height: 70,
+                              clipBehavior:
+                                  Clip.antiAlias, // Untuk memotong gambar
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color:
                                     theme.colorScheme.surfaceContainerHighest,
                               ),
-                              child: Icon(
-                                item['icon'],
-                                size: 32,
-                                color: theme.colorScheme.onSurfaceVariant,
+                              // PERUBAHAN: Icon diganti dengan Image.asset
+                              child: Image.asset(
+                                item['imagePath'],
+                                fit: BoxFit.cover,
+                                // Error builder jika gambar tidak ditemukan
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(
+                                    Icons.person_outline,
+                                    size: 32,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  );
+                                },
                               ),
                             ),
                             const SizedBox(height: 12),

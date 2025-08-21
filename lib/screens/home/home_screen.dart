@@ -16,6 +16,7 @@ import 'package:reang_app/screens/search/search_screen.dart'; // PENAMBAHAN BARU
 // PENAMBAHAN BARU: Import widget banner dan rekomendasi
 import 'package:reang_app/screens/home/widgets/info_banner_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_fitur_widget.dart';
+import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
@@ -233,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // PENAMBAHAN BARU: Atur jarak vertikal antara search bar dan menu ikon di sini
-              const SizedBox(height: 34),
+              const SizedBox(height: 35),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: GridView.count(
@@ -351,6 +352,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const RekomendasiFiturWidget(),
               const SizedBox(height: 32),
               const InfoBannerWidget(),
+              const SizedBox(height: 32),
+              const RekomendasiBeritaWidget(),
 
               // =============================================================
               const SizedBox(height: 24),

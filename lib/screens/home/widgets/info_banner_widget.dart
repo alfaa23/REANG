@@ -24,7 +24,7 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
     super.initState();
     // Lebih rendah untuk menambah gap antar banner (tweak ini jika ingin lebih/kurang)
     _pageController = PageController(
-      viewportFraction: 0.9, // 90% dari lebar layar
+      viewportFraction: 0.95, // 90% dari lebar layar
       initialPage: _currentPage,
     );
     _startAutoScroll();
