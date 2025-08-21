@@ -46,6 +46,7 @@ dependencies:
   timeago: ^3.6.1
   flutter_widget_from_html_core: ^0.16.0
   webview_flutter: ^4.13.0
+  fluttertoast: ^8.2.5
   
 
 dev_dependencies:
@@ -111,6 +112,7 @@ flutter:
     - assets/banner.png
     - assets/logo.png
     - assets/wongreang.webp
+    - assets/coba.jpg
     #icon aplikasi
     - assets/icons/info_yu.png
     - assets/icons/sehat_yu.png

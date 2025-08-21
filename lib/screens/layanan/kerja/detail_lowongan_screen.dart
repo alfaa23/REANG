@@ -78,6 +78,8 @@ class DetailLowonganScreen extends StatelessWidget {
           },
           style: ElevatedButton.styleFrom(
             // PERBAIKAN: Padding diubah agar tombol tidak terlalu besar
+            backgroundColor: const Color(0xFF25D366),
+            foregroundColor: Colors.white, // warna dan teksnya putih
             padding: const EdgeInsets.symmetric(vertical: 14),
             textStyle: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,

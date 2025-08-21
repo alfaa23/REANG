@@ -14,11 +14,7 @@ class _IbadahYuScreenState extends State<IbadahYuScreen> {
   bool _isEventInitiated = false;
   bool _isWaktuInitiated = false;
 
-  final List<String> _tabs = [
-    "Tempat Ibadah",
-    "Event Keagamaan",
-    "Waktu Ibadah",
-  ];
+  final List<String> _tabs = ["Tempat Ibadah", "Event", "Waktu Ibadah"];
 
   @override
   Widget build(BuildContext context) {

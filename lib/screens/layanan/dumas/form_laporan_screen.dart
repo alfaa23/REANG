@@ -73,23 +73,29 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Membuat InputDecoration umum untuk TextField dan Dropdown
+    // PERBAIKAN: Dekorasi untuk box luar dengan shadow
+    final boxDecoration = BoxDecoration(
+      color: theme.cardColor,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: theme.shadowColor.withOpacity(0.08),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+
+    // PERBAIKAN: Dekorasi untuk input field di dalam box (dibuat transparan)
     final inputDecoration = InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: theme.colorScheme.primary),
-      ),
+      fillColor: Colors.transparent,
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      // PERUBAHAN: Menambahkan hintStyle agar lebih samar
+      hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
     );
 
     return Scaffold(
@@ -110,10 +116,13 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
           // Judul Laporan
           Text('Judul Laporan', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          TextField(
-            controller: _jenisController,
-            decoration: inputDecoration.copyWith(
-              hintText: 'Contoh: Jalan Rusak, Sampah Menumpuk',
+          Container(
+            decoration: boxDecoration,
+            child: TextField(
+              controller: _jenisController,
+              decoration: inputDecoration.copyWith(
+                hintText: 'Contoh: Jalan Rusak, Sampah Menumpuk',
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -121,51 +130,50 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
           // Kategori
           Text('Kategori', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          DropdownMenu<String>(
-            initialSelection: _selectedKategori,
-            onSelected: (String? value) {
-              setState(() {
-                _selectedKategori = value;
-              });
-            },
-            expandedInsets: EdgeInsets.zero,
-            hintText: 'Pilih kategori',
-            inputDecorationTheme: InputDecorationTheme(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
+          Container(
+            decoration: boxDecoration,
+            child: DropdownMenu<String>(
+              initialSelection: _selectedKategori,
+              onSelected: (String? value) {
+                setState(() {
+                  _selectedKategori = value;
+                });
+              },
+              expandedInsets: EdgeInsets.zero,
+              hintText: 'Pilih kategori',
+              inputDecorationTheme: InputDecorationTheme(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                filled: true,
+                fillColor: Colors.transparent,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                // PERUBAHAN: Menambahkan hintStyle agar lebih samar
+                hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
               ),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: theme.colorScheme.primary),
-              ),
+              dropdownMenuEntries: _kategoriList.map<DropdownMenuEntry<String>>(
+                (String value) {
+                  return DropdownMenuEntry<String>(value: value, label: value);
+                },
+              ).toList(),
             ),
-            dropdownMenuEntries: _kategoriList.map<DropdownMenuEntry<String>>((
-              String value,
-            ) {
-              return DropdownMenuEntry<String>(value: value, label: value);
-            }).toList(),
           ),
           const SizedBox(height: 24),
 
           // Lokasi Kejadian
           Text('Lokasi Kejadian', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          TextField(
-            controller: _lokasiController,
-            maxLines: 3,
-            decoration: inputDecoration.copyWith(
-              hintText: 'Masukkan alamat atau lokasi kejadian',
+          Container(
+            decoration: boxDecoration,
+            child: TextField(
+              controller: _lokasiController,
+              maxLines: 3,
+              decoration: inputDecoration.copyWith(
+                hintText: 'Masukkan alamat atau lokasi kejadian',
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -178,10 +186,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             child: Container(
               height: 140,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: boxDecoration, // Menggunakan box decoration yang sama
               child: Center(
                 child: _pickedImage == null
                     ? Column(
@@ -220,11 +225,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
           // Deskripsi Laporan
           Text('Deskripsi Laporan', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          TextField(
-            controller: _deskripsiController,
-            maxLines: 4,
-            decoration: inputDecoration.copyWith(
-              hintText: 'Masukan deskripsi laporan dan berikan detail lokasi',
+          Container(
+            decoration: boxDecoration,
+            child: TextField(
+              controller: _deskripsiController,
+              maxLines: 4,
+              decoration: inputDecoration.copyWith(
+                hintText: 'Masukan deskripsi laporan dan berikan detail lokasi',
+              ),
             ),
           ),
           const SizedBox(height: 32),

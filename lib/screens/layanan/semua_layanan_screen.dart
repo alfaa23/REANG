@@ -12,6 +12,7 @@ import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/kerja_yu_screen.dart';
 import 'package:reang_app/screens/layanan/wifi/wifi_yu_screen.dart';
 import 'package:reang_app/screens/layanan/izin/izin_yu_screen.dart';
+import 'package:reang_app/screens/search/search_screen.dart'; // PENAMBAHAN BARU
 
 class SemuaLayananScreen extends StatelessWidget {
   const SemuaLayananScreen({super.key});
@@ -29,7 +30,9 @@ class SemuaLayananScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: _buildSearchBar(theme),
+        // PERBAIKAN: titleSpacing diatur untuk posisi simetris
+        titleSpacing: 0,
+        title: _buildSearchBar(context, theme),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(color: theme.dividerColor, height: 1.0),
@@ -238,24 +241,44 @@ class SemuaLayananScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSearchBar(ThemeData theme) {
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: TextField(
-        style: TextStyle(color: theme.colorScheme.onSurface),
-        decoration: InputDecoration(
-          hintText: 'Cari Layanan di Reang',
-          hintStyle: TextStyle(color: theme.hintColor),
-          prefixIcon: Icon(Icons.search, color: theme.hintColor),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 10,
-            horizontal: 4,
-          ),
+  // PERBAIKAN: Search bar diubah menjadi tombol navigasi
+  Widget _buildSearchBar(BuildContext context, ThemeData theme) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SearchScreen()),
+        );
+      },
+      child: Container(
+        height: 40,
+        // PERBAIKAN: Margin ditambahkan untuk memberi jarak dari tepi
+        margin: const EdgeInsets.only(right: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: theme.shadowColor.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search, color: theme.hintColor),
+            const SizedBox(width: 8),
+            Text(
+              'Cari Layanan di Reang',
+              // PERUBAHAN: TextStyle disesuaikan seperti di HomeScreen
+              style: TextStyle(
+                color: theme.hintColor.withOpacity(0.4),
+                fontSize: 15.0,
+              ),
+            ),
+          ],
         ),
       ),
     );
