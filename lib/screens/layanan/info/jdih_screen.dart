@@ -17,6 +17,7 @@ class _JdihScreenState extends State<JdihScreen> {
   List<PeraturanHukum> _allPeraturan = [];
   int _selectedFilter = 0;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode(); // PENAMBAHAN BARU
   String _searchQuery = '';
 
   final List<String> _filters = ['Semua', 'Perbup', 'Perda', 'Perdes'];
@@ -27,7 +28,6 @@ class _JdihScreenState extends State<JdihScreen> {
     _loadJdihData();
   }
 
-  // PERUBAHAN: Fungsi untuk memuat atau memuat ulang data JDIH
   void _loadJdihData() {
     _jdihFuture = _apiService.fetchJdih();
   }
@@ -35,7 +35,13 @@ class _JdihScreenState extends State<JdihScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.dispose(); // PENAMBAHAN BARU
     super.dispose();
+  }
+
+  // PENAMBAHAN BARU: Helper untuk unfocus global
+  void _unfocusGlobal() {
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   @override
@@ -46,7 +52,6 @@ class _JdihScreenState extends State<JdihScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        // PERUBAHAN: Menampilkan tampilan error yang lebih baik
         if (snapshot.hasError) {
           return _buildErrorView(
             context,
@@ -92,79 +97,107 @@ class _JdihScreenState extends State<JdihScreen> {
     String searchHint,
   ) {
     final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          'Peraturan Perundang-undangan',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Temukan dan akses dokumen hukum resmi Kabupaten Indramayu',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value;
-            });
-          },
-          decoration: InputDecoration(
-            hintText: searchHint,
-            prefixIcon: const Icon(Icons.search),
-            filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+    // PENAMBAHAN BARU: GestureDetector untuk menangani unfocus
+    return GestureDetector(
+      onTap: _unfocusGlobal,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          const SizedBox(height: 16),
+          Text(
+            'Peraturan Perundang-undangan',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 36,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _filters.length,
-            separatorBuilder: (c, i) => const SizedBox(width: 8),
-            itemBuilder: (c, i) {
-              final selected = i == _selectedFilter;
-              return ChoiceChip(
-                label: Text(_filters[i]),
-                selected: selected,
-                onSelected: (val) {
-                  setState(() {
-                    _selectedFilter = i;
-                  });
-                },
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                selectedColor: theme.colorScheme.primary,
-                labelStyle: TextStyle(
-                  color: selected
-                      ? theme.colorScheme.onPrimary
-                      : theme.colorScheme.onSurface,
-                ),
-                showCheckmark: false,
-              );
-            },
+          const SizedBox(height: 6),
+          Text(
+            'Temukan dan akses dokumen hukum resmi Kabupaten Indramayu',
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           ),
-        ),
-        const SizedBox(height: 16),
-        ...peraturanList
-            .map((item) => _PeraturanCard(peraturan: item))
-            .toList(),
-      ],
+          const SizedBox(height: 16),
+          // PERBAIKAN: Tampilan search bar diubah
+          Container(
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              focusNode: _searchFocus,
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: searchHint,
+                prefixIcon: Icon(Icons.search, color: theme.hintColor),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _filters.length,
+              separatorBuilder: (c, i) => const SizedBox(width: 8),
+              itemBuilder: (c, i) {
+                final selected = i == _selectedFilter;
+                return ChoiceChip(
+                  label: Text(_filters[i]),
+                  selected: selected,
+                  onSelected: (val) {
+                    _unfocusGlobal(); // Unfocus saat filter dipilih
+                    setState(() {
+                      _selectedFilter = i;
+                    });
+                  },
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  selectedColor: theme.colorScheme.primary,
+                  labelStyle: TextStyle(
+                    color: selected
+                        ? theme.colorScheme.onPrimary
+                        : theme.colorScheme.onSurface,
+                  ),
+                  showCheckmark: false,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...peraturanList
+              .map(
+                (item) => _PeraturanCard(
+                  peraturan: item,
+                  onTap: () {
+                    _unfocusGlobal(); // Unfocus sebelum pindah halaman
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailJdihScreen(peraturan: item),
+                      ),
+                    );
+                  },
+                ),
+              )
+              .toList(),
+        ],
+      ),
     );
   }
 
-  // PERUBAHAN: Widget baru untuk menampilkan pesan error dan tombol coba lagi
   Widget _buildErrorView(BuildContext context, String message) {
     final theme = Theme.of(context);
     return Center(
@@ -201,7 +234,8 @@ class _JdihScreenState extends State<JdihScreen> {
 
 class _PeraturanCard extends StatelessWidget {
   final PeraturanHukum peraturan;
-  const _PeraturanCard({required this.peraturan});
+  final VoidCallback onTap; // PENAMBAHAN BARU
+  const _PeraturanCard({required this.peraturan, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -211,14 +245,7 @@ class _PeraturanCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DetailJdihScreen(peraturan: peraturan),
-            ),
-          );
-        },
+        onTap: onTap, // Menggunakan onTap dari parent
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.all(16),

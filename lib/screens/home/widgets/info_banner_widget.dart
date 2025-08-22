@@ -57,7 +57,7 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
     return Column(
       children: [
         SizedBox(
-          height: 170,
+          height: 150,
           child: PageView.builder(
             controller: _pageController,
             itemCount: itemCount,

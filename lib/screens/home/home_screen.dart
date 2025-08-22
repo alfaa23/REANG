@@ -37,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _current = 0;
   static const int _initialPage = 3000;
 
+  // PERBAIKAN: Variabel baru untuk melacak indeks halaman saat ini dengan aman
+  int _currentPageIndex = _initialPage;
+
   // PERUBAHAN: Variabel untuk logika keluar diubah menjadi boolean
   bool _isExitPressed = false;
 
@@ -54,10 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // PERBAIKAN: Logika auto-scroll diubah agar tidak menyebabkan error
   void _startAutoScroll() {
     _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
-      if (_pageController.hasClients && _pageController.page != null) {
-        int nextPage = _pageController.page!.round() + 1;
+      if (_pageController.hasClients) {
+        // Menggunakan state _currentPageIndex yang aman, bukan _pageController.page
+        int nextPage = _currentPageIndex + 1;
         _pageController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 400),
@@ -72,6 +77,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _timer.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  // PENAMBAHAN BARU: Fungsi untuk menangani refresh
+  Future<void> _handleRefresh() async {
+    // Tambahkan logika pembaruan data Anda di sini
+    // Contoh: memuat ulang data berita, dll.
+    await Future.delayed(const Duration(seconds: 2));
+    // Panggil setState jika ada data yang perlu diperbarui di UI
+    setState(() {});
   }
 
   @override
@@ -114,250 +128,260 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         }
       },
-      child: Material(
-        color: theme.scaffoldBackgroundColor,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 230,
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: null,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _current = index % imgList.length;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final realIndex = index % imgList.length;
-                    return AnimatedBuilder(
-                      animation: _pageController,
-                      builder: (context, child) {
-                        double scale = 1.0;
-                        if (_pageController.hasClients) {
-                          double page =
-                              _pageController.page ?? _initialPage.toDouble();
-                          double value = (page - index).abs();
-                          scale = max(0.85, 1 - value * 0.3);
-                        }
-                        return Transform.scale(scale: scale, child: child);
+      child: SafeArea(
+        top: false,
+        child: Material(
+          color: theme.scaffoldBackgroundColor,
+          child: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 230,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: null,
+                      onPageChanged: (index) {
+                        setState(() {
+                          // PERBAIKAN: Memperbarui kedua state indeks
+                          _currentPageIndex = index;
+                          _current = index % imgList.length;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final realIndex = index % imgList.length;
+                        return AnimatedBuilder(
+                          animation: _pageController,
+                          builder: (context, child) {
+                            double scale = 1.0;
+                            if (_pageController.hasClients &&
+                                _pageController.position.hasPixels) {
+                              double page =
+                                  _pageController.page ??
+                                  _initialPage.toDouble();
+                              double value = (page - index).abs();
+                              scale = max(0.85, 1 - value * 0.3);
+                            }
+                            return Transform.scale(scale: scale, child: child);
+                          },
+                          child: Container(
+                            // PERBAIKAN: Margin diperkecil agar slider lebih lebar
+                            margin: const EdgeInsets.symmetric(horizontal: 0.0),
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(12.0),
+                              ),
+                              child: Image.asset(
+                                imgList[realIndex],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[800],
+                                    child: const Center(
+                                      child: Text('Gagal memuat gambar'),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: imgList.asMap().entries.map((entry) {
+                      return Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: (isDarkMode ? Colors.white : Colors.black)
+                              .withOpacity(_current == entry.key ? 0.9 : 0.4),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GestureDetector(
+                      onTap: () {
+                        // Navigasi ke SearchScreen saat di-tap
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SearchScreen(),
+                          ),
+                        );
                       },
                       child: Container(
-                        // PERBAIKAN: Margin diperkecil agar slider lebih lebar
-                        margin: const EdgeInsets.symmetric(horizontal: 0.0),
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(12.0),
-                          ),
-                          child: Image.asset(
-                            imgList[realIndex],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[800],
-                                child: const Center(
-                                  child: Text('Gagal memuat gambar'),
-                                ),
-                              );
-                            },
-                          ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              theme.cardColor, // Dibuat putih/gelap sesuai tema
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.shadowColor.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.search,
+                              color: theme.iconTheme.color?.withAlpha(178),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Cari Layanan di Reang',
+                              style: TextStyle(
+                                color: theme.hintColor.withOpacity(0.4),
+                                fontSize: 15.0,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: imgList.asMap().entries.map((entry) {
-                  return Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: (isDarkMode ? Colors.white : Colors.black)
-                          .withOpacity(_current == entry.key ? 0.9 : 0.4),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GestureDetector(
-                  onTap: () {
-                    // Navigasi ke SearchScreen saat di-tap
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SearchScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor, // Dibuat putih/gelap sesuai tema
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.shadowColor.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
+                  ),
+                  // PENAMBAHAN BARU: Atur jarak vertikal antara search bar dan menu ikon di sini
+                  const SizedBox(height: 35),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GridView.count(
+                      crossAxisCount: 4,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.75,
                       children: [
-                        Icon(
-                          Icons.search,
-                          color: theme.iconTheme.color?.withAlpha(178),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/dumas_yu.png',
+                          label: 'Dumas-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DumasYuHomeScreen(),
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Cari Layanan di Reang',
-                          style: TextStyle(
-                            color: theme.hintColor.withOpacity(0.4),
-                            fontSize: 15.0,
-                          ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/info_yu.png',
+                          label: 'Info-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const InfoYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/sehat_yu.png',
+                          label: 'Sehat-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SehatYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/sekolah_yu.png',
+                          label: 'Sekolah-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SekolahYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/ibadah_yu.png',
+                          label: 'Ibadah-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IbadahYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/plesir_yu.png',
+                          label: 'Plesir-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PlesirYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          assetIcon: 'assets/icons/pasar_yu.png',
+                          label: 'Pasar-yu',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PasarYuScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.grid_view,
+                          label: 'Semua',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SemuaLayananScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-              // PENAMBAHAN BARU: Atur jarak vertikal antara search bar dan menu ikon di sini
-              const SizedBox(height: 35),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.count(
-                  crossAxisCount: 4,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.75,
-                  children: [
-                    _MenuItem(
-                      assetIcon: 'assets/icons/dumas_yu.png',
-                      label: 'Dumas-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DumasYuHomeScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/info_yu.png',
-                      label: 'Info-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const InfoYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/sehat_yu.png',
-                      label: 'Sehat-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SehatYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/sekolah_yu.png',
-                      label: 'Sekolah-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SekolahYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/ibadah_yu.png',
-                      label: 'Ibadah-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const IbadahYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/plesir_yu.png',
-                      label: 'Plesir-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PlesirYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      assetIcon: 'assets/icons/pasar_yu.png',
-                      label: 'Pasar-yu',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PasarYuScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.grid_view,
-                      label: 'Semua',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SemuaLayananScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
 
-              // =============================================================
-              // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
-              // =============================================================
-              const SizedBox(height: 10),
-              const RekomendasiFiturWidget(),
-              const SizedBox(height: 32),
-              const InfoBannerWidget(),
-              const SizedBox(height: 32),
-              const RekomendasiBeritaWidget(),
+                  // =============================================================
+                  // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
+                  // =============================================================
+                  const SizedBox(height: 10),
+                  const RekomendasiFiturWidget(),
+                  const SizedBox(height: 32),
+                  const InfoBannerWidget(),
+                  const SizedBox(height: 32),
+                  const RekomendasiBeritaWidget(),
 
-              // =============================================================
-              const SizedBox(height: 24),
-            ],
+                  // =============================================================
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
           ),
         ),
       ),

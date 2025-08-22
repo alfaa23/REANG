@@ -120,90 +120,231 @@ class _TempatIbadahView extends StatefulWidget {
 
 class _TempatIbadahViewState extends State<_TempatIbadahView> {
   int _selectedAgama = 0;
-  final List<String> _agamaFilters = [
-    "Semua",
-    "Islam",
-    "Kristen",
-    "Buddha",
-    "Hindu",
+  // PERBAIKAN: Tipe data diubah dari List<String> menjadi List<Map<String, String>>
+  final List<Map<String, String>> _agamaFilters = [
+    {"nama": "Semua", "jenis": "Tempat Ibadah"},
+    {"nama": "Islam", "jenis": "Masjid"},
+    {"nama": "Kristen", "jenis": "Gereja"},
+    {"nama": "Buddha", "jenis": "Vihara"},
+    {"nama": "Hindu", "jenis": "Pura"},
   ];
+
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  String _searchQuery = '';
+
+  final List<Map<String, dynamic>> _allTempatIbadah = [
+    {
+      'nama': 'Masjid Agung Indramayu',
+      'alamat': 'Jl. Jenderal Sudirman No. 12, Indramayu',
+      'agama': 'Islam',
+    },
+    {
+      'nama': 'Gereja Kristen Pasundan',
+      'alamat': 'Jl. Kartini No. 5, Indramayu',
+      'agama': 'Kristen',
+    },
+    {
+      'nama': 'Vihara Dharma Rahayu',
+      'alamat': 'Jl. Cimanuk No. 150, Indramayu',
+      'agama': 'Buddha',
+    },
+    {
+      'nama': 'Masjid Jami Al-Istiqomah',
+      'alamat': 'Jl. Raya Jatibarang No. 201, Jatibarang',
+      'agama': 'Islam',
+    },
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _unfocusGlobal() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        Text(
-          "Cari Tempat Ibadah Terdekat",
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+
+    // Logika filter diterapkan di sini
+    List<Map<String, dynamic>> filteredList = _allTempatIbadah;
+    if (_selectedAgama != 0) {
+      filteredList = _allTempatIbadah
+          .where(
+            (item) => item['agama'] == _agamaFilters[_selectedAgama]['nama'],
+          )
+          .toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      filteredList = filteredList
+          .where(
+            (item) =>
+                item['nama'].toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ) ||
+                item['alamat'].toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ),
+          )
+          .toList();
+    }
+
+    return GestureDetector(
+      onTap: _unfocusGlobal,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          Text(
+            "Cari Tempat Ibadah Terdekat",
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          childAspectRatio: 3 / 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: const [
-            _IbadahCard(
-              title: "Masjid Terdekat",
-              emoji: "🕌",
-              color: Colors.green,
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            childAspectRatio: 3 / 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: const [
+              _IbadahCard(
+                title: "Masjid Terdekat",
+                emoji: "🕌",
+                color: Colors.green,
+              ),
+              _IbadahCard(
+                title: "Gereja Terdekat",
+                emoji: "⛪",
+                color: Colors.blue,
+              ),
+              _IbadahCard(
+                title: "Vihara Terdekat",
+                emoji: "🏛️",
+                color: Colors.orange,
+              ),
+              _IbadahCard(
+                title: "Pura Terdekat",
+                emoji: "🛕",
+                color: Colors.pink,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            _IbadahCard(
-              title: "Gereja Terdekat",
-              emoji: "⛪",
-              color: Colors.blue,
+            child: TextField(
+              focusNode: _searchFocus,
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Cari berdasarkan nama atau lokasi...",
+                prefixIcon: Icon(Icons.search, color: theme.hintColor),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
             ),
-            _IbadahCard(
-              title: "Vihara Terdekat",
-              emoji: "🏛️",
-              color: Colors.orange,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _agamaFilters.length,
+              separatorBuilder: (c, i) => const SizedBox(width: 8),
+              itemBuilder: (c, i) {
+                return ChoiceChip(
+                  // PERBAIKAN: Mengakses kunci 'nama' dari map
+                  label: Text(_agamaFilters[i]['nama']!),
+                  selected: _selectedAgama == i,
+                  onSelected: (selected) {
+                    _unfocusGlobal();
+                    if (selected) setState(() => _selectedAgama = i);
+                  },
+                );
+              },
             ),
-            _IbadahCard(
-              title: "Pura Terdekat",
-              emoji: "🛕",
-              color: Colors.pink,
+          ),
+          const SizedBox(height: 24),
+
+          // PERBAIKAN: Menampilkan daftar hasil filter atau pesan alternatif
+          if (filteredList.isNotEmpty)
+            ...filteredList.map(
+              (data) => _MasjidCard(
+                data: data,
+                onTap: () {
+                  _unfocusGlobal();
+                },
+              ),
+            )
+          else
+            _buildEmptyState(theme),
+        ],
+      ),
+    );
+  }
+
+  // PENAMBAHAN BARU: Widget untuk menampilkan pesan saat data kosong
+  Widget _buildEmptyState(ThemeData theme) {
+    String title;
+    String subtitle;
+
+    if (_searchQuery.isNotEmpty) {
+      // Jika kosong karena pencarian
+      title = 'Maaf, pencarianmu tidak ada';
+      subtitle = 'Coba cek ulang penulisan atau\ngunakan kata kunci lainnya.';
+    } else {
+      // Jika kosong karena filter
+      // PERBAIKAN: Mengakses kunci 'jenis' dari map
+      final jenis = _agamaFilters[_selectedAgama]['jenis'];
+      title = 'Data $jenis Belum Tersedia';
+      subtitle =
+          'Saat ini data untuk $jenis di Indramayu\nbelum terdaftar di sistem kami.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 48.0),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.search_off_rounded, size: 64, color: theme.hintColor),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        // Search bar langsung di bawah gridview
-        TextField(
-          decoration: InputDecoration(
-            hintText: "Cari berdasarkan nama atau lokasi...",
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Filter Agama sekarang bisa di-scroll ke samping
-        SizedBox(
-          height: 36,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _agamaFilters.length,
-            separatorBuilder: (c, i) => const SizedBox(width: 8),
-            itemBuilder: (c, i) {
-              return ChoiceChip(
-                label: Text(_agamaFilters[i]),
-                selected: _selectedAgama == i,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedAgama = i);
-                },
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        const _MasjidCard(),
-      ],
+      ),
     );
   }
 }
@@ -240,9 +381,10 @@ class _IbadahCard extends StatelessWidget {
   }
 }
 
-// Widget baru untuk Kartu Masjid Gedhe
 class _MasjidCard extends StatelessWidget {
-  const _MasjidCard();
+  final Map<String, dynamic> data;
+  final VoidCallback onTap;
+  const _MasjidCard({required this.data, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -251,99 +393,83 @@ class _MasjidCard extends StatelessWidget {
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              Container(
-                height: 160,
-                width: double.infinity,
-                decoration: const BoxDecoration(color: Colors.purple),
-                alignment: Alignment.center,
-                child: const Text(
-                  "Masjid Gedhe",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    "6 jam lalu",
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                Text(
-                  "Masjid Gedhe Kauman",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Container(
+                  height: 160,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.mosque,
+                    size: 64,
+                    color: theme.colorScheme.onPrimaryContainer.withOpacity(
+                      0.5,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  "Jl. Katedral No.7B, Jakarta Pusat",
-                  style: TextStyle(color: theme.hintColor),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    const SizedBox(width: 8),
-                    Text("Admin Desa", style: theme.textTheme.bodyMedium),
-                    const Spacer(),
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 16,
-                      color: theme.hintColor,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Yogyakarta",
-                      style: TextStyle(color: theme.hintColor),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Text(
-                    "Lihat detail",
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
+                    child: Text(
+                      data['agama'],
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data['nama'],
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    data['alamat'],
+                    style: TextStyle(color: theme.hintColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Text(
+                      "Lihat Lokasi", // PERBAIKAN: Teks diubah
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
