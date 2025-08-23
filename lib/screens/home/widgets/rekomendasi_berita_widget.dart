@@ -58,7 +58,7 @@ class _RekomendasiBeritaWidgetState extends State<RekomendasiBeritaWidget> {
             }
 
             // Jika data berhasil didapat, ambil 2 berita pertama
-            final List<Berita> beritaList = snapshot.data!.take(2).toList();
+            final List<Berita> beritaList = snapshot.data!.take(3).toList();
 
             return Column(
               children: beritaList

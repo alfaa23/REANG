@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class SilelakerjaView extends StatefulWidget {
-  // PENAMBAHAN BARU: Callback untuk mengirim controller ke parent
+  // Callback untuk mengirim controller ke parent
   final Function(WebViewController)? onWebViewCreated;
 
   const SilelakerjaView({super.key, this.onWebViewCreated});
@@ -11,12 +11,17 @@ class SilelakerjaView extends StatefulWidget {
   State<SilelakerjaView> createState() => _SilelakerjaViewState();
 }
 
-class _SilelakerjaViewState extends State<SilelakerjaView> {
+class _SilelakerjaViewState extends State<SilelakerjaView>
+    with AutomaticKeepAliveClientMixin {
   late final WebViewController _controller;
   bool _isLoading = true;
   bool _hasError = false;
 
   final String _url = 'https://silelakerjayu.indramayukab.go.id/';
+
+  // Ini memberitahu Flutter untuk menjaga state widget ini tetap hidup.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -34,6 +39,7 @@ class _SilelakerjaViewState extends State<SilelakerjaView> {
             _hasError = false;
           }),
           onPageFinished: (url) => setState(() => _isLoading = false),
+          // PERBAIKAN: Menggunakan onWebResourceError yang sesuai dengan versi package Anda
           onWebResourceError: (error) => setState(() {
             _isLoading = false;
             _hasError = true;
@@ -42,12 +48,15 @@ class _SilelakerjaViewState extends State<SilelakerjaView> {
       )
       ..loadRequest(Uri.parse(_url));
 
-    // PENAMBAHAN BARU: Kirim controller ke parent setelah dibuat
+    // Kirim controller ke parent setelah dibuat
     widget.onWebViewCreated?.call(_controller);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Panggil super.build(context) yang merupakan syarat dari mixin
+    super.build(context);
+
     if (_hasError) {
       return _buildErrorView(context);
     }

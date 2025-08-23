@@ -20,8 +20,8 @@ import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
 
 final List<String> imgList = [
   'assets/banner.png',
-  'assets/banner_2.png',
-  'assets/banner_3.png',
+  'assets-banner_2.png',
+  'assets-banner_3.png',
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -42,6 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // PERUBAHAN: Variabel untuk logika keluar diubah menjadi boolean
   bool _isExitPressed = false;
+
+  // PENAMBAHAN BARU: Kunci unik untuk me-refresh widget anak
+  Key _rekomendasiFiturKey = UniqueKey();
+  Key _infoBannerKey = UniqueKey();
+  Key _rekomendasiBeritaKey = UniqueKey();
 
   @override
   void initState() {
@@ -82,10 +87,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // PENAMBAHAN BARU: Fungsi untuk menangani refresh
   Future<void> _handleRefresh() async {
     // Tambahkan logika pembaruan data Anda di sini
-    // Contoh: memuat ulang data berita, dll.
     await Future.delayed(const Duration(seconds: 2));
-    // Panggil setState jika ada data yang perlu diperbarui di UI
-    setState(() {});
+    // PERBAIKAN: Perbarui kunci untuk memaksa widget anak dibuat ulang
+    setState(() {
+      _rekomendasiFiturKey = UniqueKey();
+      _infoBannerKey = UniqueKey();
+      _rekomendasiBeritaKey = UniqueKey();
+    });
   }
 
   @override
@@ -371,11 +379,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
                   // =============================================================
                   const SizedBox(height: 10),
-                  const RekomendasiFiturWidget(),
+                  // PERBAIKAN: Memberikan Key agar widget ikut refresh
+                  RekomendasiFiturWidget(key: _rekomendasiFiturKey),
                   const SizedBox(height: 32),
-                  const InfoBannerWidget(),
+                  InfoBannerWidget(key: _infoBannerKey),
                   const SizedBox(height: 32),
-                  const RekomendasiBeritaWidget(),
+                  RekomendasiBeritaWidget(key: _rekomendasiBeritaKey),
 
                   // =============================================================
                   const SizedBox(height: 24),

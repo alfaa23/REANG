@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/screens/home/widgets/rekomendasi_detail_screen.dart'; // PENAMBAHAN BARU
 
 class RekomendasiFiturWidget extends StatelessWidget {
   const RekomendasiFiturWidget({super.key});
@@ -80,45 +81,59 @@ class RekomendasiFiturWidget extends StatelessWidget {
                     itemCount: _rekomendasiItems.length,
                     itemBuilder: (context, index) {
                       final item = _rekomendasiItems[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 24.0),
-                        child: Column(
-                          children: [
-                            // Lingkaran untuk ikon/gambar
-                            Container(
-                              width: 70,
-                              height: 70,
-                              clipBehavior:
-                                  Clip.antiAlias, // Untuk memotong gambar
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                              ),
-                              // PERUBAHAN: Icon diganti dengan Image.asset
-                              child: Image.asset(
-                                item['imagePath'],
-                                fit: BoxFit.cover,
-                                // Error builder jika gambar tidak ditemukan
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(
-                                    Icons.person_outline,
-                                    size: 32,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  );
-                                },
+                      // PENAMBAHAN BARU: Dibungkus dengan GestureDetector untuk navigasi
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RekomendasiDetailScreen(
+                                kategori: item['label'],
+                                imagePath: item['imagePath'],
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            // Teks label
-                            Text(
-                              item['label'],
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 24.0),
+                          child: Column(
+                            children: [
+                              // Lingkaran untuk ikon/gambar
+                              Container(
+                                width: 70,
+                                height: 70,
+                                clipBehavior:
+                                    Clip.antiAlias, // Untuk memotong gambar
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                ),
+                                // PERUBAHAN: Icon diganti dengan Image.asset
+                                child: Image.asset(
+                                  item['imagePath'],
+                                  fit: BoxFit.cover,
+                                  // Error builder jika gambar tidak ditemukan
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(
+                                      Icons.person_outline,
+                                      size: 32,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              // Teks label
+                              Text(
+                                item['label'],
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

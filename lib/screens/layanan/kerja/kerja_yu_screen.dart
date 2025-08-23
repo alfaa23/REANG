@@ -139,6 +139,9 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
             ],
           ),
         ),
+        // GestureDetector di sini memeriksa posisi ketukan.
+        // Jika ketukan berada di luar bounds widget yang sedang fokus (misal TextField),
+        // maka kita panggil unfocus() -> keyboard/search nonaktif.
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapDown: (details) {
@@ -150,16 +153,21 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                   final box = renderObject;
                   final topLeft = box.localToGlobal(Offset.zero);
                   final rect = topLeft & box.size;
+                  // Jika ketukan DI LUAR widget yang sedang fokus -> unfocus
                   if (!rect.contains(details.globalPosition)) {
                     FocusManager.instance.primaryFocus?.unfocus();
                   }
+                  // Jika ketukan di dalam rect (misal TextField), biarkan fokus normal
                 } else {
+                  // Jika tidak bisa mendapatkan RenderBox, unfocus sebagai fallback
                   FocusManager.instance.primaryFocus?.unfocus();
                 }
               } catch (_) {
+                // Safety fallback: jika error, unfocus
                 FocusManager.instance.primaryFocus?.unfocus();
               }
             } else {
+              // Tidak ada yang fokus -> nothing to do (tetap panggil unfocus untuk jaga-jaga)
               FocusManager.instance.primaryFocus?.unfocus();
             }
           },
