@@ -80,7 +80,8 @@ class RekomendasiDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Rekomendasi Fitur')),
+      // PERBAIKAN: Judul AppBar dihapus
+      appBar: AppBar(title: const Text('')),
       body: ListView(
         physics: const BouncingScrollPhysics(),
         children: [
@@ -136,8 +137,10 @@ class RekomendasiDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               'Temani Aktivitasmu',
-              style: theme.textTheme.titleMedium?.copyWith(
+              // PERBAIKAN: Ukuran font diperbesar
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
           ),
@@ -183,9 +186,10 @@ class _LayananCard extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // PERBAIKAN: Ukuran ikon diperbesar
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primaryContainer,
@@ -200,11 +204,16 @@ class _LayananCard extends StatelessWidget {
                   children: [
                     Text(
                       layanan.nama,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      // PERBAIKAN: Ukuran font nama layanan diperbesar
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     Text(
                       layanan.deskripsi,
-                      style: TextStyle(color: theme.hintColor, fontSize: 12),
+                      // PERBAIKAN: Ukuran font deskripsi layanan diperbesar
+                      style: TextStyle(color: theme.hintColor, fontSize: 14),
                     ),
                   ],
                 ),
