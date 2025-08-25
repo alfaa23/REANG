@@ -330,16 +330,13 @@ class DestinationCard extends StatelessWidget {
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: EdgeInsets.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          "Lihat Detail ›",
-                          style: TextStyle(fontSize: 14),
+                      // PERBAIKAN: TextButton diganti dengan Text
+                      Text(
+                        "Lihat Detail ›",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],

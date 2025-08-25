@@ -1,9 +1,40 @@
 import 'package:flutter/material.dart';
-// Asumsi path ini benar, sesuaikan jika perlu
+import 'package:reang_app/screens/layanan/sehat/detail_artikel_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/konsultasi_dokter_screen.dart';
 
 class SehatYuScreen extends StatelessWidget {
   const SehatYuScreen({super.key});
+
+  // Data dummy untuk artikel kesehatan
+  final List<Map<String, dynamic>> _articles = const [
+    {
+      'imagePath': 'assets/images/artikel_stroke.png',
+      'kategori': 'Kesehatan',
+      'judul': 'Keseringan Begadang Bisa Picu Stroke, Kok Bisa?',
+      'penulis': 'Dr. Sarah Wijaya',
+      'waktu': '1 jam lalu',
+      'content':
+          'Nak, muda harus hati-hati, keseringan begadang ternyata bisa memicu masalah stroke. Stroke merupakan kondisi medis serius yang terjadi ketika pasokan darah ke otak mengalami gangguan, akibat penyumbatan (iskemik) atau pecahnya pembuluh darah (hemoragik).\n\nSpesialis saraf dari Perhimpunan Dokter Neurologi Seluruh Indonesia (Perdosni) dr Henry Riyanto, SpN, SubspNN (K) FINS FIPP menjelaskan kebiasaan begadang mungkin saja menjadi salah satu faktor risiko stroke. Menurutnya, ini berkaitan erat dengan tingkat stres tinggi yang ditimbulkan dari begadang.',
+    },
+    {
+      'imagePath': 'assets/images/artikel_olahraga.png',
+      'kategori': 'Olahraga',
+      'judul': 'Tips Olahraga Ringan untuk Pemula yang Efektif',
+      'penulis': 'Fitness Coach Ahmad',
+      'waktu': '1 hari lalu',
+      'content':
+          'Memulai rutinitas olahraga tidak harus selalu dengan intensitas tinggi. Bagi pemula, olahraga ringan yang konsisten jauh lebih bermanfaat dan berkelanjutan. Berikut adalah beberapa tips yang bisa Anda coba untuk memulai kebiasaan sehat ini.',
+    },
+    {
+      'imagePath': 'assets/images/artikel_vaksin.png',
+      'kategori': 'Pencegahan',
+      'judul': 'Pentingnya Vaksinasi untuk Kesehatan Keluarga',
+      'penulis': 'Admin Dinkes',
+      'waktu': '3 hari lalu',
+      'content':
+          'Vaksinasi adalah salah satu cara paling efektif untuk melindungi diri sendiri dan keluarga dari berbagai penyakit menular berbahaya. Dengan vaksin, tubuh akan membentuk antibodi untuk melawan kuman penyebab penyakit, sehingga risiko sakit parah bisa dihindari.',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +92,6 @@ class SehatYuScreen extends StatelessWidget {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // PERBAIKAN: Warna biru pekat digunakan untuk mode terang dan gelap.
         color: Colors.blue.shade800,
         borderRadius: BorderRadius.circular(12),
       ),
@@ -71,7 +101,6 @@ class SehatYuScreen extends StatelessWidget {
           Text(
             'Temukan informasi dan lokasi fasilitas kesehatan seperti rumah sakit, puskesmas, dan apotek di sekitar Anda. Dapatkan juga edukasi seputar gaya hidup sehat dengan mudah di sini.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              // PERBAIKAN: Warna teks dibuat putih agar selalu kontras.
               color: Colors.white.withOpacity(0.9),
             ),
           ),
@@ -146,29 +175,8 @@ class SehatYuScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        children: [
-          _ArtikelCard(
-            imagePath: 'assets/images/artikel_stroke.png',
-            kategori: 'Kesehatan',
-            judul: 'Keseringan Begadang Bisa Picu Stroke, Kok Bisa?',
-            penulis: 'Dr. Sarah Wijaya',
-            waktu: '1 jam lalu',
-          ),
-          _ArtikelCard(
-            imagePath: 'assets/images/artikel_olahraga.png',
-            kategori: 'Olahraga',
-            judul: 'Tips Olahraga Ringan untuk Pemula yang Efektif',
-            penulis: 'Fitness Coach Ahmad',
-            waktu: '1 hari lalu',
-          ),
-          _ArtikelCard(
-            imagePath: 'assets/images/artikel_vaksin.png',
-            kategori: 'Pencegahan',
-            judul: 'Pentingnya Vaksinasi untuk Kesehatan Keluarga',
-            penulis: 'Admin Dinkes',
-            waktu: '3 hari lalu',
-          ),
-        ],
+        // PERBAIKAN: Menggunakan map untuk membuat kartu artikel secara dinamis
+        children: _articles.map((data) => _ArtikelCard(data: data)).toList(),
       ),
     );
   }
@@ -360,14 +368,9 @@ class _LayananCard extends StatelessWidget {
 }
 
 class _ArtikelCard extends StatelessWidget {
-  final String imagePath, kategori, judul, penulis, waktu;
-  const _ArtikelCard({
-    required this.imagePath,
-    required this.kategori,
-    required this.judul,
-    required this.penulis,
-    required this.waktu,
-  });
+  // PERBAIKAN: Menerima satu map data
+  final Map<String, dynamic> data;
+  const _ArtikelCard({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -376,12 +379,20 @@ class _ArtikelCard extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        onTap: () {},
+        // PERBAIKAN: Menambahkan onTap untuk navigasi
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailArtikelScreen(articleData: data),
+            ),
+          );
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Image.asset(
-              imagePath,
+              data['imagePath'],
               height: 160,
               width: double.infinity,
               fit: BoxFit.cover,
@@ -403,7 +414,7 @@ class _ArtikelCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    kategori,
+                    data['kategori'],
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
@@ -411,7 +422,7 @@ class _ArtikelCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    judul,
+                    data['judul'],
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -420,7 +431,7 @@ class _ArtikelCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '$penulis • $waktu',
+                        '${data['penulis']} • ${data['waktu']}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
@@ -495,7 +506,7 @@ class _RekomendasiCard extends StatelessWidget {
             if (rating != null)
               Row(
                 children: [
-                  Icon(Icons.star, color: Colors.amber, size: 16),
+                  const Icon(Icons.star, color: Colors.amber, size: 16),
                   const SizedBox(width: 4),
                   Text(
                     rating!,
