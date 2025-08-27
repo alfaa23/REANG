@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart'; // Diperlukan untuk format tanggal
 import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/models/jdih_model.dart';
+import 'package:reang_app/models/artikel_sehat_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -79,6 +80,27 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil jadwal sholat: $e');
+    }
+  }
+
+  // =======================================================================
+  // API ARTIKEL KESEHATAN (BARU)
+  // =======================================================================
+  final String _baseUrlInfoSehat = 'http://192.168.254.224:8000/api/info-sehat';
+
+  Future<List<ArtikelSehat>> fetchArtikelKesehatan() async {
+    try {
+      final response = await _dio.get(_baseUrlInfoSehat);
+      if (response.statusCode == 200) {
+        final List<ArtikelSehat> artikelList = (response.data as List)
+            .map((item) => ArtikelSehat.fromJson(item))
+            .toList();
+        return artikelList;
+      } else {
+        throw Exception('Gagal memuat artikel kesehatan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil artikel kesehatan: $e');
     }
   }
 }

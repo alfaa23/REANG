@@ -1,27 +1,22 @@
 import 'package:flutter/material.dart';
+// Import package yang benar untuk menampilkan HTML
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:reang_app/models/artikel_sehat_model.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class DetailArtikelScreen extends StatelessWidget {
-  // Data artikel yang akan diterima dari halaman sebelumnya
-  final Map<String, dynamic> articleData;
+  final ArtikelSehat artikel;
 
-  const DetailArtikelScreen({super.key, required this.articleData});
+  const DetailArtikelScreen({super.key, required this.artikel});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Mengambil data dengan aman, memberikan nilai default jika tidak ada
-    final String imagePath = articleData['imagePath'] ?? '';
-    final String title = articleData['judul'] ?? 'Judul Tidak Tersedia';
-    final String author = articleData['penulis'] ?? 'Penulis Tidak Diketahui';
-    final String content = articleData['content'] ?? 'Konten tidak tersedia.';
-    final String waktu = articleData['waktu'] ?? '';
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          // AppBar fleksibel dengan gambar
           SliverAppBar(
             expandedHeight: 250.0,
             pinned: true,
@@ -36,7 +31,10 @@ class DetailArtikelScreen extends StatelessWidget {
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: _buildHeaderImage(theme, imagePath),
+              background: _RetryImage(
+                imageUrl: artikel.foto,
+                fallback: _buildFallback(theme),
+              ),
               stretchModes: const [
                 StretchMode.zoomBackground,
                 StretchMode.blurBackground,
@@ -58,18 +56,21 @@ class DetailArtikelScreen extends StatelessWidget {
                         radius: 12,
                         backgroundColor: theme.colorScheme.primaryContainer,
                         child: Icon(
-                          Icons.person,
+                          Icons.local_hospital_outlined,
                           size: 14,
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(author, style: theme.textTheme.labelLarge),
+                      Text(
+                        'Dinas Kesehatan', // Author bisa dibuat dinamis jika ada di API
+                        style: theme.textTheme.labelLarge,
+                      ),
                       const SizedBox(width: 8),
                       const Text('•'),
                       const SizedBox(width: 8),
                       Text(
-                        waktu,
+                        timeago.format(artikel.tanggal, locale: 'id'),
                         style: TextStyle(color: theme.hintColor, fontSize: 12),
                       ),
                     ],
@@ -78,17 +79,17 @@ class DetailArtikelScreen extends StatelessWidget {
 
                   // Judul Berita
                   Text(
-                    title,
+                    artikel.judul,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // Isi Artikel
-                  Text(
-                    content,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                  // Menampilkan konten HTML
+                  HtmlWidget(
+                    artikel.deskripsi,
+                    textStyle: theme.textTheme.bodyLarge?.copyWith(
                       height: 1.6,
                       fontSize: 16,
                     ),
@@ -103,33 +104,74 @@ class DetailArtikelScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderImage(ThemeData theme, String imagePath) {
-    if (imagePath.isEmpty) {
-      return Container(
-        color: theme.colorScheme.surfaceVariant,
-        child: Center(
-          child: Icon(
-            Icons.newspaper,
-            size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-          ),
+  static Widget _buildFallback(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.surfaceVariant,
+      child: Center(
+        child: Icon(
+          Icons.newspaper,
+          size: 64,
+          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
         ),
-      );
+      ),
+    );
+  }
+}
+
+/// Widget untuk retry load gambar otomatis
+class _RetryImage extends StatefulWidget {
+  final String imageUrl;
+  final Widget fallback;
+
+  const _RetryImage({required this.imageUrl, required this.fallback});
+
+  @override
+  State<_RetryImage> createState() => _RetryImageState();
+}
+
+class _RetryImageState extends State<_RetryImage> {
+  int _retryCount = 0;
+  bool _loading = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.imageUrl.isEmpty) {
+      return widget.fallback;
     }
 
-    return Image.asset(
-      imagePath,
+    return Image.network(
+      widget.imageUrl,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
+      key: ValueKey(_retryCount), // supaya reload ketika retry
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          _loading = false;
+          return child;
+        }
         return Container(
-          color: theme.colorScheme.surfaceVariant,
-          child: Center(
-            child: Icon(
-              Icons.broken_image_outlined,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-            ),
-          ),
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (!_loading) {
+          _loading = true;
+
+          // Retry otomatis setelah 2 detik
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                _retryCount++;
+              });
+            }
+          });
+        }
+
+        return Container(
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ), // tetap loading, bukan gambar patah
         );
       },
     );

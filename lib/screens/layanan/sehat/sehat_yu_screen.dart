@@ -1,40 +1,47 @@
+// File: lib/screens/layanan/sehat/sehat_yu_screen.dart
+import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/artikel_sehat_model.dart';
 import 'package:reang_app/screens/layanan/sehat/detail_artikel_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/konsultasi_dokter_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
-class SehatYuScreen extends StatelessWidget {
+/// SehatYuScreen (full) with robust image loading for artikel cards.
+class SehatYuScreen extends StatefulWidget {
   const SehatYuScreen({super.key});
 
-  // Data dummy untuk artikel kesehatan
-  final List<Map<String, dynamic>> _articles = const [
-    {
-      'imagePath': 'assets/images/artikel_stroke.png',
-      'kategori': 'Kesehatan',
-      'judul': 'Keseringan Begadang Bisa Picu Stroke, Kok Bisa?',
-      'penulis': 'Dr. Sarah Wijaya',
-      'waktu': '1 jam lalu',
-      'content':
-          'Nak, muda harus hati-hati, keseringan begadang ternyata bisa memicu masalah stroke. Stroke merupakan kondisi medis serius yang terjadi ketika pasokan darah ke otak mengalami gangguan, akibat penyumbatan (iskemik) atau pecahnya pembuluh darah (hemoragik).\n\nSpesialis saraf dari Perhimpunan Dokter Neurologi Seluruh Indonesia (Perdosni) dr Henry Riyanto, SpN, SubspNN (K) FINS FIPP menjelaskan kebiasaan begadang mungkin saja menjadi salah satu faktor risiko stroke. Menurutnya, ini berkaitan erat dengan tingkat stres tinggi yang ditimbulkan dari begadang.',
-    },
-    {
-      'imagePath': 'assets/images/artikel_olahraga.png',
-      'kategori': 'Olahraga',
-      'judul': 'Tips Olahraga Ringan untuk Pemula yang Efektif',
-      'penulis': 'Fitness Coach Ahmad',
-      'waktu': '1 hari lalu',
-      'content':
-          'Memulai rutinitas olahraga tidak harus selalu dengan intensitas tinggi. Bagi pemula, olahraga ringan yang konsisten jauh lebih bermanfaat dan berkelanjutan. Berikut adalah beberapa tips yang bisa Anda coba untuk memulai kebiasaan sehat ini.',
-    },
-    {
-      'imagePath': 'assets/images/artikel_vaksin.png',
-      'kategori': 'Pencegahan',
-      'judul': 'Pentingnya Vaksinasi untuk Kesehatan Keluarga',
-      'penulis': 'Admin Dinkes',
-      'waktu': '3 hari lalu',
-      'content':
-          'Vaksinasi adalah salah satu cara paling efektif untuk melindungi diri sendiri dan keluarga dari berbagai penyakit menular berbahaya. Dengan vaksin, tubuh akan membentuk antibodi untuk melawan kuman penyebab penyakit, sehingga risiko sakit parah bisa dihindari.',
-    },
-  ];
+  @override
+  State<SehatYuScreen> createState() => _SehatYuScreenState();
+}
+
+class _SehatYuScreenState extends State<SehatYuScreen> {
+  final ApiService _apiService = ApiService();
+  late Future<List<ArtikelSehat>> _artikelFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadArtikel();
+  }
+
+  void _loadArtikel() {
+    _artikelFuture = _apiService.fetchArtikelKesehatan();
+    timeago.setLocaleMessages('id', timeago.IdMessages());
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _loadArtikel();
+    });
+    try {
+      await _artikelFuture;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,20 +76,25 @@ class SehatYuScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        children: [
-          _buildInfoLokasi(theme),
-          _buildSectionTitle(theme, 'Layanan Utama'),
-          _buildLayananUtama(context, theme),
-          _buildSectionTitle(theme, 'Artikel Kesehatan'),
-          _buildArtikelKesehatan(theme),
-          _buildSectionTitle(theme, 'Aplikasi Rekomendasi'),
-          _buildAplikasiRekomendasi(),
-          _buildSectionTitle(theme, 'Informasi Layanan'),
-          _buildInformasiLayanan(context),
-          const SizedBox(height: 16),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          children: [
+            _buildInfoLokasi(theme),
+            _buildSectionTitle(theme, 'Layanan Utama'),
+            _buildLayananUtama(context, theme),
+            _buildSectionTitle(theme, 'Artikel Kesehatan'),
+            _buildArtikelKesehatan(theme),
+            _buildSectionTitle(theme, 'Aplikasi Rekomendasi'),
+            _buildAplikasiRekomendasi(),
+            _buildSectionTitle(theme, 'Informasi Layanan'),
+            _buildInformasiLayanan(context),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -172,12 +184,36 @@ class SehatYuScreen extends StatelessWidget {
   }
 
   Widget _buildArtikelKesehatan(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        // PERBAIKAN: Menggunakan map untuk membuat kartu artikel secara dinamis
-        children: _articles.map((data) => _ArtikelCard(data: data)).toList(),
-      ),
+    return FutureBuilder<List<ArtikelSehat>>(
+      future: _artikelFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'Gagal memuat artikel.\nSilakan tarik ke bawah untuk mencoba lagi.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+        final articles = snapshot.data!;
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: articles.map((data) => _ArtikelCard(data: data)).toList(),
+          ),
+        );
+      },
     );
   }
 
@@ -276,8 +312,7 @@ class SehatYuScreen extends StatelessWidget {
   }
 }
 
-// --- WIDGET-WIDGET KECIL ---
-
+// --- small widgets (unchanged) ---
 class _LayananCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -367,54 +402,306 @@ class _LayananCard extends StatelessWidget {
   }
 }
 
-class _ArtikelCard extends StatelessWidget {
-  // PERBAIKAN: Menerima satu map data
-  final Map<String, dynamic> data;
-  const _ArtikelCard({required this.data});
+// --- Download Queue to throttle concurrent downloads ---
+class _DownloadQueue {
+  static int _active = 0;
+  static const int _maxActive = 4; // batasi concurrent download
+  static final List<Completer<void>> _waiters = [];
+
+  static Future<void> acquire() async {
+    if (_active < _maxActive) {
+      _active++;
+      return;
+    }
+    final c = Completer<void>();
+    _waiters.add(c);
+    await c.future;
+    _active++;
+  }
+
+  static void release() {
+    _active = max(0, _active - 1);
+    if (_waiters.isNotEmpty) {
+      final c = _waiters.removeAt(0);
+      if (!c.isCompleted) c.complete();
+    }
+  }
+}
+
+class RobustNetworkImageWithDio extends StatefulWidget {
+  final String imageUrl;
+  final BoxFit fit;
+  final double? height;
+  final double? width;
+  final int maxAttempts;
+  final Duration baseDelay;
+  final Map<String, String>? headers;
+
+  const RobustNetworkImageWithDio({
+    required this.imageUrl,
+    this.fit = BoxFit.cover,
+    this.height,
+    this.width,
+    this.maxAttempts = 5, // lebih sabar: 5 percobaan
+    this.baseDelay = const Duration(seconds: 1),
+    this.headers,
+    super.key,
+  });
+
+  @override
+  State<RobustNetworkImageWithDio> createState() =>
+      _RobustNetworkImageWithDioState();
+}
+
+class _RobustNetworkImageWithDioState extends State<RobustNetworkImageWithDio> {
+  final Dio _dio = Dio();
+  Uint8List? _bytes;
+  bool _loading = false;
+  bool _error = false; // sekarang dipakai di build
+  CancelToken? _cancelToken;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  @override
+  void didUpdateWidget(covariant RobustNetworkImageWithDio oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.headers != widget.headers) {
+      _resetAndStart();
+    }
+  }
+
+  void _resetAndStart() {
+    _cancelToken?.cancel("updated");
+    _bytes = null;
+    _error = false;
+    _loading = false;
+    _startDownload();
+  }
+
+  Future<void> _startDownload() async {
+    // pastikan state loading true saat mulai
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+
+    _cancelToken = CancelToken();
+
+    for (int attempt = 1; attempt <= widget.maxAttempts && mounted; attempt++) {
+      await _DownloadQueue.acquire();
+      bool released = false;
+      try {
+        // tambahkan param retry agar bypass cache jika perlu
+        final uri = Uri.parse(widget.imageUrl);
+        final urlWithRetry = uri
+            .replace(
+              queryParameters: {
+                ...uri.queryParameters,
+                'v': DateTime.now().millisecondsSinceEpoch.toString(),
+              },
+            )
+            .toString();
+
+        final response = await _dio.get<List<int>>(
+          urlWithRetry,
+          options: Options(
+            responseType: ResponseType.bytes,
+            sendTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 15),
+            headers:
+                widget.headers ??
+                {
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  'Pragma': 'no-cache',
+                },
+            validateStatus: (s) => s != null && s >= 200 && s < 400,
+          ),
+          cancelToken: _cancelToken,
+        );
+
+        final data = Uint8List.fromList(response.data ?? <int>[]);
+        if (data.isNotEmpty) {
+          if (!mounted) return;
+          setState(() {
+            _bytes = data;
+            _loading = false;
+            _error = false;
+          });
+          // release dan keluar
+          _DownloadQueue.release();
+          released = true;
+          return;
+        } else {
+          // anggap error — biarkan retry logic menangani
+        }
+      } catch (e) {
+        if (!mounted) {
+          if (!released) _DownloadQueue.release();
+          return;
+        }
+        if (_cancelToken != null && _cancelToken!.isCancelled) {
+          if (!released) _DownloadQueue.release();
+          return;
+        }
+        if (attempt == widget.maxAttempts) {
+          if (mounted) {
+            setState(() {
+              _error = true;
+              _loading = false;
+            });
+          }
+          if (!released) _DownloadQueue.release();
+          return;
+        } else {
+          // backoff before next attempt
+          final backoffMillis =
+              widget.baseDelay.inMilliseconds * pow(2, attempt - 1);
+          if (!released) _DownloadQueue.release();
+          await Future.delayed(Duration(milliseconds: backoffMillis.toInt()));
+          continue;
+        }
+      } finally {
+        // jika belum direlease di blok diatas, release sekarang
+        if (!released) {
+          try {
+            _DownloadQueue.release();
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  void _retryDownload() {
+    if (!mounted) return;
+    setState(() {
+      _bytes = null;
+      _loading = false;
+      _error = false;
+    });
+    _startDownload();
+  }
+
+  @override
+  void dispose() {
+    _cancelToken?.cancel('disposed');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (_bytes != null) {
+      return Image.memory(
+        _bytes!,
+        height: widget.height,
+        width: widget.width ?? double.infinity,
+        fit: widget.fit,
+        gaplessPlayback: true,
+      );
+    }
+
+    // Jika sedang loading → tunjukkan spinner
+    if (_loading && !_error) {
+      return Container(
+        height: widget.height,
+        width: widget.width ?? double.infinity,
+        color: theme.colorScheme.surfaceVariant,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Jika error → tunjukkan broken image + teks retry (penggunaan _error supaya analyzer senang)
+    if (_error) {
+      return GestureDetector(
+        onTap: _retryDownload,
+        child: Container(
+          height: widget.height,
+          width: widget.width ?? double.infinity,
+          color: theme.colorScheme.surfaceVariant,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.broken_image_outlined,
+                  size: 40,
+                  color: theme.hintColor,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ketuk untuk coba lagi',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // fallback (seharusnya jarang terjadi karena kita set _loading true saat mulai)
+    return Container(
+      height: widget.height,
+      width: widget.width ?? double.infinity,
+      color: theme.colorScheme.surfaceVariant,
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+// --- Artikel card using RobustNetworkImageWithDio ---
+class _ArtikelCard extends StatelessWidget {
+  final ArtikelSehat data;
+  const _ArtikelCard({required this.data});
+
+  String _noCacheUrl(String url) {
+    if (url.isEmpty) return url;
+    // gunakan url apa adanya — downloader akan menambahkan param v
+    return url;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rawUrl = _noCacheUrl(data.foto);
+
     return Card(
       clipBehavior: Clip.hardEdge,
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        // PERBAIKAN: Menambahkan onTap untuk navigasi
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DetailArtikelScreen(articleData: data),
-            ),
-          );
-        },
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (c) => DetailArtikelScreen(artikel: data)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.asset(
-              data['imagePath'],
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
+            if (rawUrl.isNotEmpty)
+              SizedBox(
                 height: 160,
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Center(
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: theme.hintColor,
-                    size: 40,
-                  ),
+                width: double.infinity,
+                child: RobustNetworkImageWithDio(
+                  imageUrl: rawUrl,
+                  height: 160,
+                  width: double.infinity,
                 ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    data['kategori'],
+                    data.kategori,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
@@ -422,7 +709,7 @@ class _ArtikelCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    data['judul'],
+                    data.judul,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -431,7 +718,7 @@ class _ArtikelCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '${data['penulis']} • ${data['waktu']}',
+                        timeago.format(data.tanggal, locale: 'id'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
@@ -456,10 +743,10 @@ class _ArtikelCard extends StatelessWidget {
   }
 }
 
+// --- Rekomendasi & InfoCard (tidak diubah) ---
 class _RekomendasiCard extends StatelessWidget {
   final String logoPath, title, subtitle;
   final String? rating;
-
   const _RekomendasiCard({
     required this.logoPath,
     required this.title,
