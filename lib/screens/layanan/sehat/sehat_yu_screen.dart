@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -826,14 +827,37 @@ class _RekomendasiCard extends StatelessWidget {
 
   Future<void> _launchAppOrStore() async {
     final appUri = Uri.parse(appUrlScheme);
-    final storeUri = Uri.parse(storeUrl);
 
-    if (await canLaunchUrl(appUri)) {
-      // Jika bisa membuka skema URL, buka aplikasinya
-      await launchUrl(appUri);
-    } else {
-      // Jika tidak, buka Play Store/App Store
+    // Mapping kecil untuk App Store (iOS) berdasarkan title — agar tidak perlu ubah pemanggilan _RekomendasiCard
+    const Map<String, String> _iosStoreByTitle = {
+      'Halodoc': 'https://apps.apple.com/app/id1067217981',
+      'Mobile JKN': 'https://apps.apple.com/app/id1237601115',
+      'Alodokter': 'https://apps.apple.com/app/id1405482962',
+    };
+
+    // Tentukan target store URL berdasarkan platform
+    final String targetStoreUrl = Platform.isIOS
+        ? (_iosStoreByTitle[title] ?? storeUrl)
+        : storeUrl;
+
+    final storeUri = Uri.parse(targetStoreUrl);
+
+    try {
+      if (await canLaunchUrl(appUri)) {
+        // Jika bisa membuka skema URL, buka aplikasinya
+        await launchUrl(appUri);
+        return;
+      }
+    } catch (_) {
+      // ignore and fallback to store
+    }
+
+    // fallback: buka store sesuai platform (external app)
+    if (await canLaunchUrl(storeUri)) {
       await launchUrl(storeUri, mode: LaunchMode.externalApplication);
+    } else {
+      // terakhir: coba buka storeUri tanpa mode
+      await launchUrl(storeUri);
     }
   }
 
