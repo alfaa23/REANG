@@ -86,7 +86,7 @@ class ApiService {
   // =======================================================================
   // API ARTIKEL KESEHATAN (BARU)
   // =======================================================================
-  final String _baseUrlInfoSehat = 'http://192.168.254.224:8000/api/info-sehat';
+  final String _baseUrlInfoSehat = 'http://192.168.255.91:8000/api/info-sehat';
 
   Future<List<ArtikelSehat>> fetchArtikelKesehatan() async {
     try {

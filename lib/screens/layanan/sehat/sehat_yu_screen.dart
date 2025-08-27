@@ -10,6 +10,7 @@ import 'package:reang_app/screens/layanan/sehat/detail_artikel_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/konsultasi_dokter_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 
 /// SehatYuScreen (full) with robust image loading for artikel cards.
 class SehatYuScreen extends StatefulWidget {
@@ -223,20 +224,28 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
       child: Column(
         children: [
           _RekomendasiCard(
-            logoPath: 'assets/logos/halodoc.png',
+            logoPath: 'assets/logos/halodoc.webp',
             title: 'Halodoc',
             subtitle: 'Konsultasi dokter online 24/7',
+            appUrlScheme: 'halodoc://',
+            storeUrl:
+                'https://play.google.com/store/apps/details?id=com.halodoc.android',
           ),
           _RekomendasiCard(
-            logoPath: 'assets/logos/bpjs.png',
-            title: 'BPJS Kesehatan',
-            subtitle: 'Layanan kesehatan terjangkau',
+            logoPath: 'assets/logos/mobilejkn.webp',
+            title: 'Mobile JKN',
+            subtitle: 'Layanan BPJS Kesehatan',
+            appUrlScheme: 'mobilejkn://', // Contoh, mungkin perlu disesuaikan
+            storeUrl:
+                'https://play.google.com/store/apps/details?id=app.bpjs.kesehatan',
           ),
           _RekomendasiCard(
-            logoPath: 'assets/logos/alodokter.png',
+            logoPath: 'assets/logos/alodokter.webp',
             title: 'Alodokter',
             subtitle: 'Informasi kesehatan terpercaya',
-            rating: '4.7',
+            appUrlScheme: 'alodokter://',
+            storeUrl:
+                'https://play.google.com/store/apps/details?id=com.alodokter.android',
           ),
         ],
       ),
@@ -743,67 +752,78 @@ class _ArtikelCard extends StatelessWidget {
   }
 }
 
-// --- Rekomendasi & InfoCard (tidak diubah) ---
+// PERBAIKAN: Widget ini diubah untuk menangani logika pembukaan aplikasi
 class _RekomendasiCard extends StatelessWidget {
-  final String logoPath, title, subtitle;
-  final String? rating;
+  final String logoPath, title, subtitle, appUrlScheme, storeUrl;
+
   const _RekomendasiCard({
     required this.logoPath,
     required this.title,
     required this.subtitle,
-    this.rating,
+    required this.appUrlScheme,
+    required this.storeUrl,
   });
+
+  Future<void> _launchAppOrStore() async {
+    final appUri = Uri.parse(appUrlScheme);
+    final storeUri = Uri.parse(storeUrl);
+
+    if (await canLaunchUrl(appUri)) {
+      // Jika bisa membuka skema URL, buka aplikasinya
+      await launchUrl(appUri);
+    } else {
+      // Jika tidak, buka Play Store/App Store
+      await launchUrl(storeUri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Image.asset(
-              logoPath,
-              width: 48,
-              height: 48,
-              errorBuilder: (c, e, s) => const SizedBox(width: 48, height: 48),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
-                    ),
-                  ),
-                ],
+      child: InkWell(
+        onTap: _launchAppOrStore, // Menjalankan fungsi saat diklik
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              // PERBAIKAN: Menambahkan ClipRRect untuk membuat sudut melengkung
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: Image.asset(
+                  logoPath,
+                  width: 48,
+                  height: 48,
+                  errorBuilder: (c, e, s) =>
+                      const SizedBox(width: 48, height: 48),
+                ),
               ),
-            ),
-            if (rating != null)
-              Row(
-                children: [
-                  const Icon(Icons.star, color: Colors.amber, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    rating!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-          ],
+              // Rating dihapus sesuai permintaan
+            ],
+          ),
         ),
       ),
     );
