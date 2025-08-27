@@ -28,6 +28,7 @@ class PetaScreen extends StatefulWidget {
 class _PetaScreenState extends State<PetaScreen> {
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
+  bool _isLoading = true;
   String _currentAddress = "Mencari alamat...";
 
   final ApiService _apiService = ApiService();
@@ -58,14 +59,20 @@ class _PetaScreenState extends State<PetaScreen> {
     });
   }
 
+  // PERBAIKAN: Logika perizinan disamakan dengan contoh PetaIbadahScreen
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        // Meminta pengguna mengaktifkan GPS melalui dialog sistem
         await Geolocator.openLocationSettings();
+        // Cek lagi setelah pengguna mungkin kembali dari pengaturan
         serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled)
-          throw Exception('Layanan lokasi tidak diaktifkan.');
+        if (!serviceEnabled) {
+          throw Exception('Layanan lokasi tidak diaktifkan oleh pengguna.');
+        }
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
@@ -73,8 +80,13 @@ class _PetaScreenState extends State<PetaScreen> {
         permission = await Geolocator.requestPermission();
         if (permission != LocationPermission.whileInUse &&
             permission != LocationPermission.always) {
-          throw Exception('Izin lokasi ditolak.');
+          throw Exception('Izin lokasi tidak diberikan oleh pengguna.');
         }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        // Pengguna menolak permanen, tidak bisa meminta lagi
+        throw Exception('Izin lokasi ditolak secara permanen.');
       }
 
       Position position = await Geolocator.getCurrentPosition(
@@ -85,11 +97,13 @@ class _PetaScreenState extends State<PetaScreen> {
       if (mounted) {
         setState(() {
           _currentPosition = LatLng(position.latitude, position.longitude);
+          _isLoading = false;
           _mapController.move(_currentPosition!, 15.0);
         });
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -128,10 +142,6 @@ class _PetaScreenState extends State<PetaScreen> {
               ? fullAddress
               : "Alamat tidak ditemukan";
         });
-      } else {
-        setState(() {
-          _currentAddress = "Alamat tidak ditemukan";
-        });
       }
     } catch (_) {
       if (mounted) {
@@ -150,12 +160,17 @@ class _PetaScreenState extends State<PetaScreen> {
   }
 
   void _showDetailDialog(LokasiPeta tempat) {
+    final theme = Theme.of(context); // Ambil theme di sini
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.all(0),
         clipBehavior: Clip.antiAlias,
+        // PERBAIKAN: Warna dialog disesuaikan dengan tema
+        backgroundColor: theme.cardColor,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -197,9 +212,11 @@ class _PetaScreenState extends State<PetaScreen> {
                       Expanded(
                         child: Text(
                           tempat.nama,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
+                            // PERBAIKAN: Warna teks disesuaikan dengan tema
+                            color: isDarkMode ? Colors.white : Colors.black87,
                           ),
                         ),
                       ),
@@ -208,7 +225,10 @@ class _PetaScreenState extends State<PetaScreen> {
                   const SizedBox(height: 8),
                   Text(
                     tempat.alamat,
-                    style: TextStyle(color: Colors.grey.shade600),
+                    // PERBAIKAN: Warna teks disesuaikan dengan tema
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
@@ -234,6 +254,141 @@ class _PetaScreenState extends State<PetaScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: FutureBuilder<List<LokasiPeta>>(
+        future: _lokasiFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _buildErrorView(context);
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildErrorView(
+              context,
+              message: 'Data lokasi tidak ditemukan.',
+            );
+          }
+
+          final daftarLokasi = snapshot.data!;
+          List<Marker> markers = daftarLokasi.map((tempat) {
+            return Marker(
+              point: tempat.lokasi,
+              width: 40,
+              height: 40,
+              child: GestureDetector(
+                onTap: () => _showDetailDialog(tempat),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: tempat.warna ?? Colors.red,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    tempat.icon ?? Icons.location_pin,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            );
+          }).toList();
+
+          return Stack(
+            children: [
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: daftarLokasi.first.lokasi,
+                  initialZoom: 14.0,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.reang_app',
+                  ),
+                  MarkerLayer(markers: markers),
+                  if (_currentPosition != null)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _currentPosition!,
+                          width: 24,
+                          height: 24,
+                          child: const Icon(
+                            Icons.my_location,
+                            color: Colors.blue,
+                            size: 24,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              _buildCustomAppBar(context),
+              Positioned(
+                bottom: 110,
+                right: 16,
+                child: FloatingActionButton(
+                  onPressed: _getCurrentLocation,
+                  mini: true,
+                  backgroundColor: Colors.white,
+                  child: const Icon(Icons.my_location, color: Colors.black54),
+                ),
+              ),
+              _buildCustomBottomSheet(daftarLokasi.length),
+              // PERBAIKAN: Menambahkan kembali indikator loading untuk GPS
+              if (_isLoading) const Center(child: CircularProgressIndicator()),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorView(BuildContext context, {String? message}) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              message ?? 'Gagal memuat halaman. Periksa koneksi internet Anda.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _loadLokasiData();
+                });
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
             ),
           ],
         ),
@@ -337,139 +492,6 @@ class _PetaScreenState extends State<PetaScreen> {
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: FutureBuilder<List<LokasiPeta>>(
-        future: _lokasiFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _buildErrorView(context);
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildErrorView(
-              context,
-              message: 'Data lokasi tidak ditemukan.',
-            );
-          }
-
-          final daftarLokasi = snapshot.data!;
-          List<Marker> markers = daftarLokasi.map((tempat) {
-            return Marker(
-              point: tempat.lokasi,
-              width: 40,
-              height: 40,
-              child: GestureDetector(
-                onTap: () => _showDetailDialog(tempat),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: tempat.warna ?? Colors.red,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    tempat.icon ?? Icons.location_pin,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            );
-          }).toList();
-
-          return Stack(
-            children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: daftarLokasi.first.lokasi,
-                  initialZoom: 14.0,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.reang_app',
-                  ),
-                  MarkerLayer(markers: markers),
-                  if (_currentPosition != null)
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _currentPosition!,
-                          width: 24,
-                          height: 24,
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Colors.blue,
-                            size: 24,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-              _buildCustomAppBar(context),
-              Positioned(
-                bottom: 110,
-                right: 16,
-                child: FloatingActionButton(
-                  onPressed: _getCurrentLocation,
-                  mini: true,
-                  backgroundColor: Colors.white,
-                  child: const Icon(Icons.my_location, color: Colors.black54),
-                ),
-              ),
-              _buildCustomBottomSheet(daftarLokasi.length),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildErrorView(BuildContext context, {String? message}) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
-            const SizedBox(height: 16),
-            Text(
-              message ?? 'Gagal memuat halaman. Periksa koneksi internet Anda.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.hintColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _loadLokasiData();
-                });
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
             ),
           ],
         ),
