@@ -1,15 +1,12 @@
-// File: lib/screens/layanan/sehat/sehat_yu_screen.dart
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:reang_app/models/artikel_sehat_model.dart';
 import 'package:reang_app/screens/layanan/sehat/detail_artikel_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/konsultasi_dokter_screen.dart';
 import 'package:reang_app/screens/peta/peta_screen.dart';
-import 'package:reang_app/models/lokasi_peta_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
@@ -25,93 +22,72 @@ class SehatYuScreen extends StatefulWidget {
 class _SehatYuScreenState extends State<SehatYuScreen> {
   final ApiService _apiService = ApiService();
   late Future<List<ArtikelSehat>> _artikelFuture;
+  // PENAMBAHAN BARU: Future untuk menampung jumlah lokasi
+  late Future<List<int>> _lokasiCountsFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadArtikel();
+    _loadData();
   }
 
-  void _loadArtikel() {
+  // PERBAIKAN: Menggabungkan semua pemanggilan data dalam satu fungsi
+  void _loadData() {
     _artikelFuture = _apiService.fetchArtikelKesehatan();
+    _lokasiCountsFuture = _fetchLokasiCounts(); // Memanggil fungsi baru
     timeago.setLocaleMessages('id', timeago.IdMessages());
+  }
+
+  // PENAMBAHAN BARU: Fungsi untuk mengambil jumlah lokasi secara bersamaan
+  Future<List<int>> _fetchLokasiCounts() async {
+    try {
+      final results = await Future.wait([
+        _apiService.fetchLokasiPeta('hospital'),
+        _apiService.fetchLokasiPeta('sehat-olahraga'),
+      ]);
+      // Mengembalikan daftar jumlah [jumlahRS, jumlahOlahraga]
+      return results.map((list) => list.length).toList();
+    } catch (e) {
+      // Jika gagal, kembalikan 0 agar tidak error
+      return [0, 0];
+    }
   }
 
   Future<void> _handleRefresh() async {
     setState(() {
-      _loadArtikel();
+      _loadData(); // Memuat ulang semua data saat di-refresh
     });
-    try {
-      await _artikelFuture;
-    } catch (_) {}
   }
 
-  // PENAMBAHAN BARU: Fungsi untuk membuka peta
-  void _openMap(BuildContext context, String type) async {
-    try {
-      // Tampilkan dialog loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
+  void _openMap(BuildContext context, String type) {
+    String apiUrl;
+    String judulHalaman;
+    IconData icon;
+    Color color;
 
-      List<Map<String, dynamic>> dataLokasi;
-      String judulHalaman;
-      IconData icon;
-      Color color;
-
-      if (type == 'hospital') {
-        // PERBAIKAN: Endpoint diubah menjadi 'hospital'
-        dataLokasi = await _apiService.fetchLokasiPeta('hospital');
-        judulHalaman = 'Peta Rumah Sakit';
-        icon = Icons.local_hospital_outlined;
-        color = Colors.blue;
-      } else {
-        dataLokasi = await _apiService.fetchLokasiPeta('sehat-olahraga');
-        judulHalaman = 'Peta Tempat Olahraga';
-        icon = Icons.sports_soccer_outlined;
-        color = Colors.orange;
-      }
-
-      final List<LokasiPeta> daftarLokasi = dataLokasi.map((data) {
-        return LokasiPeta(
-          nama: data['name'] ?? 'Tanpa Nama',
-          alamat: data['address'] ?? 'Tanpa Alamat',
-          lokasi: LatLng(
-            double.tryParse(data['latitude'].toString()) ?? 0.0,
-            double.tryParse(data['longitude'].toString()) ?? 0.0,
-          ),
-          fotoUrl: data['foto'],
-          icon: icon,
-          warna: color,
-        );
-      }).toList();
-
-      Navigator.of(context).pop(); // Tutup dialog loading
-
-      if (daftarLokasi.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data lokasi tidak ditemukan.')),
-        );
-        return;
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PetaScreen(
-            daftarLokasi: daftarLokasi,
-            judulHalaman: judulHalaman,
-          ),
-        ),
-      );
-    } catch (e) {
-      Navigator.of(context).pop(); // Tutup dialog loading jika error
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat data peta: $e')));
+    if (type == 'hospital') {
+      apiUrl = 'hospital';
+      judulHalaman = 'Peta Rumah Sakit';
+      icon = Icons.local_hospital_outlined;
+      color = Colors.blue;
+    } else {
+      apiUrl = 'sehat-olahraga';
+      judulHalaman = 'Peta Tempat Olahraga';
+      icon = Icons.sports_soccer_outlined;
+      color = Colors.orange;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PetaScreen(
+          apiUrl: apiUrl,
+          judulHalaman: judulHalaman,
+          defaultIcon: icon,
+          defaultColor: color,
+        ),
+      ),
+    );
   }
 
   @override
@@ -209,31 +185,43 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _LayananCard(
-                    icon: Icons.local_hospital_outlined,
-                    title: 'Rumah Sakit Terdekat',
-                    subtitle: '24 tersedia',
-                    color: Colors.blue,
-                    onTap: () => _openMap(context, 'hospital'),
-                  ),
+          // PERBAIKAN: Dibungkus dengan FutureBuilder untuk mendapatkan jumlah lokasi
+          FutureBuilder<List<int>>(
+            future: _lokasiCountsFuture,
+            builder: (context, snapshot) {
+              // Menampilkan data statis saat loading atau jika error
+              final int rsCount = snapshot.hasData ? snapshot.data![0] : 24;
+              final int olahragaCount = snapshot.hasData
+                  ? snapshot.data![1]
+                  : 12;
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _LayananCard(
+                        icon: Icons.local_hospital_outlined,
+                        title: 'Rumah Sakit Terdekat',
+                        subtitle: '$rsCount tersedia',
+                        color: Colors.blue,
+                        onTap: () => _openMap(context, 'hospital'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _LayananCard(
+                        icon: Icons.sports_soccer_outlined,
+                        title: 'Tempat Olahraga',
+                        subtitle: '$olahragaCount tersedia',
+                        color: Colors.orange,
+                        onTap: () => _openMap(context, 'olahraga'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _LayananCard(
-                    icon: Icons.sports_soccer_outlined,
-                    title: 'Tempat Olahraga',
-                    subtitle: '12 tersedia',
-                    color: Colors.orange,
-                    onTap: () => _openMap(context, 'olahraga'),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           _LayananCard(
