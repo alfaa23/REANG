@@ -2,12 +2,14 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:reang_app/models/artikel_sehat_model.dart';
 import 'package:reang_app/screens/layanan/sehat/detail_artikel_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/konsultasi_dokter_screen.dart';
+import 'package:reang_app/screens/peta/peta_screen.dart';
+import 'package:reang_app/models/lokasi_peta_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
@@ -42,6 +44,74 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
     try {
       await _artikelFuture;
     } catch (_) {}
+  }
+
+  // PENAMBAHAN BARU: Fungsi untuk membuka peta
+  void _openMap(BuildContext context, String type) async {
+    try {
+      // Tampilkan dialog loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      List<Map<String, dynamic>> dataLokasi;
+      String judulHalaman;
+      IconData icon;
+      Color color;
+
+      if (type == 'hospital') {
+        // PERBAIKAN: Endpoint diubah menjadi 'hospital'
+        dataLokasi = await _apiService.fetchLokasiPeta('hospital');
+        judulHalaman = 'Peta Rumah Sakit';
+        icon = Icons.local_hospital_outlined;
+        color = Colors.blue;
+      } else {
+        dataLokasi = await _apiService.fetchLokasiPeta('sehat-olahraga');
+        judulHalaman = 'Peta Tempat Olahraga';
+        icon = Icons.sports_soccer_outlined;
+        color = Colors.orange;
+      }
+
+      final List<LokasiPeta> daftarLokasi = dataLokasi.map((data) {
+        return LokasiPeta(
+          nama: data['name'] ?? 'Tanpa Nama',
+          alamat: data['address'] ?? 'Tanpa Alamat',
+          lokasi: LatLng(
+            double.tryParse(data['latitude'].toString()) ?? 0.0,
+            double.tryParse(data['longitude'].toString()) ?? 0.0,
+          ),
+          fotoUrl: data['foto'],
+          icon: icon,
+          warna: color,
+        );
+      }).toList();
+
+      Navigator.of(context).pop(); // Tutup dialog loading
+
+      if (daftarLokasi.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data lokasi tidak ditemukan.')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PetaScreen(
+            daftarLokasi: daftarLokasi,
+            judulHalaman: judulHalaman,
+          ),
+        ),
+      );
+    } catch (e) {
+      Navigator.of(context).pop(); // Tutup dialog loading jika error
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat data peta: $e')));
+    }
   }
 
   @override
@@ -149,6 +219,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
                     title: 'Rumah Sakit Terdekat',
                     subtitle: '24 tersedia',
                     color: Colors.blue,
+                    onTap: () => _openMap(context, 'hospital'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -158,6 +229,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
                     title: 'Tempat Olahraga',
                     subtitle: '12 tersedia',
                     color: Colors.orange,
+                    onTap: () => _openMap(context, 'olahraga'),
                   ),
                 ),
               ],
@@ -229,7 +301,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             subtitle: 'Konsultasi dokter online 24/7',
             appUrlScheme: 'halodoc://',
             storeUrl:
-                'https://play.google.com/store/apps/details?id=com.halodoc.android',
+                'https://play.google.com/store/apps/details?id=com.linkdokter.halodoc.android', // iOS: https://apps.apple.com/app/id1067217981
           ),
           _RekomendasiCard(
             logoPath: 'assets/logos/mobilejkn.webp',
@@ -237,7 +309,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             subtitle: 'Layanan BPJS Kesehatan',
             appUrlScheme: 'mobilejkn://', // Contoh, mungkin perlu disesuaikan
             storeUrl:
-                'https://play.google.com/store/apps/details?id=app.bpjs.kesehatan',
+                'https://play.google.com/store/apps/details?id=app.bpjs.mobile', // iOS: https://apps.apple.com/app/id1237601115
           ),
           _RekomendasiCard(
             logoPath: 'assets/logos/alodokter.webp',
@@ -245,7 +317,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             subtitle: 'Informasi kesehatan terpercaya',
             appUrlScheme: 'alodokter://',
             storeUrl:
-                'https://play.google.com/store/apps/details?id=com.alodokter.android',
+                'https://play.google.com/store/apps/details?id=com.alodokter.android', // iOS: https://apps.apple.com/app/id1405482962
           ),
         ],
       ),

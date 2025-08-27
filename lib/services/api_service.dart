@@ -9,7 +9,14 @@ class ApiService {
   final Dio _dio = Dio();
 
   // =======================================================================
-  // API BERITA
+  // KONFIGURASI BASE URL
+  // =======================================================================
+  // PERBAIKAN: Base URL untuk backend Laravel Anda.
+  // Ubah alamat IP di sini jika diperlukan.
+  final String _baseUrlBackend = 'http://192.168.1.5:8000/api';
+
+  // =======================================================================
+  // API BERITA (EKSTERNAL)
   // =======================================================================
   final String _baseUrlBerita =
       'https://indramayukab.go.id/wp-json/wp/v2/posts?_embed';
@@ -31,7 +38,7 @@ class ApiService {
   }
 
   // =======================================================================
-  // API JDIH (Jaringan Dokumentasi dan Informasi Hukum)
+  // API JDIH (EKSTERNAL)
   // =======================================================================
   final String _baseUrlJdih = 'https://jdih.indramayukab.go.id/api/integrasi';
 
@@ -58,22 +65,18 @@ class ApiService {
   }
 
   // =======================================================================
-  // API WAKTU IBADAH (JADWAL SHOLAT)
-  // Mengambil data dari Aladhan API berdasarkan kota dan tanggal.
+  // API WAKTU IBADAH (EKSTERNAL)
   // =======================================================================
   Future<Map<String, String>> fetchJadwalSholat() async {
     try {
-      // Mendapatkan tanggal hari ini dalam format dd-MM-yyyy
       final String today = DateFormat('dd-MM-yyyy').format(DateTime.now());
       final String url =
           'http://api.aladhan.com/v1/timingsByCity/$today?city=Indramayu&country=Indonesia&method=3';
 
       final response = await _dio.get(url);
       if (response.statusCode == 200 && response.data['data'] != null) {
-        // Langsung mengembalikan map 'timings'
         final timings =
             response.data['data']['timings'] as Map<String, dynamic>;
-        // Mengonversi semua value menjadi String untuk keamanan
         return timings.map((key, value) => MapEntry(key, value.toString()));
       } else {
         throw Exception('Gagal memuat jadwal sholat');
@@ -84,13 +87,12 @@ class ApiService {
   }
 
   // =======================================================================
-  // API ARTIKEL KESEHATAN (BARU)
+  // API ARTIKEL KESEHATAN (LOKAL)
   // =======================================================================
-  final String _baseUrlInfoSehat = 'http://192.168.255.91:8000/api/info-sehat';
-
   Future<List<ArtikelSehat>> fetchArtikelKesehatan() async {
     try {
-      final response = await _dio.get(_baseUrlInfoSehat);
+      // PERBAIKAN: Menggunakan _baseUrlBackend
+      final response = await _dio.get('$_baseUrlBackend/info-sehat');
       if (response.statusCode == 200) {
         final List<ArtikelSehat> artikelList = (response.data as List)
             .map((item) => ArtikelSehat.fromJson(item))
@@ -101,6 +103,23 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil artikel kesehatan: $e');
+    }
+  }
+
+  // =======================================================================
+  // API LOKASI PETA (LOKAL)
+  // =======================================================================
+  Future<List<Map<String, dynamic>>> fetchLokasiPeta(String endpoint) async {
+    try {
+      // PERBAIKAN: Menggunakan _baseUrlBackend
+      final response = await _dio.get('$_baseUrlBackend/$endpoint');
+      if (response.statusCode == 200 && response.data is List) {
+        return List<Map<String, dynamic>>.from(response.data);
+      } else {
+        throw Exception('Gagal memuat data lokasi');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data lokasi: $e');
     }
   }
 }
