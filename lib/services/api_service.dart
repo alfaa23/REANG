@@ -13,7 +13,7 @@ class ApiService {
   // =======================================================================
   // PERBAIKAN: Base URL untuk backend Laravel Anda.
   // Ubah alamat IP di sini jika diperlukan.
-  final String _baseUrlBackend = 'http://192.168.1.5:8000/api';
+  final String _baseUrlBackend = 'http://192.168.254.173:8000/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)

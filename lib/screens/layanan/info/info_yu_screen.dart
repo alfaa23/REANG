@@ -5,6 +5,9 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
 import 'package:reang_app/screens/layanan/info/cctv_screen.dart';
 import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
+// PERUBAHAN: Import file view baru
+import 'package:reang_app/screens/layanan/info/satu_data_view.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class InfoYuScreen extends StatefulWidget {
   const InfoYuScreen({super.key});
@@ -20,6 +23,17 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
   int _selectedTabIndex = 0;
   bool _isCctvInitiated = false;
   bool _isJdihInitiated = false;
+  // PERUBAHAN: Menambahkan state untuk lazy load dan controller
+  bool _isSatuDataInitiated = false;
+  WebViewController? _satuDataWebViewController;
+
+  // PERUBAHAN: Menambahkan tab baru
+  final List<Map<String, dynamic>> _tabs = const [
+    {'label': 'Berita', 'icon': Icons.newspaper},
+    {'label': 'CCTV', 'icon': Icons.videocam},
+    {'label': 'JDIH', 'icon': Icons.balance},
+    {'label': 'Satu Data', 'icon': Icons.dataset_outlined},
+  ];
 
   @override
   void initState() {
@@ -27,80 +41,94 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     _loadBerita();
   }
 
-  // PERUBAHAN: Fungsi untuk memuat atau memuat ulang data berita
   void _loadBerita() {
     timeago.setLocaleMessages('id', timeago.IdMessages());
-    _beritaFuture = _apiService.fetchBerita();
+    _beritaFuture = _api_service_fetchWrapper();
+  }
+
+  // wrapper to avoid linter confusion when replacing existing ApiService usage
+  Future<List<Berita>> _api_service_fetchWrapper() {
+    return _apiService.fetchBerita();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    // PERUBAHAN: Membungkus Scaffold dengan WillPopScope
+    return WillPopScope(
+      onWillPop: () async {
+        // Jika tab "Satu Data" yang aktif dan WebView bisa kembali
+        if (_selectedTabIndex == 3 && _satuDataWebViewController != null) {
+          if (await _satuDataWebViewController!.canGoBack()) {
+            // Kembali di dalam WebView, dan jangan keluar dari halaman
+            await _satuDataWebViewController!.goBack();
+            return false;
+          }
+        }
+        // Jika tidak, izinkan untuk keluar dari halaman
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Info-yu',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Update terbaru dari Indramayu',
+                style: TextStyle(fontSize: 12, color: theme.hintColor),
+              ),
+            ],
+          ),
+        ),
+        body: Column(
           children: [
-            const Text(
-              'Info-yu',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SizedBox(
+                height: 44,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _tabs.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (context, i) {
+                    return _buildFilterChip(
+                      context,
+                      label: _tabs[i]['label'],
+                      icon: _tabs[i]['icon'],
+                      index: i,
+                    );
+                  },
+                ),
+              ),
             ),
-            Text(
-              'Update terbaru dari Indramayu',
-              style: TextStyle(fontSize: 12, color: theme.hintColor),
+            const SizedBox(height: 12),
+            Expanded(
+              child: IndexedStack(
+                index: _selectedTabIndex,
+                children: [
+                  _buildBeritaView(),
+                  _isCctvInitiated ? const CctvView() : Container(),
+                  _isJdihInitiated ? const JdihScreen() : Container(),
+                  // PERUBAHAN: Menambahkan view Satu Data
+                  _isSatuDataInitiated
+                      ? SatuDataView(
+                          onControllerCreated: (controller) {
+                            _satuDataWebViewController = controller;
+                          },
+                        )
+                      : Container(),
+                ],
+              ),
             ),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildFilterChip(
-                    context,
-                    label: 'Berita',
-                    icon: Icons.newspaper,
-                    index: 0,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildFilterChip(
-                    context,
-                    label: 'CCTV',
-                    icon: Icons.videocam,
-                    index: 1,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildFilterChip(
-                    context,
-                    label: 'JDIH',
-                    icon: Icons.balance,
-                    index: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: IndexedStack(
-              index: _selectedTabIndex,
-              children: [
-                _buildBeritaView(),
-                _isCctvInitiated ? const CctvView() : Container(),
-                _isJdihInitiated ? const JdihScreen() : Container(),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -122,17 +150,22 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
 
     return GestureDetector(
       onTap: () {
+        // pastikan keyboard/search nonaktif saat pindah tab (sama seperti KerjaYu)
+        FocusManager.instance.primaryFocus?.unfocus();
+
         setState(() {
           _selectedTabIndex = index;
           if (index == 1 && !_isCctvInitiated) {
             _isCctvInitiated = true;
           } else if (index == 2 && !_isJdihInitiated) {
             _isJdihInitiated = true;
+          } else if (index == 3 && !_isSatuDataInitiated) {
+            _isSatuDataInitiated = true;
           }
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(30),
@@ -163,7 +196,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        // PERUBAHAN: Menampilkan tampilan error yang lebih baik
         if (snapshot.hasError) {
           return _buildErrorView(
             context,
@@ -193,7 +225,6 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     );
   }
 
-  // PERUBAHAN: Widget baru untuk menampilkan pesan error dan tombol coba lagi
   Widget _buildErrorView(BuildContext context, String message) {
     final theme = Theme.of(context);
     return Center(
@@ -236,12 +267,20 @@ class InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DetailBeritaScreen(berita: berita),
-        ),
-      ),
+      onTap: () {
+        // pastikan keyboard/search nonaktif sebelum navigasi
+        FocusManager.instance.primaryFocus?.unfocus();
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailBeritaScreen(berita: berita),
+          ),
+        ).then((_) {
+          // safety: tetap unfocus saat kembali
+          FocusManager.instance.primaryFocus?.unfocus();
+        });
+      },
       borderRadius: BorderRadius.circular(12),
       child: Card(
         clipBehavior: Clip.hardEdge,

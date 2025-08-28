@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:reang_app/models/lokasi_peta_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class PetaScreen extends StatefulWidget {
   final String apiUrl;
@@ -42,53 +43,60 @@ class _PetaScreenState extends State<PetaScreen> {
   }
 
   void _loadLokasiData() {
-    _lokasiFuture = _apiService.fetchLokasiPeta(widget.apiUrl).then((data) {
-      return data.map((item) {
-        return LokasiPeta(
-          nama: item['name'] ?? 'Tanpa Nama',
-          alamat: item['address'] ?? 'Tanpa Alamat',
-          lokasi: LatLng(
-            double.tryParse(item['latitude'].toString()) ?? 0.0,
-            double.tryParse(item['longitude'].toString()) ?? 0.0,
-          ),
-          fotoUrl: item['foto'],
-          icon: widget.defaultIcon,
-          warna: widget.defaultColor,
-        );
-      }).toList();
-    });
+    _lokasiFuture = _api_service_fetchWrapper(widget.apiUrl);
   }
 
-  // PERBAIKAN: Logika perizinan disamakan dengan contoh PetaIbadahScreen
+  // Wrapper to keep conversion logic separated and easy to read
+  Future<List<LokasiPeta>> _api_service_fetchWrapper(String apiUrl) async {
+    final data = await _apiService.fetchLokasiPeta(apiUrl);
+    return data.map((item) {
+      return LokasiPeta(
+        nama: item['name'] ?? 'Tanpa Nama',
+        alamat: item['address'] ?? 'Tanpa Alamat',
+        lokasi: LatLng(
+          double.tryParse(item['latitude'].toString()) ?? 0.0,
+          double.tryParse(item['longitude'].toString()) ?? 0.0,
+        ),
+        fotoUrl: item['foto'],
+        icon: widget.defaultIcon,
+        warna: widget.defaultColor,
+      );
+    }).toList();
+  }
+
   Future<void> _getCurrentLocation() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+
     try {
+      // 1. Cek apakah layanan lokasi aktif
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // Meminta pengguna mengaktifkan GPS melalui dialog sistem
         await Geolocator.openLocationSettings();
-        // Cek lagi setelah pengguna mungkin kembali dari pengaturan
+        await Future.delayed(const Duration(seconds: 2));
         serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
-          throw Exception('Layanan lokasi tidak diaktifkan oleh pengguna.');
+          throw Exception('Aktifkan GPS terlebih dahulu');
         }
       }
 
+      // 2. Cek izin lokasi
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission != LocationPermission.whileInUse &&
             permission != LocationPermission.always) {
-          throw Exception('Izin lokasi tidak diberikan oleh pengguna.');
+          throw Exception('Izin lokasi ditolak');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // Pengguna menolak permanen, tidak bisa meminta lagi
-        throw Exception('Izin lokasi ditolak secara permanen.');
+        throw Exception(
+          'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk memberikan izin',
+        );
       }
 
+      // 3. Dapatkan posisi saat ini
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -98,18 +106,28 @@ class _PetaScreenState extends State<PetaScreen> {
         setState(() {
           _currentPosition = LatLng(position.latitude, position.longitude);
           _isLoading = false;
-          _mapController.move(_currentPosition!, 15.0);
+        });
+
+        // Pindahkan map setelah frame dirender agar controller siap
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            if (_currentPosition != null) {
+              _mapController.move(_currentPosition!, 15.0);
+            }
+          } catch (_) {
+            // ignore jika gagal memindahkan
+          }
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Gagal mendapatkan lokasi. Pastikan GPS dan izin aktif.',
-            ),
-          ),
+        Fluttertoast.showToast(
+          msg: 'Gagal mendapatkan lokasi: ${e.toString()}',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
         );
       }
     }
@@ -155,12 +173,16 @@ class _PetaScreenState extends State<PetaScreen> {
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      // Handle error
+      Fluttertoast.showToast(
+        msg: 'Tidak dapat membuka aplikasi peta',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+      );
     }
   }
 
   void _showDetailDialog(LokasiPeta tempat) {
-    final theme = Theme.of(context); // Ambil theme di sini
+    final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
     showDialog(
@@ -169,7 +191,6 @@ class _PetaScreenState extends State<PetaScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.all(0),
         clipBehavior: Clip.antiAlias,
-        // PERBAIKAN: Warna dialog disesuaikan dengan tema
         backgroundColor: theme.cardColor,
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -177,23 +198,31 @@ class _PetaScreenState extends State<PetaScreen> {
             SizedBox(
               height: 150,
               width: double.infinity,
-              child: Image.network(
-                tempat.fotoUrl ?? '',
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return const Center(child: CircularProgressIndicator());
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey.shade200,
-                    child: Icon(
-                      Icons.image_not_supported,
-                      color: Colors.grey.shade400,
+              child: (tempat.fotoUrl != null && tempat.fotoUrl!.isNotEmpty)
+                  ? Image.network(
+                      tempat.fotoUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey.shade200,
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey.shade400,
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: Colors.grey.shade200,
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
-                  );
-                },
-              ),
             ),
             Padding(
               padding: const EdgeInsets.all(20.0),
@@ -215,7 +244,6 @@ class _PetaScreenState extends State<PetaScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            // PERBAIKAN: Warna teks disesuaikan dengan tema
                             color: isDarkMode ? Colors.white : Colors.black87,
                           ),
                         ),
@@ -225,7 +253,6 @@ class _PetaScreenState extends State<PetaScreen> {
                   const SizedBox(height: 8),
                   Text(
                     tempat.alamat,
-                    // PERBAIKAN: Warna teks disesuaikan dengan tema
                     style: TextStyle(
                       color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
                     ),
@@ -315,8 +342,8 @@ class _PetaScreenState extends State<PetaScreen> {
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: daftarLokasi.first.lokasi,
-                  initialZoom: 14.0,
+                  center: daftarLokasi.first.lokasi,
+                  zoom: 14.0,
                 ),
                 children: [
                   TileLayer(
@@ -354,7 +381,6 @@ class _PetaScreenState extends State<PetaScreen> {
                 ),
               ),
               _buildCustomBottomSheet(daftarLokasi.length),
-              // PERBAIKAN: Menambahkan kembali indikator loading untuk GPS
               if (_isLoading) const Center(child: CircularProgressIndicator()),
             ],
           );

@@ -19,13 +19,14 @@ class ArtikelSehat {
 
   factory ArtikelSehat.fromJson(Map<String, dynamic> json) {
     var unescape = HtmlUnescape();
+
     return ArtikelSehat(
       id: json['id'] ?? 0,
       foto: json['foto'] ?? '',
-      // Membersihkan judul dari tag HTML jika ada
       judul: unescape.convert(json['judul'] ?? 'Tanpa Judul'),
       deskripsi: json['deskripsi'] ?? '',
-      kategori: json['kategori']?['nama'] ?? 'Kesehatan',
+      // PERBAIKAN: Logika disederhanakan untuk membaca 'kategori' sebagai string
+      kategori: json['kategori'] ?? 'Kesehatan',
       tanggal: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
     );
   }
