@@ -22,7 +22,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   bool _isPpdbInitiated = false;
   WebViewController? _ppdbWebViewController;
 
-  // Data ini sekarang hanya untuk tampilan kartu di halaman utama
   final List<Map<String, dynamic>> _schools = const [
     {
       'icon': Icons.palette_outlined,
@@ -31,7 +30,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Usia 4-6 tahun',
       'description':
           'Pendidikan anak usia dini dengan metode bermain sambil belajar',
-      'countText': 'Lihat Lokasi', // Teks diubah
+      'countText': 'Lihat Lokasi',
       'fitur': 'tk',
     },
     {
@@ -76,9 +75,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
     },
   ];
 
-  // PERBAIKAN: Fungsi ini sekarang hanya mengirimkan URL API ke PetaScreen
   void _openMap(BuildContext context, String jenjang, String judulHalaman) {
-    // Kita hanya perlu mengirim endpoint-nya saja, karena base URL sudah ada di ApiService
     final String apiUrl = 'tempat-sekolah?fitur=$jenjang';
 
     Navigator.push(
@@ -88,7 +85,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
           apiUrl: apiUrl,
           judulHalaman: judulHalaman,
           defaultIcon: Icons.school,
-          defaultColor: Colors.blue, // Anda bisa sesuaikan warnanya jika perlu
+          defaultColor: Colors.blue,
         ),
       ),
     );
@@ -311,9 +308,26 @@ class _SchoolCard extends StatelessWidget {
                     style: TextStyle(fontSize: 13, color: theme.hintColor),
                   ),
                 ),
-                TextButton(
-                  onPressed: onTapCari,
-                  child: const Text('Cari Terdekat ›'),
+                GestureDetector(
+                  onTap: onTapCari,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade800,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Cari Sekolah',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13, // lebih kecil
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
