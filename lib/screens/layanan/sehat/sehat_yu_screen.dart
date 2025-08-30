@@ -138,8 +138,6 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             _buildArtikelKesehatan(theme),
             _buildSectionTitle(theme, 'Aplikasi Rekomendasi'),
             _buildAplikasiRekomendasi(),
-            _buildSectionTitle(theme, 'Informasi Layanan'),
-            _buildInformasiLayanan(context),
             const SizedBox(height: 16),
           ],
         ),
@@ -307,74 +305,6 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             appUrlScheme: 'alodokter://',
             storeUrl:
                 'https://play.google.com/store/apps/details?id=com.alodokter.android', // iOS: https://apps.apple.com/app/id1405482962
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInformasiLayanan(BuildContext context) {
-    const infoItems = [
-      {
-        'icon': Icons.access_time_outlined,
-        'title': 'Jam Operasional',
-        'lines': [
-          'Senin - Jumat: 08:00 - 16:00',
-          'Sabtu: 08:00 - 12:00',
-          'Minggu: Tutup',
-        ],
-      },
-      {
-        'icon': Icons.phone_outlined,
-        'title': 'Kontak Bantuan',
-        'lines': [
-          'Telepon: (0234) 1234567',
-          'WhatsApp: 0812-3456-7890',
-          'Email: adminduk@desa.go.id',
-        ],
-      },
-      {
-        'icon': Icons.location_on_outlined,
-        'title': 'Lokasi Kantor',
-        'lines': [
-          'Jl. Ir. H. Juanda No.1, Singajaya, Kec. Indramayu, Jawa Barat 45218',
-        ],
-      },
-      {
-        'icon': Icons.lightbulb_outline,
-        'title': 'Tips',
-        'lines': [
-          'Tulis keluhan dengan jelas',
-          'Sebutkan sudah berapa lama sakit',
-          'Lampirkan foto jika perlu',
-        ],
-      },
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _InfoCard(data: infoItems[0])),
-                const SizedBox(width: 12),
-                Expanded(child: _InfoCard(data: infoItems[1])),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _InfoCard(data: infoItems[2])),
-                const SizedBox(width: 12),
-                Expanded(child: _InfoCard(data: infoItems[3])),
-              ],
-            ),
           ),
         ],
       ),
@@ -908,54 +838,6 @@ class _RekomendasiCard extends StatelessWidget {
               // Rating dihapus sesuai permintaan
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const _InfoCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              data['icon'] as IconData,
-              size: 28,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              data['title'] as String,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ...List<Widget>.from(
-              (data['lines'] as List<String>).map(
-                (line) => Text(
-                  line,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.hintColor,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -3,6 +3,8 @@ import 'package:intl/intl.dart'; // Diperlukan untuk format tanggal
 import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/models/jdih_model.dart';
 import 'package:reang_app/models/artikel_sehat_model.dart';
+import 'package:reang_app/models/info_pajak_model.dart';
+import 'package:reang_app/models/sekolah_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -13,7 +15,7 @@ class ApiService {
   // =======================================================================
   // PERBAIKAN: Base URL untuk backend Laravel Anda.
   // Ubah alamat IP di sini jika diperlukan.
-  final String _baseUrlBackend = 'http://192.168.254.173:8000/api';
+  final String _baseUrlBackend = 'https://c642f6e8317a.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -120,6 +122,41 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data lokasi: $e');
+    }
+  }
+
+  // =======================================================================
+  // API INFO PAJAK (BARU)
+  // =======================================================================
+  Future<List<InfoPajak>> fetchInfoPajak() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-pajak');
+      if (response.statusCode == 200) {
+        final List<InfoPajak> infoList = (response.data as List)
+            .map((item) => InfoPajak.fromJson(item))
+            .toList();
+        return infoList;
+      } else {
+        throw Exception('Gagal memuat info pajak');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil info pajak: $e');
+    }
+  }
+
+  Future<List<SekolahModel>> fetchTempatSekolah() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/tempat-sekolah');
+      if (response.statusCode == 200) {
+        final List<SekolahModel> sekolahList = (response.data as List)
+            .map((item) => SekolahModel.fromJson(item))
+            .toList();
+        return sekolahList;
+      } else {
+        throw Exception('Gagal memuat data sekolah');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data sekolah: $e');
     }
   }
 }

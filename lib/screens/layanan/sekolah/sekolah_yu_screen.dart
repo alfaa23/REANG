@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/screens/peta/peta_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-
-// Import halaman PPDB
 import 'package:reang_app/screens/layanan/sekolah/ppdb_webview_screen.dart';
-
-// Import halaman Berita Pendidikan
 import 'package:reang_app/screens/layanan/sekolah/berita_pendidikan_view.dart';
 
 class SekolahYuScreen extends StatefulWidget {
@@ -16,7 +13,6 @@ class SekolahYuScreen extends StatefulWidget {
 class _SekolahYuScreenState extends State<SekolahYuScreen> {
   int _selectedTab = 0;
 
-  // Hapus tab Beasiswa
   final List<Map<String, dynamic>> _tabs = const [
     {'label': 'Cari Sekolah', 'icon': Icons.search},
     {'label': 'PPDB Indramayu', 'icon': Icons.assignment_ind_outlined},
@@ -26,6 +22,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   bool _isPpdbInitiated = false;
   WebViewController? _ppdbWebViewController;
 
+  // Data ini sekarang hanya untuk tampilan kartu di halaman utama
   final List<Map<String, dynamic>> _schools = const [
     {
       'icon': Icons.palette_outlined,
@@ -34,7 +31,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Usia 4-6 tahun',
       'description':
           'Pendidikan anak usia dini dengan metode bermain sambil belajar',
-      'countText': '15 sekolah tersedia',
+      'countText': 'Lihat Lokasi', // Teks diubah
+      'fitur': 'tk',
     },
     {
       'icon': Icons.menu_book_outlined,
@@ -43,7 +41,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 1-6',
       'description':
           'Pendidikan dasar 6 tahun untuk membangun fondasi akademik yang kuat',
-      'countText': '28 sekolah tersedia',
+      'countText': 'Lihat Lokasi',
+      'fitur': 'sd',
     },
     {
       'icon': Icons.school_outlined,
@@ -52,7 +51,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 7-9',
       'description':
           'Pendidikan menengah pertama dengan kurikulum wajib & peminatan ringan',
-      'countText': '22 sekolah tersedia',
+      'countText': 'Lihat Lokasi',
+      'fitur': 'smp',
     },
     {
       'icon': Icons.cast_for_education_outlined,
@@ -61,7 +61,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 10-12',
       'description':
           'Pendidikan menengah dengan berbagai jurusan dan peminatan',
-      'countText': '18 sekolah tersedia',
+      'countText': 'Lihat Lokasi',
+      'fitur': 'sma',
     },
     {
       'icon': Icons.account_balance_outlined,
@@ -70,9 +71,28 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'S1/S2/S3',
       'description':
           'Pendidikan tinggi dengan berbagai program studi dan fakultas',
-      'countText': '8 universitas tersedia',
+      'countText': 'Lihat Lokasi',
+      'fitur': 'kuliah',
     },
   ];
+
+  // PERBAIKAN: Fungsi ini sekarang hanya mengirimkan URL API ke PetaScreen
+  void _openMap(BuildContext context, String jenjang, String judulHalaman) {
+    // Kita hanya perlu mengirim endpoint-nya saja, karena base URL sudah ada di ApiService
+    final String apiUrl = 'tempat-sekolah?fitur=$jenjang';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PetaScreen(
+          apiUrl: apiUrl,
+          judulHalaman: judulHalaman,
+          defaultIcon: Icons.school,
+          defaultColor: Colors.blue, // Anda bisa sesuaikan warnanya jika perlu
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +142,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                           },
                         )
                       : Container(),
-                  const BeritaPendidikanView(), // ✅ Panggil view dari file terpisah
+                  const BeritaPendidikanView(),
                 ],
               ),
             ),
@@ -207,7 +227,14 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
           style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
         ),
         const SizedBox(height: 16),
-        ..._schools.map((s) => _SchoolCard(data: s)).toList(),
+        ..._schools
+            .map(
+              (s) => _SchoolCard(
+                data: s,
+                onTapCari: () => _openMap(context, s['fitur'], s['title']),
+              ),
+            )
+            .toList(),
       ],
     );
   }
@@ -215,7 +242,9 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
 
 class _SchoolCard extends StatelessWidget {
   final Map<String, dynamic> data;
-  const _SchoolCard({required this.data});
+  final VoidCallback onTapCari;
+
+  const _SchoolCard({required this.data, required this.onTapCari});
 
   @override
   Widget build(BuildContext context) {
@@ -283,9 +312,7 @@ class _SchoolCard extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {
-                    // TODO: aksi Cari Terdekat
-                  },
+                  onPressed: onTapCari,
                   child: const Text('Cari Terdekat ›'),
                 ),
               ],

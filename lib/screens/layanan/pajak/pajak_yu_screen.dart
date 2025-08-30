@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/info_pajak_model.dart';
 import 'package:reang_app/screens/layanan/pajak/cek_pajak_webview.dart';
+import 'package:reang_app/screens/layanan/pajak/detail_pajak_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:html_unescape/html_unescape.dart'; // Import untuk membersihkan HTML
 
 class PajakYuScreen extends StatefulWidget {
   const PajakYuScreen({super.key});
@@ -8,27 +13,29 @@ class PajakYuScreen extends StatefulWidget {
 }
 
 class _PajakYuScreenState extends State<PajakYuScreen> {
-  int _selectedTab = 0; // 0=Info Pajak, 1=Cek Pajak
+  int _selectedTab = 0;
   bool _isWebViewInitiated = false;
 
-  final List<Map<String, dynamic>> _articles = const [
-    {
-      'category': 'Pajak Kendaraan',
-      'timeAgo': '2 jam lalu',
-      'title': 'Cara Mudah Bayar Pajak Kendaraan Online',
-      'description':
-          'Kini membayar pajak kendaraan tahunan bisa dilakukan dari rumah melalui aplikasi resmi Samsat digital.',
-      'author': 'Bapenda Indramayu',
-    },
-    {
-      'category': 'Pajak Bumi & Bangunan',
-      'timeAgo': '4 jam lalu',
-      'title': 'Jatuh Tempo Pembayaran PBB Semakin Dekat',
-      'description':
-          'Wajib pajak diimbau segera melunasi PBB sebelum jatuh tempo untuk menghindari denda keterlambatan.',
-      'author': 'Bapenda Indramayu',
-    },
-  ];
+  // State untuk memanggil API
+  final ApiService _apiService = ApiService();
+  late Future<List<InfoPajak>> _infoPajakFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInfoPajak();
+  }
+
+  void _loadInfoPajak() {
+    _infoPajakFuture = _apiService.fetchInfoPajak();
+    timeago.setLocaleMessages('id', timeago.IdMessages());
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _loadInfoPajak();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,124 +121,168 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
   }
 
   Widget _buildInfoPajakView(ThemeData theme) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        Text(
-          'Informasi Seputar Pajak',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+    return FutureBuilder<List<InfoPajak>>(
+      future: _infoPajakFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'Gagal memuat informasi.\nSilakan tarik ke bawah untuk mencoba lagi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.hintColor),
+              ),
+            ),
+          );
+        }
+        final articles = snapshot.data!;
+        return RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              Text(
+                'Informasi Seputar Pajak',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Ketahui jenis pajak yang berlaku di daerah Anda dan cara mengurusnya.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...articles.map((a) => _ArticleCard(data: a)).toList(),
+            ],
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Ketahui jenis pajak yang berlaku di daerah Anda dan cara mengurusnya.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-        ),
-        const SizedBox(height: 16),
-        ..._articles.map((a) => _ArticleCard(data: a)).toList(),
-      ],
+        );
+      },
     );
   }
 }
 
-/// Kartu artikel pajak
+/// Kartu artikel pajak dengan tampilan baru
 class _ArticleCard extends StatelessWidget {
-  final Map<String, dynamic> data;
+  final InfoPajak data;
   const _ArticleCard({required this.data});
+
+  // Fungsi untuk membersihkan tag HTML dari deskripsi
+  String _getExcerpt(String htmlText) {
+    final unescape = HtmlUnescape();
+    // Menghapus tag HTML dan membersihkan entitas HTML
+    final String text = htmlText.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
+    // PERBAIKAN: Menambahkan .trim() untuk menghapus spasi di awal dan akhir
+    return unescape.convert(text).trim();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final String excerpt = _getExcerpt(data.deskripsi);
 
     return Card(
+      clipBehavior: Clip.hardEdge,
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header dengan tinggi 180
-          Stack(
-            children: [
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  data['category'],
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    data['timeAgo'],
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          // Body dengan deskripsi max 3 baris
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data['title'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  data['description'],
-                  maxLines: 3, // Diubah dari 2 menjadi 3 baris
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: theme.hintColor),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 14, color: theme.hintColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      data['author'],
-                      style: TextStyle(fontSize: 13, color: theme.hintColor),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Baca selengkapnya ›'),
-                    ),
-                  ],
-                ),
-              ],
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailPajakScreen(artikel: data),
             ),
-          ),
-        ],
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Image.network(
+              data.foto,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 180,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: const Center(child: CircularProgressIndicator()),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 180,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Icon(
+                      Icons.receipt_long_outlined,
+                      color: theme.hintColor,
+                      size: 48,
+                    ),
+                  ),
+                );
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.kategori,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    data.judul,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  // PERBAIKAN: Menambahkan kembali deskripsi singkat
+                  const SizedBox(height: 6),
+                  Text(
+                    excerpt,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: theme.hintColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        'Bapenda Indramayu • ${timeago.format(data.tanggal, locale: 'id')}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Lihat Selengkapnya ›',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
