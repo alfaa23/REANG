@@ -3,6 +3,8 @@ import 'package:reang_app/screens/peta/peta_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:reang_app/screens/layanan/sekolah/ppdb_webview_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/berita_pendidikan_view.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/models/sekolah_model.dart';
 
 class SekolahYuScreen extends StatefulWidget {
   const SekolahYuScreen({super.key});
@@ -30,7 +32,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Usia 4-6 tahun',
       'description':
           'Pendidikan anak usia dini dengan metode bermain sambil belajar',
-      'countText': 'Lihat Lokasi',
       'fitur': 'tk',
     },
     {
@@ -40,7 +41,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 1-6',
       'description':
           'Pendidikan dasar 6 tahun untuk membangun fondasi akademik yang kuat',
-      'countText': 'Lihat Lokasi',
       'fitur': 'sd',
     },
     {
@@ -50,7 +50,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 7-9',
       'description':
           'Pendidikan menengah pertama dengan kurikulum wajib & peminatan ringan',
-      'countText': 'Lihat Lokasi',
       'fitur': 'smp',
     },
     {
@@ -60,7 +59,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 10-12',
       'description':
           'Pendidikan menengah dengan berbagai jurusan dan peminatan',
-      'countText': 'Lihat Lokasi',
       'fitur': 'sma',
     },
     {
@@ -70,7 +68,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'S1/S2/S3',
       'description':
           'Pendidikan tinggi dengan berbagai program studi dan fakultas',
-      'countText': 'Lihat Lokasi',
       'fitur': 'kuliah',
     },
   ];
@@ -208,31 +205,57 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   }
 
   Widget _buildCariSekolahView(ThemeData theme) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        Text(
-          'Cari Sekolah Terdekat',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Pilih jenjang pendidikan untuk menemukan sekolah terbaik di sekitar Anda',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-        ),
-        const SizedBox(height: 16),
-        ..._schools
-            .map(
-              (s) => _SchoolCard(
-                data: s,
-                onTapCari: () => _openMap(context, s['fitur'], s['title']),
+    return FutureBuilder<List<SekolahModel>>(
+      future: ApiService().fetchTempatSekolah(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}"));
+        }
+        final sekolahList = snapshot.data ?? [];
+
+        // hitung jumlah per fitur
+        final Map<String, int> countPerFitur = {};
+        for (var s in sekolahList) {
+          countPerFitur[s.fitur] = (countPerFitur[s.fitur] ?? 0) + 1;
+        }
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            Text(
+              'Cari Sekolah Terdekat',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-            )
-            .toList(),
-      ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pilih jenjang pendidikan untuk menemukan sekolah terbaik di sekitar Anda',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ..._schools.map((s) {
+              final fitur = s['fitur'] as String;
+              final count = countPerFitur[fitur] ?? 0;
+              return _SchoolCard(
+                data: {
+                  ...s,
+                  'countText': count > 0
+                      ? "$count Sekolah Tersedia"
+                      : "Tidak ada Sekolah",
+                },
+                onTapCari: () => _openMap(context, fitur, s['title']),
+              );
+            }).toList(),
+          ],
+        );
+      },
     );
   }
 }
@@ -323,7 +346,7 @@ class _SchoolCard extends StatelessWidget {
                       'Cari Sekolah',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 13, // lebih kecil
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
