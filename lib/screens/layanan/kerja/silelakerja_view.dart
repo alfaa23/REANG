@@ -48,8 +48,8 @@ class _SilelakerjaViewState extends State<SilelakerjaView>
             });
           },
           onWebResourceError: (error) {
-            // Hanya tangani error jika WebView sudah terinisialisasi
-            if (_isWebViewInitialized) {
+            // Hanya tangani error jika WebView sudah terinisialisasi dan untuk main frame
+            if (_isWebViewInitialized && error.isForMainFrame == true) {
               setState(() {
                 _isLoading = false;
                 _hasError = true;
