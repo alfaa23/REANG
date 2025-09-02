@@ -45,13 +45,17 @@ class _CctvViewState extends State<CctvView> {
           },
           // PERUBAHAN: Menambahkan onWebResourceError untuk menangkap error
           onWebResourceError: (WebResourceError error) {
-            if (mounted) {
-              setState(() {
-                _hasError = true;
-                _errorMessage =
-                    'Gagal memuat halaman. Periksa koneksi internet Anda.';
-              });
+            // Tambahan perbaikan: Hanya tangani error jika itu untuk main frame
+            if (error.isForMainFrame == true) {
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                  _errorMessage =
+                      'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                });
+              }
             }
+            // Jika bukan main frame, abaikan error (misalnya resource pendukung seperti gambar atau script yang gagal)
           },
           onNavigationRequest: (request) {
             if (request.url.startsWith('https://cctv.indramayukab.go.id/')) {

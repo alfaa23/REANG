@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class SilelakerjaView extends StatefulWidget {
-  // Callback untuk mengirim controller ke parent
   final Function(WebViewController)? onWebViewCreated;
 
   const SilelakerjaView({super.key, this.onWebViewCreated});
@@ -16,10 +15,10 @@ class _SilelakerjaViewState extends State<SilelakerjaView>
   late final WebViewController _controller;
   bool _isLoading = true;
   bool _hasError = false;
+  bool _isWebViewInitialized = false;
 
   final String _url = 'https://silelakerjayu.indramayukab.go.id/';
 
-  // Ini memberitahu Flutter untuk menjaga state widget ini tetap hidup.
   @override
   bool get wantKeepAlive => true;
 
@@ -34,36 +33,57 @@ class _SilelakerjaViewState extends State<SilelakerjaView>
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (url) => setState(() {
-            _isLoading = true;
-            _hasError = false;
-          }),
-          onPageFinished: (url) => setState(() => _isLoading = false),
-          // PERBAIKAN: Menggunakan onWebResourceError yang sesuai dengan versi package Anda
-          onWebResourceError: (error) => setState(() {
-            _isLoading = false;
-            _hasError = true;
-          }),
+          onPageStarted: (url) {
+            if (!_isWebViewInitialized) return;
+
+            setState(() {
+              _isLoading = true;
+              _hasError = false;
+            });
+          },
+          onPageFinished: (url) {
+            setState(() {
+              _isLoading = false;
+              _hasError = false;
+            });
+          },
+          onWebResourceError: (error) {
+            // Hanya tangani error jika WebView sudah terinisialisasi
+            if (_isWebViewInitialized) {
+              setState(() {
+                _isLoading = false;
+                _hasError = true;
+              });
+            }
+          },
         ),
       )
       ..loadRequest(Uri.parse(_url));
 
-    // Kirim controller ke parent setelah dibuat
+    // Tandai WebView sudah terinisialisasi setelah delay
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isWebViewInitialized = true;
+        });
+      }
+    });
+
     widget.onWebViewCreated?.call(_controller);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Panggil super.build(context) yang merupakan syarat dari mixin
     super.build(context);
 
-    if (_hasError) {
-      return _buildErrorView(context);
-    }
     return Stack(
       children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading) const Center(child: CircularProgressIndicator()),
+        if (_isWebViewInitialized) WebViewWidget(controller: _controller),
+
+        if (_hasError)
+          _buildErrorView(context)
+        else if (_isLoading)
+          const Center(child: CircularProgressIndicator()),
       ],
     );
   }
@@ -87,7 +107,13 @@ class _SilelakerjaViewState extends State<SilelakerjaView>
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => _controller.loadRequest(Uri.parse(_url)),
+              onPressed: () {
+                setState(() {
+                  _isLoading = true;
+                  _hasError = false;
+                });
+                _controller.loadRequest(Uri.parse(_url));
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
             ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -7,6 +9,8 @@ import 'package:reang_app/models/lokasi_peta_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+// tambahan: gunakan alias untuk menghindari tabrakan nama dengan geocoding.Location
+import 'package:location/location.dart' as loc;
 
 class PetaScreen extends StatefulWidget {
   final String apiUrl;
@@ -69,18 +73,36 @@ class _PetaScreenState extends State<PetaScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Cek apakah layanan lokasi aktif
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      // ====== 1. Gunakan package `location` untuk request service (memicu dialog sistem di Android) ======
+      final loc.Location locationService = loc.Location();
+
+      bool serviceEnabled = await locationService.serviceEnabled();
       if (!serviceEnabled) {
-        await Geolocator.openLocationSettings();
+        // requestService() akan memicu dialog sistem di Android untuk mengaktifkan location service
+        serviceEnabled = await locationService.requestService();
+        // tunggu sebentar agar perubahan service tercatat
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      // fallback: jika masih false, coba buka settings (untuk jaga-jaga)
+      if (!serviceEnabled) {
+        // Pada beberapa device, requestService tidak memunculkan dialog 'high accuracy'.
+        // Buka Location Settings sebagai fallback.
+        if (Platform.isAndroid) {
+          await Geolocator.openLocationSettings();
+        } else if (Platform.isIOS) {
+          await Geolocator.openAppSettings();
+        }
+
+        // tunggu sejenak dan cek ulang
         await Future.delayed(const Duration(seconds: 2));
-        serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        serviceEnabled = await locationService.serviceEnabled();
         if (!serviceEnabled) {
           throw Exception('Aktifkan GPS terlebih dahulu');
         }
       }
 
-      // 2. Cek izin lokasi
+      // ====== 2. Cek izin lokasi (permission) melalui geolocator ======
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -91,15 +113,17 @@ class _PetaScreenState extends State<PetaScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
+        // Izin ditolak permanen -> arahkan pengguna ke pengaturan aplikasi
         throw Exception(
           'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk memberikan izin',
         );
       }
 
-      // 3. Dapatkan posisi saat ini
+      // ====== 3. Dapatkan posisi saat ini ======
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
       await _getAddressFromLatLng(position);
 
       if (mounted) {

@@ -1,24 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/berita_pendidikan_model.dart';
 import 'package:reang_app/screens/layanan/sekolah/detail_berita_pendidikan_screen.dart';
-
-// Model data dummy untuk berita
-class BeritaPendidikan {
-  final String imagePath; // Ditambahkan
-  final String title;
-  final String excerpt;
-  final String timeAgo;
-  final String author; // Ditambahkan
-  final String content; // Ditambahkan
-
-  const BeritaPendidikan({
-    required this.imagePath,
-    required this.title,
-    required this.excerpt,
-    required this.timeAgo,
-    required this.author,
-    required this.content,
-  });
-}
+import 'package:reang_app/services/api_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:html_unescape/html_unescape.dart'; // PENAMBAHAN BARU
 
 class BeritaPendidikanView extends StatefulWidget {
   const BeritaPendidikanView({super.key});
@@ -28,143 +13,157 @@ class BeritaPendidikanView extends StatefulWidget {
 }
 
 class _BeritaPendidikanViewState extends State<BeritaPendidikanView> {
-  // Data dummy untuk tampilan awal (diperbarui dengan data lengkap)
-  final List<BeritaPendidikan> _beritaList = const [
-    BeritaPendidikan(
-      imagePath: 'assets/images/artikel_ppdb.png',
-      title: 'Tahun Ajaran Baru 2025/2026 Dimulai',
-      excerpt:
-          'Dinas Pendidikan Indramayu mengumumkan dimulainya tahun ajaran baru dengan beberapa penyesuaian kurikulum...',
-      timeAgo: '1 hari yang lalu',
-      author: 'Dinas Pendidikan',
-      content:
-          'Dinas Pendidikan Indramayu mengumumkan dimulainya tahun ajaran baru dengan beberapa penyesuaian kurikulum. Perubahan ini bertujuan untuk meningkatkan relevansi pendidikan dengan kebutuhan zaman sekarang.\n\nKepala Dinas Pendidikan menyatakan bahwa fokus utama adalah pada pengembangan keterampilan digital dan karakter siswa.',
-    ),
-    BeritaPendidikan(
-      imagePath: 'assets/images/artikel_kurikulum.png',
-      title: 'Lomba Cerdas Cermat Tingkat SMP Digelar',
-      excerpt:
-          'Puluhan sekolah menengah pertama berpartisipasi dalam lomba cerdas cermat tahunan yang diadakan di Pendopo...',
-      timeAgo: '3 hari yang lalu',
-      author: 'Disdik Indramayu',
-      content:
-          'Puluhan sekolah menengah pertama berpartisipasi dalam lomba cerdas cermat tahunan yang diadakan di Pendopo Kabupaten Indramayu. Acara ini bertujuan untuk mengasah kemampuan akademik dan sportivitas para siswa.',
-    ),
-    BeritaPendidikan(
-      imagePath: 'assets/images/artikel_vaksin.png',
-      title: 'Program Beasiswa untuk Siswa Berprestasi Dibuka',
-      excerpt:
-          'Pemerintah daerah membuka pendaftaran program beasiswa bagi siswa-siswi berprestasi di tingkat SMA/SMK...',
-      timeAgo: '5 hari yang lalu',
-      author: 'Admin Disdik',
-      content:
-          'Pemerintah daerah membuka pendaftaran program beasiswa bagi siswa-siswi berprestasi di tingkat SMA/SMK. Program ini mencakup bantuan biaya pendidikan hingga lulus serta program pembinaan khusus.',
-    ),
-  ];
+  final ApiService _apiService = ApiService();
+  Future<List<BeritaPendidikanModel>>? _beritaFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBerita();
+  }
+
+  void _loadBerita() {
+    setState(() {
+      _beritaFuture = _apiService.fetchBeritaPendidikan();
+    });
+    timeago.setLocaleMessages('id', timeago.IdMessages());
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Untuk saat ini, kita gunakan ListView langsung dengan data dummy
-    // Nanti bisa diganti dengan FutureBuilder jika sudah ada API
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _beritaList.length,
-      itemBuilder: (context, index) => Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
-        child: _BeritaCard(berita: _beritaList[index]),
-      ),
+    if (_beritaFuture == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return FutureBuilder<List<BeritaPendidikanModel>>(
+      future: _beritaFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Gagal memuat berita.'),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _loadBerita,
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          );
+        }
+        final articles = snapshot.data!;
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: articles.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: _BeritaCard(berita: articles[index]),
+          ),
+        );
+      },
     );
   }
 }
 
-// Widget kartu berita yang digabung di sini (private)
 class _BeritaCard extends StatelessWidget {
-  final BeritaPendidikan berita;
+  final BeritaPendidikanModel berita;
   const _BeritaCard({required this.berita});
+
+  // PENAMBAHAN BARU: Fungsi untuk membersihkan HTML
+  String _cleanHtml(String htmlString) {
+    final unescape = HtmlUnescape();
+    final String clean = htmlString.replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
+    return unescape.convert(clean);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: () {
-        // PERBAIKAN: Navigasi ke halaman detail berita
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetailBeritaPendidikanScreen(
-              // Mengirim data dalam format Map yang diharapkan oleh halaman detail
-              articleData: {
-                'imagePath': berita.imagePath,
-                'title': berita.title,
-                'author': berita.author,
-                'waktu': berita.timeAgo,
-                'content': berita.content,
-              },
+    // PERBAIKAN: Mengambil deskripsi bersih dari HTML
+    final String cleanDescription = _cleanHtml(berita.deskripsi);
+
+    return Card(
+      clipBehavior: Clip.hardEdge,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  DetailBeritaPendidikanScreen(artikel: berita),
             ),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        clipBehavior: Clip.hardEdge,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          );
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // PERBAIKAN: Menampilkan gambar dari data
-            Image.asset(
-              berita.imagePath,
+            Image.network(
+              berita.foto,
               height: 180,
               width: double.infinity,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      color: theme.hintColor,
-                      size: 48,
+              errorBuilder: (c, e, s) => Container(
+                height: 180,
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Center(
+                  child: Icon(
+                    Icons.article_outlined,
+                    color: theme.hintColor,
+                    size: 48,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pendidikan', // Kategori statis
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: Text(
-                berita.timeAgo,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    berita.judul,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  // PERBAIKAN: Menambahkan deskripsi singkat 2 baris
+                  Text(
+                    cleanDescription,
+                    style: TextStyle(color: theme.hintColor, height: 1.5),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'Dinas Pendidikan • ${timeago.format(berita.tanggal, locale: 'id')}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                      ),
+                      // PERBAIKAN: Spacer dan "Lihat Selengkapnya" dihapus
+                    ],
+                  ),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Text(
-                berita.title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                berita.excerpt,
-                style: TextStyle(color: theme.hintColor),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 8),
           ],
         ),
       ),

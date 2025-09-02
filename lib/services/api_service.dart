@@ -5,6 +5,7 @@ import 'package:reang_app/models/jdih_model.dart';
 import 'package:reang_app/models/artikel_sehat_model.dart';
 import 'package:reang_app/models/info_pajak_model.dart';
 import 'package:reang_app/models/sekolah_model.dart';
+import 'package:reang_app/models/berita_pendidikan_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -13,9 +14,8 @@ class ApiService {
   // =======================================================================
   // KONFIGURASI BASE URL
   // =======================================================================
-  // PERBAIKAN: Base URL untuk backend Laravel Anda.
-  // Ubah alamat IP di sini jika diperlukan.
-  final String _baseUrlBackend = 'https://c642f6e8317a.ngrok-free.app/api';
+  // Backend lokal
+  final String _baseUrlBackend = 'https://7f1d2a7ef409.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -157,6 +157,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data sekolah: $e');
+    }
+  }
+
+  // =======================================================================
+  // API BERITA PENDIDIKAN (BARU)
+  // =======================================================================
+  Future<List<BeritaPendidikanModel>> fetchBeritaPendidikan() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-sekolah');
+      if (response.statusCode == 200) {
+        final List<BeritaPendidikanModel> beritaList = (response.data as List)
+            .map((item) => BeritaPendidikanModel.fromJson(item))
+            .toList();
+        return beritaList;
+      } else {
+        throw Exception('Gagal memuat berita pendidikan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil berita pendidikan: $e');
     }
   }
 }

@@ -14,6 +14,7 @@ import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/search/search_screen.dart'; // PENAMBAHAN BARU: Import halaman pencarian
 
 // PENAMBAHAN BARU: Import widget banner dan rekomendasi
+import 'package:reang_app/screens/home/widgets/konsultasi_dokter_card.dart';
 import 'package:reang_app/screens/home/widgets/info_banner_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_fitur_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
@@ -378,7 +379,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   // =============================================================
                   // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
                   // =============================================================
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 2),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: KonsultasiDokterCard(),
+                  ),
+                  const SizedBox(height: 32),
                   // PERBAIKAN: Memberikan Key agar widget ikut refresh
                   RekomendasiFiturWidget(key: _rekomendasiFiturKey),
                   const SizedBox(height: 32),

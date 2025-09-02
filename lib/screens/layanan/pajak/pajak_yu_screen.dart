@@ -268,14 +268,6 @@ class _ArticleCard extends StatelessWidget {
                           color: theme.hintColor,
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        'Lihat Selengkapnya ›',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                     ],
                   ),
                 ],

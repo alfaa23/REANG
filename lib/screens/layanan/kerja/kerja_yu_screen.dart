@@ -18,6 +18,8 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
 
   // Controller untuk Silelakerja WebView
   WebViewController? _silelakerjaController;
+  // PENAMBAHAN BARU: State untuk lazy load
+  bool _isSilelakerjaInitiated = false;
 
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
@@ -182,12 +184,14 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                   index: _mainTab,
                   children: [
                     _buildBerandaView(theme),
-                    // Memberikan callback ke SilelakerjaView
-                    SilelakerjaView(
-                      onWebViewCreated: (controller) {
-                        _silelakerjaController = controller;
-                      },
-                    ),
+                    // PERBAIKAN: Terapkan lazy load di sini
+                    _isSilelakerjaInitiated
+                        ? SilelakerjaView(
+                            onWebViewCreated: (controller) {
+                              _silelakerjaController = controller;
+                            },
+                          )
+                        : Container(), // Tampilkan container kosong sebelum diinisiasi
                   ],
                 ),
               ),
@@ -209,8 +213,13 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
           return Expanded(
             child: GestureDetector(
               onTap: () {
-                setState(() => _mainTab = i);
-                // NONAKTIFKAN search saat beralih tab utama
+                setState(() {
+                  _mainTab = i;
+                  // PERBAIKAN: Set flag lazy load saat tab Silelakerja diklik pertama kali
+                  if (i == 1 && !_isSilelakerjaInitiated) {
+                    _isSilelakerjaInitiated = true;
+                  }
+                });
                 _unfocusGlobal();
               },
               child: Container(

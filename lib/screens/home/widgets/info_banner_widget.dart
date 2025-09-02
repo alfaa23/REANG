@@ -31,7 +31,7 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
   }
 
   void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 13), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 9), (timer) {
       if (_pageController.hasClients && imgList.isNotEmpty) {
         int nextPage = (_currentPage + 1) % imgList.length;
         _pageController.animateToPage(
