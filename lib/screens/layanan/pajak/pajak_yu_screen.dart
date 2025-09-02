@@ -35,6 +35,12 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
     setState(() {
       _loadInfoPajak();
     });
+    // Pastikan FutureBuilder menunggu future baru kalau diperlukan
+    try {
+      await _infoPajakFuture;
+    } catch (_) {
+      // biarkan saja, tampilan error akan ditangani oleh FutureBuilder
+    }
   }
 
   @override
@@ -47,7 +53,7 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Pajak‑Yu',
+              'Pajak-Yu',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
@@ -127,18 +133,69 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+
+        // Error, null, atau empty -> tampilkan UI "gagal" dengan ikon awan dan tombol coba lagi
         if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Text(
-                'Gagal memuat informasi.\nSilakan tarik ke bawah untuk mencoba lagi.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: theme.hintColor),
+          return RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: ListView(
+              // Gunakan ListView agar RefreshIndicator dan scroll tetap berfungsi
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Ikon awan gagal — menggantikan asset agar tidak perlu file tambahan
+                        Icon(
+                          Icons.cloud_off_outlined,
+                          size: 96,
+                          color: theme.hintColor,
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Maaf, tidak ada jaringan atau layanan sedang bermasalah.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: theme.hintColor,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Periksa koneksi internet Anda atau coba lagi.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: theme.hintColor.withOpacity(0.9),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: 160,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              _handleRefresh();
+                            },
+                            child: const Text('Coba Lagi'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Beri sedikit space di bawah agar bisa di-pull
+                SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+              ],
             ),
           );
         }
+
         final articles = snapshot.data!;
         return RefreshIndicator(
           onRefresh: _handleRefresh,
