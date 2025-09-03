@@ -189,10 +189,10 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
             future: _lokasiCountsFuture,
             builder: (context, snapshot) {
               // Menampilkan data statis saat loading atau jika error
-              final int rsCount = snapshot.hasData ? snapshot.data![0] : 24;
+              final int rsCount = snapshot.hasData ? snapshot.data![0] : 0;
               final int olahragaCount = snapshot.hasData
                   ? snapshot.data![1]
-                  : 12;
+                  : 0;
 
               return IntrinsicHeight(
                 child: Row(

@@ -1,4 +1,5 @@
 import 'package:html_unescape/html_unescape.dart';
+import 'package:reang_app/models/berita_model.dart';
 
 class InfoKerja {
   final int id;

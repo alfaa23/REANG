@@ -4,7 +4,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:reang_app/screens/layanan/sekolah/ppdb_webview_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/berita_pendidikan_view.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:reang_app/models/sekolah_model.dart';
 
 class SekolahYuScreen extends StatefulWidget {
   const SekolahYuScreen({super.key});
@@ -14,6 +13,9 @@ class SekolahYuScreen extends StatefulWidget {
 
 class _SekolahYuScreenState extends State<SekolahYuScreen> {
   int _selectedTab = 0;
+  // --- PERUBAHAN 1: Tambahkan state untuk menyimpan jumlah sekolah ---
+  Map<String, int> _schoolCounts = {};
+  // -----------------------------------------------------------------
 
   final List<Map<String, dynamic>> _tabs = const [
     {'label': 'Cari Sekolah', 'icon': Icons.search},
@@ -71,6 +73,39 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'fitur': 'kuliah',
     },
   ];
+
+  // --- PERUBAHAN 2: Panggil fungsi untuk fetch data saat screen pertama kali dibuka ---
+  @override
+  void initState() {
+    super.initState();
+    _fetchSchoolCounts();
+  }
+  // ----------------------------------------------------------------------------------
+
+  // --- PERUBAHAN 3: Buat fungsi baru untuk mengambil data jumlah sekolah ---
+  // Fungsi ini berjalan di latar belakang tanpa mengganggu UI.
+  // Jika gagal (tidak ada internet), _schoolCounts akan tetap kosong (default 0).
+  Future<void> _fetchSchoolCounts() async {
+    try {
+      final sekolahList = await ApiService().fetchTempatSekolah();
+      final Map<String, int> counts = {};
+      for (var s in sekolahList) {
+        counts[s.fitur] = (counts[s.fitur] ?? 0) + 1;
+      }
+      // Cek jika widget masih ada di tree sebelum setState
+      if (mounted) {
+        setState(() {
+          _schoolCounts = counts;
+        });
+      }
+    } catch (e) {
+      // Jika terjadi error (misal: tidak ada koneksi), biarkan saja.
+      // Tidak perlu menampilkan pesan error di halaman ini.
+      // _schoolCounts akan tetap kosong, sehingga count akan jadi 0.
+      debugPrint("Gagal mengambil data jumlah sekolah: $e");
+    }
+  }
+  // -------------------------------------------------------------------------
 
   void _openMap(BuildContext context, String jenjang, String judulHalaman) {
     final String apiUrl = 'tempat-sekolah?fitur=$jenjang';
@@ -204,60 +239,45 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
     );
   }
 
+  // --- PERUBAHAN 4: Hapus FutureBuilder ---
   Widget _buildCariSekolahView(ThemeData theme) {
-    return FutureBuilder<List<SekolahModel>>(
-      future: ApiService().fetchTempatSekolah(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
-        }
-        final sekolahList = snapshot.data ?? [];
-
-        // hitung jumlah per fitur
-        final Map<String, int> countPerFitur = {};
-        for (var s in sekolahList) {
-          countPerFitur[s.fitur] = (countPerFitur[s.fitur] ?? 0) + 1;
-        }
-
-        return ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          physics: const BouncingScrollPhysics(),
-          children: [
-            Text(
-              'Cari Sekolah Terdekat',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Pilih jenjang pendidikan untuk menemukan sekolah terbaik di sekitar Anda',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ..._schools.map((s) {
-              final fitur = s['fitur'] as String;
-              final count = countPerFitur[fitur] ?? 0;
-              return _SchoolCard(
-                data: {
-                  ...s,
-                  'countText': count > 0
-                      ? "$count Sekolah Tersedia"
-                      : "Tidak ada Sekolah",
-                },
-                onTapCari: () => _openMap(context, fitur, s['title']),
-              );
-            }).toList(),
-          ],
-        );
-      },
+    // Tidak ada lagi FutureBuilder, langsung bangun ListView.
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        Text(
+          'Cari Sekolah Terdekat',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Pilih jenjang pendidikan untuk menemukan sekolah terbaik di sekitar Anda',
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+        ),
+        const SizedBox(height: 16),
+        // Gunakan data dari state _schoolCounts
+        ..._schools.map((s) {
+          final fitur = s['fitur'] as String;
+          // Ambil jumlah dari state, jika tidak ada, defaultnya 0.
+          final count = _schoolCounts[fitur] ?? 0;
+          return _SchoolCard(
+            data: {
+              ...s,
+              'countText': count > 0
+                  ? "$count Sekolah Tersedia"
+                  : "0 Sekolah Tersedia", // Tampilkan 0 jika tidak ada
+            },
+            onTapCari: () => _openMap(context, fitur, s['title']),
+          );
+        }).toList(),
+      ],
     );
   }
+
+  // -------------------------------------------
 }
 
 class _SchoolCard extends StatelessWidget {
