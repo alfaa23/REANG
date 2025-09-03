@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/info_kerja_model.dart';
+import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -13,97 +15,40 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
   int _mainTab = 0;
   int _selectedFilterTab = 0;
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocus = FocusNode(); // FocusNode untuk search
+  final FocusNode _searchFocus = FocusNode();
   String _searchQuery = '';
-
-  // Controller untuk Silelakerja WebView
   WebViewController? _silelakerjaController;
-  // PENAMBAHAN BARU: State untuk lazy load
   bool _isSilelakerjaInitiated = false;
+
+  Future<List<InfoKerjaModel>>? _infoKerjaFuture;
 
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
     {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
   ];
 
-  final List<Map<String, dynamic>> _filterTabs = const [
-    {'label': 'Semua', 'icon': Icons.work_outline},
-    {'label': 'Lowongan', 'icon': Icons.apartment_outlined},
-    {'label': 'Job Fair', 'icon': Icons.event_available_outlined},
-    {'label': 'Pelatihan', 'icon': Icons.model_training_outlined},
-  ];
+  // --- TAMBAHAN: Buat pemetaan dari nama kategori ke ikonnya ---
+  final Map<String, IconData> _categoryIcons = {
+    'lowongan': Icons.apartment_outlined,
+    'job fair': Icons.event_available_outlined,
+    'pelatihan': Icons.model_training_outlined,
+    // Tambahkan pemetaan lain jika ada kategori baru di API
+  };
+  // ------------------------------------------------------------------
 
-  final List<Map<String, dynamic>> _jobs = const [
-    {
-      'category': 'Lowongan',
-      'logoPath': 'assets/logos/daya_anugrah.png',
-      'title': 'CRM Operation & Customer Handling',
-      'company': 'PT Daya Anugrah Mandiri',
-      'type': 'Full-Time',
-      'location': 'Bandung, Jawa Barat',
-      'salary': 'Rp 6.000.000 - Rp 7.000.000 per bulan',
-      'benefits': [
-        'Gaji Kompetitif',
-        'BPJS Kesehatan & Ketenagakerjaan',
-        'Kesempatan Pengembangan Karier',
-      ],
-      'description':
-          'Mengelola administrasi barang/PO, koordinasi dengan banyak pihak, dan memastikan kelancaran proses pengadaan barang untuk kebutuhan penjualan.',
-    },
-    {
-      'category': 'Lowongan',
-      'logoPath': 'assets/logos/bank_bca.png',
-      'title': 'Staf Legal Korporasi',
-      'company': 'PT Bank Central Asia Tbk',
-      'type': 'Full-Time',
-      'location': 'Indramayu, Jawa Barat',
-      'salary': 'Rp 5.500.000 - Rp 6.500.000 per bulan',
-      'benefits': ['Asuransi Jiwa', 'Tunjangan Hari Raya', 'Program Pensiun'],
-      'description':
-          'Melakukan review perjanjian kerjasama, legal drafting, serta memberikan opini hukum untuk mendukung kegiatan operasional perusahaan.',
-    },
-    {
-      'category': 'Pelatihan',
-      'logoPath': 'assets/logos/kemnaker.png',
-      'title': 'Pelatihan Digital Marketing',
-      'company': 'Balai Latihan Kerja (BLK) Indramayu',
-      'type': 'Gratis',
-      'location': 'Indramayu, Jawa Barat',
-      'salary': 'Sertifikat Kompetensi',
-      'benefits': [
-        'Modul Pelatihan',
-        'Instruktur Ahli',
-        'Sertifikat dari BNSP',
-      ],
-      'description':
-          'Program pelatihan intensif selama 1 bulan untuk menguasai SEO, SEM, Social Media Marketing, dan Content Marketing. Terbuka untuk umum.',
-    },
-    {
-      'category': 'Job Fair',
-      'logoPath': 'assets/logos/indramayu.png',
-      'title': 'Indramayu Career Expo 2025',
-      'company': 'Disnaker Indramayu',
-      'type': 'Acara',
-      'location': 'Gedung Sport Center Indramayu',
-      'salary': '25-26 Agustus 2025',
-      'benefits': [
-        'Puluhan Perusahaan Ternama',
-        'Walk-in Interview',
-        'Seminar Karir',
-      ],
-      'description':
-          'Bursa kerja terbesar di Indramayu. Bawa CV terbaikmu dan temukan ratusan lowongan dari berbagai industri. Acara ini gratis dan terbuka untuk umum.',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _infoKerjaFuture = ApiService().fetchInfoKerja();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _searchFocus.dispose(); // dispose focus node
+    _searchFocus.dispose();
     super.dispose();
   }
 
-  // Helper: unfocus global
   void _unfocusGlobal() {
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -112,7 +57,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // WillPopScope untuk menangani back di WebView
     return WillPopScope(
       onWillPop: () async {
         if (_mainTab == 1 && _silelakerjaController != null) {
@@ -141,57 +85,26 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
             ],
           ),
         ),
-        // GestureDetector di sini memeriksa posisi ketukan.
-        // Jika ketukan berada di luar bounds widget yang sedang fokus (misal TextField),
-        // maka kita panggil unfocus() -> keyboard/search nonaktif.
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
-          onTapDown: (details) {
-            final focused = FocusManager.instance.primaryFocus;
-            if (focused != null && focused.context != null) {
-              try {
-                final renderObject = focused.context!.findRenderObject();
-                if (renderObject is RenderBox) {
-                  final box = renderObject;
-                  final topLeft = box.localToGlobal(Offset.zero);
-                  final rect = topLeft & box.size;
-                  // Jika ketukan DI LUAR widget yang sedang fokus -> unfocus
-                  if (!rect.contains(details.globalPosition)) {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                  }
-                  // Jika ketukan di dalam rect (misal TextField), biarkan fokus normal
-                } else {
-                  // Jika tidak bisa mendapatkan RenderBox, unfocus sebagai fallback
-                  FocusManager.instance.primaryFocus?.unfocus();
-                }
-              } catch (_) {
-                // Safety fallback: jika error, unfocus
-                FocusManager.instance.primaryFocus?.unfocus();
-              }
-            } else {
-              // Tidak ada yang fokus -> nothing to do (tetap panggil unfocus untuk jaga-jaga)
-              FocusManager.instance.primaryFocus?.unfocus();
-            }
-          },
+          onTap: _unfocusGlobal,
           child: Column(
             children: [
               const SizedBox(height: 12),
               _buildMainTabs(theme),
-              // PERUBAHAN: Atur jarak antara filter utama dan konten di bawahnya
               const SizedBox(height: 24),
               Expanded(
                 child: IndexedStack(
                   index: _mainTab,
                   children: [
                     _buildBerandaView(theme),
-                    // PERBAIKAN: Terapkan lazy load di sini
                     _isSilelakerjaInitiated
                         ? SilelakerjaView(
                             onWebViewCreated: (controller) {
                               _silelakerjaController = controller;
                             },
                           )
-                        : Container(), // Tampilkan container kosong sebelum diinisiasi
+                        : Container(),
                   ],
                 ),
               ),
@@ -215,7 +128,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
               onTap: () {
                 setState(() {
                   _mainTab = i;
-                  // PERBAIKAN: Set flag lazy load saat tab Silelakerja diklik pertama kali
                   if (i == 1 && !_isSilelakerjaInitiated) {
                     _isSilelakerjaInitiated = true;
                   }
@@ -264,58 +176,113 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
   }
 
   Widget _buildBerandaView(ThemeData theme) {
-    List<Map<String, dynamic>> filteredJobs = _jobs;
-
-    if (_selectedFilterTab != 0) {
-      filteredJobs = _jobs
-          .where(
-            (j) => j['category'] == _filterTabs[_selectedFilterTab]['label'],
-          )
-          .toList();
-    }
-
-    if (_searchQuery.isNotEmpty) {
-      filteredJobs = filteredJobs
-          .where(
-            (j) => (j['title'] as String).toLowerCase().contains(
-              _searchQuery.toLowerCase(),
+    return FutureBuilder<List<InfoKerjaModel>>(
+      future: _infoKerjaFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Gagal memuat data: ${snapshot.error.toString()}'),
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Text(
+              'Tidak ada lowongan tersedia saat ini',
+              style: TextStyle(color: theme.hintColor),
             ),
-          )
-          .toList();
-    }
+          );
+        }
 
-    final String searchHint = _selectedFilterTab == 0
-        ? 'Cari semua...'
-        : 'Cari di ${_filterTabs[_selectedFilterTab]['label']}...';
+        final allJobs = snapshot.data!;
 
-    return Column(
-      children: [
-        _buildSearchBar(theme, searchHint),
-        const SizedBox(height: 16),
-        _buildFilterTabs(theme),
-        const SizedBox(height: 16),
-        Expanded(
-          child: filteredJobs.isEmpty
-              ? Center(
-                  child: Text(
-                    'Tidak ada data tersedia',
-                    style: TextStyle(color: theme.hintColor),
-                  ),
+        // --- Buat daftar filter secara dinamis ---
+        final Set<String> uniqueCategories = allJobs
+            .map((job) => job.kategori)
+            .toSet();
+        final List<Map<String, dynamic>> dynamicFilterTabs = [
+          {'label': 'Semua', 'icon': Icons.work_outline},
+        ];
+        for (String category in uniqueCategories) {
+          dynamicFilterTabs.add({
+            'label':
+                category[0].toUpperCase() + category.substring(1), // Capitalize
+            'icon':
+                _categoryIcons[category.toLowerCase()] ?? Icons.work_outline,
+          });
+        }
+        // ----------------------------------------------------
+
+        List<InfoKerjaModel> filteredJobs = allJobs;
+
+        // Gunakan dynamicFilterTabs untuk memfilter
+        if (_selectedFilterTab != 0) {
+          // Tambah validasi untuk mencegah error out of range
+          if (_selectedFilterTab < dynamicFilterTabs.length) {
+            final categoryToFilter =
+                dynamicFilterTabs[_selectedFilterTab]['label'];
+            filteredJobs = allJobs
+                .where(
+                  (j) =>
+                      j.kategori.toLowerCase() ==
+                      categoryToFilter.toLowerCase(),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: filteredJobs.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 16),
-                  itemBuilder: (_, i) => _JobCard(data: filteredJobs[i]),
-                ),
-        ),
-      ],
+                .toList();
+          }
+        }
+
+        if (_searchQuery.isNotEmpty) {
+          filteredJobs = filteredJobs
+              .where(
+                (j) =>
+                    j.posisi.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ) ||
+                    j.namaPerusahaan.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ),
+              )
+              .toList();
+        }
+
+        final String searchHint =
+            (_selectedFilterTab == 0 ||
+                _selectedFilterTab >= dynamicFilterTabs.length)
+            ? 'Cari semua...'
+            : 'Cari di ${dynamicFilterTabs[_selectedFilterTab]['label']}...';
+
+        return Column(
+          children: [
+            _buildSearchBar(theme, searchHint),
+            const SizedBox(height: 16),
+            // Kirim daftar filter dinamis ke widget
+            _buildFilterTabs(theme, dynamicFilterTabs),
+            const SizedBox(height: 16),
+            Expanded(
+              child: filteredJobs.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Tidak ada data yang cocok',
+                        style: TextStyle(color: theme.hintColor),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: filteredJobs.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 16),
+                      itemBuilder: (_, i) => _JobCard(data: filteredJobs[i]),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  // PERBAIKAN: Tampilan search bar diubah
   Widget _buildSearchBar(ThemeData theme, String hintText) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -351,21 +318,27 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
     );
   }
 
-  Widget _buildFilterTabs(ThemeData theme) {
+  // --- Terima daftar tab sebagai parameter ---
+  Widget _buildFilterTabs(
+    ThemeData theme,
+    List<Map<String, dynamic>> filterTabs,
+  ) {
     return SizedBox(
       height: 44,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
-        itemCount: _filterTabs.length,
+        itemCount: filterTabs.length, // Gunakan panjang list dinamis
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final tabData = _filterTabs[i];
+          final tabData = filterTabs[i]; // Gunakan data dari list dinamis
           final sel = i == _selectedFilterTab;
           return GestureDetector(
             onTap: () {
-              setState(() => _selectedFilterTab = i);
-              // NONAKTIFKAN search saat memilih filter
+              // Validasi agar tidak error jika filter berubah dan index lama tidak valid
+              if (i < filterTabs.length) {
+                setState(() => _selectedFilterTab = i);
+              }
               _unfocusGlobal();
             },
             child: Container(
@@ -408,8 +381,14 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
 }
 
 class _JobCard extends StatelessWidget {
-  final Map<String, dynamic> data;
+  final InfoKerjaModel data;
   const _JobCard({required this.data});
+
+  // Helper untuk mengubah HTML menjadi teks biasa untuk ringkasan
+  String _stripHtml(String htmlText) {
+    final RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
+    return htmlText.replaceAll(exp, ' ').replaceAll('&nbsp;', ' ').trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -426,18 +405,13 @@ class _JobCard extends StatelessWidget {
       color: cardColor,
       child: InkWell(
         onTap: () {
-          // NONAKTIFKAN search secara global sebelum navigasi
           FocusManager.instance.primaryFocus?.unfocus();
-
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DetailLowonganScreen(data: data),
+              builder: (context) => DetailLowonganScreen(jobData: data),
             ),
-          ).then((_) {
-            // Pastikan search tetap nonaktif saat kembali dari halaman detail
-            FocusManager.instance.primaryFocus?.unfocus();
-          });
+          );
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -445,77 +419,105 @@ class _JobCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 120.0, // Batasi tinggi maksimal
                 ),
-                child: Image.asset(
-                  data['logoPath'],
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.business,
-                      size: 40,
-                      color: Colors.grey.shade400,
-                    );
-                  },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    data.foto,
+                    width: 80, // Lebar tetap seperti semula
+                    // Tanpa 'fit', tinggi gambar akan menyesuaikan untuk menjaga rasio
+                    errorBuilder: (context, error, stackTrace) {
+                      // Jika error, tampilkan kotak 80x80 yang konsisten
+                      return Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.business,
+                          size: 40,
+                          color: Colors.grey.shade400,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                data['title'],
+                data.posisi,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: textColor,
+                  fontSize: 17,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                data['company'],
-                style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
+                data.namaPerusahaan,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: textColor,
+                  fontSize: 15,
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(data['type'], style: TextStyle(color: subtleTextColor)),
-              Text(data['location'], style: TextStyle(color: subtleTextColor)),
-              const SizedBox(height: 4),
+              const SizedBox(height: 12), // Jarak ditambah
+              // --- PERUBAHAN DIMULAI DI SINI ---
+              Row(
+                children: [
+                  Icon(
+                    Icons.business_center_outlined,
+                    size: 16,
+                    color: subtleTextColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      data.jenisKerja,
+                      style: TextStyle(color: subtleTextColor, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6), // Jarak antar baris
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: subtleTextColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      data.alamat,
+                      style: TextStyle(color: subtleTextColor, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12), // Jarak ditambah
+              // --- AKHIR PERUBAHAN ---
               Text(
-                data['salary'],
+                data.formattedGaji,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: textColor,
                   fontWeight: FontWeight.w600,
+                  fontSize: 15,
                 ),
               ),
               const SizedBox(height: 12),
-              if (data['benefits'] != null)
-                ...List<Widget>.from(
-                  (data['benefits'] as List<String>).map(
-                    (b) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '• ',
-                            style: TextStyle(color: textColor, fontSize: 14),
-                          ),
-                          Expanded(
-                            child: Text(
-                              b,
-                              style: TextStyle(color: textColor, fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
               Text(
-                data['description'],
-                style: TextStyle(color: subtleTextColor, height: 1.5),
+                _stripHtml(data.deskripsi),
+                style: TextStyle(
+                  color: subtleTextColor,
+                  height: 1.5,
+                  fontSize: 15,
+                ),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),

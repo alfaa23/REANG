@@ -6,6 +6,7 @@ import 'package:reang_app/models/artikel_sehat_model.dart';
 import 'package:reang_app/models/info_pajak_model.dart';
 import 'package:reang_app/models/sekolah_model.dart';
 import 'package:reang_app/models/berita_pendidikan_model.dart';
+import 'package:reang_app/models/info_kerja_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -176,6 +177,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil berita pendidikan: $e');
+    }
+  }
+
+  // =======================================================================
+  // API INFO KERJA (BARU)
+  // =======================================================================
+  Future<List<InfoKerjaModel>> fetchInfoKerja() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-kerja');
+      if (response.statusCode == 200) {
+        final List<InfoKerjaModel> infoKerjaList = (response.data as List)
+            .map((item) => InfoKerjaModel.fromJson(item))
+            .toList();
+        return infoKerjaList;
+      } else {
+        throw Exception('Gagal memuat data pekerjaan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data pekerjaan: $e');
     }
   }
 }
