@@ -17,10 +17,18 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
   @override
   void initState() {
     super.initState();
-    _jadwalFuture = (() async {
-      await initializeDateFormatting('id_ID', null);
-      return await _apiService.fetchJadwalSholat();
-    })();
+    _loadData();
+  }
+
+  // --- TAMBAHAN: Fungsi untuk memuat atau memuat ulang data ---
+  void _loadData() {
+    setState(() {
+      _jadwalFuture = (() async {
+        // Inisialisasi locale tetap di sini untuk keamanan
+        await initializeDateFormatting('id_ID', null);
+        return await _apiService.fetchJadwalSholat();
+      })();
+    });
   }
 
   @override
@@ -31,9 +39,14 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        // --- PERUBAHAN: Memanggil tampilan error jika ada masalah ---
         if (snapshot.hasError) {
-          return Center(child: Text('Gagal memuat data: ${snapshot.error}'));
+          return _buildErrorView(
+            context,
+            'Gagal memuat jadwal. Periksa koneksi internet Anda.',
+          );
         }
+        // -----------------------------------------------------------
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text('Tidak ada jadwal tersedia.'));
         }
@@ -71,6 +84,42 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
       },
     );
   }
+
+  // --- WIDGET BARU: Tampilan untuk error dengan tombol "Coba Lagi" ---
+  Widget _buildErrorView(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              "Gagal Memuat Jadwal",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData, // Memanggil fungsi reload data
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  // --------------------------------------------------------------------
 
   Widget _buildContentView(
     BuildContext context,
@@ -114,7 +163,6 @@ class _WaktuIbadahViewState extends State<WaktuIbadahView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // PERBAIKAN: Warna ikon diubah menjadi putih agar kontras
                     Icon(
                       Icons.location_on,
                       size: 16,

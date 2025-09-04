@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/layanan/ibadah/event_keagamaan_view.dart';
 import 'package:reang_app/screens/layanan/ibadah/waktu_ibadah_view.dart';
+import 'package:reang_app/screens/peta/peta_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class IbadahYuScreen extends StatefulWidget {
   const IbadahYuScreen({super.key});
@@ -17,12 +21,17 @@ class _IbadahYuScreenState extends State<IbadahYuScreen> {
   final List<String> _tabs = ["Tempat Ibadah", "Event", "Waktu Ibadah"];
 
   @override
+  void deactivate() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    super.deactivate();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      resizeToAvoidBottomInset:
-          false, // Prevents content from moving when keyboard appears
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,6 +59,7 @@ class _IbadahYuScreenState extends State<IbadahYuScreen> {
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
                       setState(() {
                         _selectedTab = i;
                         if (i == 1 && !_isEventInitiated) {
@@ -110,7 +120,6 @@ class _IbadahYuScreenState extends State<IbadahYuScreen> {
   }
 }
 
-// --- KONTEN TAB "TEMPAT IBADAH" ---
 class _TempatIbadahView extends StatefulWidget {
   const _TempatIbadahView();
 
@@ -119,42 +128,33 @@ class _TempatIbadahView extends StatefulWidget {
 }
 
 class _TempatIbadahViewState extends State<_TempatIbadahView> {
+  late Future<List<Map<String, dynamic>>> _ibadahFuture;
   int _selectedAgama = 0;
-  // PERBAIKAN: Tipe data diubah dari List<String> menjadi List<Map<String, String>>
+
   final List<Map<String, String>> _agamaFilters = [
     {"nama": "Semua", "jenis": "Tempat Ibadah"},
-    {"nama": "Islam", "jenis": "Masjid"},
-    {"nama": "Kristen", "jenis": "Gereja"},
-    {"nama": "Buddha", "jenis": "Vihara"},
-    {"nama": "Hindu", "jenis": "Pura"},
+    {"nama": "Masjid", "jenis": "Masjid"},
+    {"nama": "Gereja", "jenis": "Gereja"},
+    {"nama": "Vihara", "jenis": "Vihara"},
+    {"nama": "Pura", "jenis": "Pura"},
   ];
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   String _searchQuery = '';
 
-  final List<Map<String, dynamic>> _allTempatIbadah = [
-    {
-      'nama': 'Masjid Agung Indramayu',
-      'alamat': 'Jl. Jenderal Sudirman No. 12, Indramayu',
-      'agama': 'Islam',
-    },
-    {
-      'nama': 'Gereja Kristen Pasundan',
-      'alamat': 'Jl. Kartini No. 5, Indramayu',
-      'agama': 'Kristen',
-    },
-    {
-      'nama': 'Vihara Dharma Rahayu',
-      'alamat': 'Jl. Cimanuk No. 150, Indramayu',
-      'agama': 'Buddha',
-    },
-    {
-      'nama': 'Masjid Jami Al-Istiqomah',
-      'alamat': 'Jl. Raya Jatibarang No. 201, Jatibarang',
-      'agama': 'Islam',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _ibadahFuture = ApiService().fetchLokasiPeta('tempat-ibadah');
+  }
+
+  // --- TAMBAHAN: Fungsi untuk memuat ulang data ---
+  void _reloadData() {
+    setState(() {
+      _ibadahFuture = ApiService().fetchLokasiPeta('tempat-ibadah');
+    });
+  }
 
   @override
   void dispose() {
@@ -167,32 +167,37 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
+  void _openMap(BuildContext context, String fitur, String judulHalaman) {
+    final String apiUrl = 'tempat-ibadah?fitur=$fitur';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PetaScreen(
+          apiUrl: apiUrl,
+          judulHalaman: judulHalaman,
+          defaultIcon: Icons.place,
+          defaultColor: Colors.teal,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchMapsUrl(String lat, String lng) async {
+    final Uri url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'Tidak dapat membuka aplikasi peta';
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: e.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Logika filter diterapkan di sini
-    List<Map<String, dynamic>> filteredList = _allTempatIbadah;
-    if (_selectedAgama != 0) {
-      filteredList = _allTempatIbadah
-          .where(
-            (item) => item['agama'] == _agamaFilters[_selectedAgama]['nama'],
-          )
-          .toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      filteredList = filteredList
-          .where(
-            (item) =>
-                item['nama'].toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ) ||
-                item['alamat'].toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ),
-          )
-          .toList();
-    }
 
     return GestureDetector(
       onTap: _unfocusGlobal,
@@ -214,30 +219,34 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
             mainAxisSpacing: 12,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            children: const [
+            children: [
               _IbadahCard(
                 title: "Masjid Terdekat",
                 emoji: "🕌",
                 color: Colors.green,
+                onTap: () => _openMap(context, 'Masjid', 'Peta Masjid'),
               ),
               _IbadahCard(
                 title: "Gereja Terdekat",
                 emoji: "⛪",
                 color: Colors.blue,
+                onTap: () => _openMap(context, 'Gereja', 'Peta Gereja'),
               ),
               _IbadahCard(
                 title: "Vihara Terdekat",
                 emoji: "🏛️",
                 color: Colors.orange,
+                onTap: () => _openMap(context, 'Vihara', 'Peta Vihara'),
               ),
               _IbadahCard(
                 title: "Pura Terdekat",
                 emoji: "🛕",
                 color: Colors.pink,
+                onTap: () => _openMap(context, 'Pura', 'Peta Pura'),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 5),
           Container(
             decoration: BoxDecoration(
               color: theme.cardColor,
@@ -254,9 +263,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
               focusNode: _searchFocus,
               controller: _searchController,
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
+                setState(() => _searchQuery = value);
               },
               decoration: InputDecoration(
                 hintText: "Cari berdasarkan nama atau lokasi...",
@@ -275,7 +282,6 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
               separatorBuilder: (c, i) => const SizedBox(width: 8),
               itemBuilder: (c, i) {
                 return ChoiceChip(
-                  // PERBAIKAN: Mengakses kunci 'nama' dari map
                   label: Text(_agamaFilters[i]['nama']!),
                   selected: _selectedAgama == i,
                   onSelected: (selected) {
@@ -287,48 +293,133 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
             ),
           ),
           const SizedBox(height: 24),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _ibadahFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              // --- PERUBAHAN: Memanggil _buildErrorState dengan tombol ---
+              if (snapshot.hasError) {
+                return _buildErrorState(
+                  theme,
+                  "Gagal memuat data. Periksa koneksi internet Anda.",
+                );
+              }
+              // -----------------------------------------------------------
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return _buildEmptyState(theme, isSearch: false);
+              }
 
-          // PERBAIKAN: Menampilkan daftar hasil filter atau pesan alternatif
-          if (filteredList.isNotEmpty)
-            ...filteredList.map(
-              (data) => _MasjidCard(
-                data: data,
-                onTap: () {
-                  _unfocusGlobal();
-                },
-              ),
-            )
-          else
-            _buildEmptyState(theme),
+              List<Map<String, dynamic>> filteredList = snapshot.data!;
+              if (_selectedAgama != 0) {
+                filteredList = snapshot.data!
+                    .where(
+                      (item) =>
+                          item['fitur'] ==
+                          _agamaFilters[_selectedAgama]['nama'],
+                    )
+                    .toList();
+              }
+              if (_searchQuery.isNotEmpty) {
+                filteredList = filteredList
+                    .where(
+                      (item) =>
+                          (item['name'] as String).toLowerCase().contains(
+                            _searchQuery.toLowerCase(),
+                          ) ||
+                          (item['address'] as String).toLowerCase().contains(
+                            _searchQuery.toLowerCase(),
+                          ),
+                    )
+                    .toList();
+              }
+
+              if (filteredList.isEmpty) {
+                return _buildEmptyState(
+                  theme,
+                  isSearch: _searchQuery.isNotEmpty,
+                );
+              }
+
+              return Column(
+                children: filteredList
+                    .map(
+                      (data) => _MasjidCard(
+                        data: data,
+                        onTap: () => _launchMapsUrl(
+                          data['latitude'].toString(),
+                          data['longitude'].toString(),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
-  // PENAMBAHAN BARU: Widget untuk menampilkan pesan saat data kosong
-  Widget _buildEmptyState(ThemeData theme) {
-    String title;
-    String subtitle;
+  Widget _buildEmptyState(ThemeData theme, {required bool isSearch}) {
+    String title = isSearch
+        ? 'Maaf, pencarianmu tidak ada'
+        : 'Data ${_agamaFilters[_selectedAgama]['jenis']} Belum Tersedia';
+    String subtitle = isSearch
+        ? 'Coba cek ulang penulisan atau\ngunakan kata kunci lainnya.'
+        : 'Saat ini data untuk ${_agamaFilters[_selectedAgama]['jenis']} di Indramayu\nbelum terdaftar di sistem kami.';
 
-    if (_searchQuery.isNotEmpty) {
-      // Jika kosong karena pencarian
-      title = 'Maaf, pencarianmu tidak ada';
-      subtitle = 'Coba cek ulang penulisan atau\ngunakan kata kunci lainnya.';
-    } else {
-      // Jika kosong karena filter
-      // PERBAIKAN: Mengakses kunci 'jenis' dari map
-      final jenis = _agamaFilters[_selectedAgama]['jenis'];
-      title = 'Data $jenis Belum Tersedia';
-      subtitle =
-          'Saat ini data untuk $jenis di Indramayu\nbelum terdaftar di sistem kami.';
-    }
+    return _buildMessageState(theme, Icons.search_off_rounded, title, subtitle);
+  }
 
+  // --- PERUBAHAN: Widget error sekarang memiliki tombol ---
+  Widget _buildErrorState(ThemeData theme, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              "Terjadi Kesalahan",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _reloadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  // -----------------------------------------------------
+
+  Widget _buildMessageState(
+    ThemeData theme,
+    IconData icon,
+    String title,
+    String subtitle,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 48.0),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.search_off_rounded, size: 64, color: theme.hintColor),
+            Icon(icon, size: 64, color: theme.hintColor),
             const SizedBox(height: 16),
             Text(
               title,
@@ -353,28 +444,35 @@ class _IbadahCard extends StatelessWidget {
   final String title;
   final String emoji;
   final Color color;
+  final VoidCallback onTap;
+
   const _IbadahCard({
     required this.title,
     required this.emoji,
     required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(12),
-      child: Text(
-        "$emoji\n$title",
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 20,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          "$emoji\n$title",
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
       ),
     );
@@ -389,6 +487,11 @@ class _MasjidCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final String nama = data['name'] ?? 'Tanpa Nama';
+    final String alamat = data['address'] ?? 'Tanpa Alamat';
+    final String agama = data['fitur'] ?? 'Ibadah';
+    final String fotoUrl = data['foto'] ?? '';
+
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -401,20 +504,25 @@ class _MasjidCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                Container(
+                Image.network(
+                  fotoUrl,
                   height: 160,
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.mosque,
-                    size: 64,
-                    color: theme.colorScheme.onPrimaryContainer.withOpacity(
-                      0.5,
-                    ),
-                  ),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 160,
+                      color: theme.colorScheme.primaryContainer,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.mosque,
+                        size: 64,
+                        color: theme.colorScheme.onPrimaryContainer.withOpacity(
+                          0.5,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 Positioned(
                   top: 8,
@@ -429,7 +537,7 @@ class _MasjidCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      data['agama'],
+                      agama,
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
@@ -442,14 +550,14 @@ class _MasjidCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    data['nama'],
+                    nama,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    data['alamat'],
+                    alamat,
                     style: TextStyle(color: theme.hintColor),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -458,7 +566,7 @@ class _MasjidCard extends StatelessWidget {
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      "Lihat Lokasi", // PERBAIKAN: Teks diubah
+                      "Lihat Lokasi",
                       style: TextStyle(
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,

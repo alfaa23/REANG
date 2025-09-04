@@ -7,6 +7,7 @@ import 'package:reang_app/models/info_pajak_model.dart';
 import 'package:reang_app/models/sekolah_model.dart';
 import 'package:reang_app/models/berita_pendidikan_model.dart';
 import 'package:reang_app/models/info_kerja_model.dart';
+import 'package:reang_app/models/event_keagamaan_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -16,7 +17,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://d8e86de997f9.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://945dab703ee3.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -196,6 +197,22 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data pekerjaan: $e');
+    }
+  }
+
+  Future<List<EventKeagamaanModel>> fetchEventKeagamaan() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/event-agama');
+      if (response.statusCode == 200) {
+        final List<EventKeagamaanModel> eventList = (response.data as List)
+            .map((item) => EventKeagamaanModel.fromJson(item))
+            .toList();
+        return eventList;
+      } else {
+        throw Exception('Gagal memuat data event');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data event: $e');
     }
   }
 }

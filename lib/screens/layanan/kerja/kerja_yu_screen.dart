@@ -27,20 +27,25 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
     {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
   ];
 
-  // --- TAMBAHAN: Buat pemetaan dari nama kategori ke ikonnya ---
   final Map<String, IconData> _categoryIcons = {
     'lowongan': Icons.apartment_outlined,
     'job fair': Icons.event_available_outlined,
     'pelatihan': Icons.model_training_outlined,
-    // Tambahkan pemetaan lain jika ada kategori baru di API
   };
-  // ------------------------------------------------------------------
 
   @override
   void initState() {
     super.initState();
     _infoKerjaFuture = ApiService().fetchInfoKerja();
   }
+
+  // --- TAMBAHAN: Fungsi untuk memuat ulang data ---
+  void _reloadData() {
+    setState(() {
+      _infoKerjaFuture = ApiService().fetchInfoKerja();
+    });
+  }
+  // --------------------------------------------------
 
   @override
   void dispose() {
@@ -182,11 +187,14 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        // --- PERUBAHAN: Menambahkan tampilan error dengan tombol ---
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Gagal memuat data: ${snapshot.error.toString()}'),
+          return _buildErrorView(
+            context,
+            'Gagal memuat data. Periksa koneksi internet Anda.',
           );
         }
+        // ---------------------------------------------------------
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Text(
@@ -197,8 +205,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
         }
 
         final allJobs = snapshot.data!;
-
-        // --- Buat daftar filter secara dinamis ---
         final Set<String> uniqueCategories = allJobs
             .map((job) => job.kategori)
             .toSet();
@@ -213,13 +219,10 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                 _categoryIcons[category.toLowerCase()] ?? Icons.work_outline,
           });
         }
-        // ----------------------------------------------------
 
         List<InfoKerjaModel> filteredJobs = allJobs;
 
-        // Gunakan dynamicFilterTabs untuk memfilter
         if (_selectedFilterTab != 0) {
-          // Tambah validasi untuk mencegah error out of range
           if (_selectedFilterTab < dynamicFilterTabs.length) {
             final categoryToFilter =
                 dynamicFilterTabs[_selectedFilterTab]['label'];
@@ -257,7 +260,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
           children: [
             _buildSearchBar(theme, searchHint),
             const SizedBox(height: 16),
-            // Kirim daftar filter dinamis ke widget
             _buildFilterTabs(theme, dynamicFilterTabs),
             const SizedBox(height: 16),
             Expanded(
@@ -282,6 +284,37 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
       },
     );
   }
+
+  // --- TAMBAHAN: Widget untuk menampilkan error ---
+  Widget _buildErrorView(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _reloadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  // ------------------------------------------------
 
   Widget _buildSearchBar(ThemeData theme, String hintText) {
     return Padding(
@@ -318,7 +351,6 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
     );
   }
 
-  // --- Terima daftar tab sebagai parameter ---
   Widget _buildFilterTabs(
     ThemeData theme,
     List<Map<String, dynamic>> filterTabs,
@@ -328,14 +360,13 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
-        itemCount: filterTabs.length, // Gunakan panjang list dinamis
+        itemCount: filterTabs.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final tabData = filterTabs[i]; // Gunakan data dari list dinamis
+          final tabData = filterTabs[i];
           final sel = i == _selectedFilterTab;
           return GestureDetector(
             onTap: () {
-              // Validasi agar tidak error jika filter berubah dan index lama tidak valid
               if (i < filterTabs.length) {
                 setState(() => _selectedFilterTab = i);
               }
@@ -384,7 +415,6 @@ class _JobCard extends StatelessWidget {
   final InfoKerjaModel data;
   const _JobCard({required this.data});
 
-  // Helper untuk mengubah HTML menjadi teks biasa untuk ringkasan
   String _stripHtml(String htmlText) {
     final RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
     return htmlText.replaceAll(exp, ' ').replaceAll('&nbsp;', ' ').trim();
@@ -394,7 +424,6 @@ class _JobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final cardColor = isDark ? const Color(0xFF2E2E2E) : theme.cardColor;
     final textColor = isDark ? Colors.white : theme.textTheme.bodyLarge!.color;
     final subtleTextColor = isDark ? Colors.white70 : theme.hintColor;
@@ -420,17 +449,13 @@ class _JobCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxHeight: 120.0, // Batasi tinggi maksimal
-                ),
+                constraints: const BoxConstraints(maxHeight: 120.0),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
                     data.foto,
-                    width: 80, // Lebar tetap seperti semula
-                    // Tanpa 'fit', tinggi gambar akan menyesuaikan untuk menjaga rasio
+                    width: 80,
                     errorBuilder: (context, error, stackTrace) {
-                      // Jika error, tampilkan kotak 80x80 yang konsisten
                       return Container(
                         width: 80,
                         height: 80,
@@ -465,8 +490,7 @@ class _JobCard extends StatelessWidget {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 12), // Jarak ditambah
-              // --- PERUBAHAN DIMULAI DI SINI ---
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Icon(
@@ -483,7 +507,7 @@ class _JobCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6), // Jarak antar baris
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(
@@ -500,8 +524,7 @@ class _JobCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12), // Jarak ditambah
-              // --- AKHIR PERUBAHAN ---
+              const SizedBox(height: 12),
               Text(
                 data.formattedGaji,
                 style: theme.textTheme.bodyMedium?.copyWith(

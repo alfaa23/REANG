@@ -1,25 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/event_keagamaan_model.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
 class DetailEventScreen extends StatelessWidget {
-  // final Map<String, dynamic> eventData; // Nanti akan menerima data event
-  const DetailEventScreen({super.key /*, required this.eventData*/});
+  // --- PERUBAHAN: Menerima objek EventKeagamaanModel ---
+  final EventKeagamaanModel event;
+  const DetailEventScreen({super.key, required this.event});
+
+  // --- FUNGSI BARU: Untuk membuka aplikasi peta ---
+  Future<void> _launchMapsUrl(String lat, String lng) async {
+    final Uri url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'Tidak dapat membuka aplikasi peta';
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: e.toString());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Data dummy untuk contoh, nanti akan diganti dari eventData
-    const String title = "Kajian Tafsir Al-Quran";
-    const String author = "Kementerian Agama";
-    const String timeAgo = "2 jam lalu";
-    const String date = "Senin, 15 Januari 2024";
-    const String time = "19:30 WIB s/d selesai";
-    const String placeName = "Masjid Al-Ikhlas";
-    const String address = "KAB. Indramayu KEC. Balongan Desa Tegal Lurung";
-    const String description =
-        "- Kajian rutin setiap Senin malam tentang tafsir Al-Qur’an.\n- Terbuka untuk umum, membawa Al-Qur’an pribadi sangat dianjurkan.\n- Disampaikan oleh Ustadz pembimbing dari Kemenag.";
-    const String imagePath =
-        'assets/images/kajian_banner.png'; // Ganti dengan path gambar Anda
+    // Data sekarang diambil dari objek 'event'
+    final String timeAgo = timeago.format(event.eventDateTime, locale: 'id');
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -31,9 +41,8 @@ class DetailEventScreen extends StatelessWidget {
             expandedHeight: 220.0,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              // PERBAIKAN: Judul dihapus dari FlexibleSpaceBar
-              background: Image.asset(
-                imagePath,
+              background: Image.network(
+                event.foto, // Menggunakan foto dari API
                 fit: BoxFit.cover,
                 errorBuilder: (c, e, s) => Container(
                   color: theme.colorScheme.primary,
@@ -57,9 +66,8 @@ class DetailEventScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // PERBAIKAN: Judul dipindahkan ke sini
                     Text(
-                      title,
+                      event.judul, // Menggunakan judul dari API
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -84,13 +92,13 @@ class DetailEventScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              author,
+                              "Penyelenggara", // Label statis
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              timeAgo,
+                              "Diposting ${timeAgo}", // Menggunakan timeago
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.hintColor,
                               ),
@@ -115,14 +123,16 @@ class DetailEventScreen extends StatelessWidget {
                               theme,
                               Icons.calendar_month_outlined,
                               "Waktu",
-                              "$date\n$time",
+                              // Menggunakan tanggal & waktu dari model
+                              "${event.formattedDate}\n${event.formattedTime} WIB s/d selesai",
                             ),
                             const Divider(height: 24),
                             _buildDetailRow(
                               theme,
                               Icons.location_on_outlined,
                               "Lokasi",
-                              "$placeName\n$address",
+                              // Menggunakan lokasi & alamat dari model
+                              "${event.lokasi}\n${event.alamat}",
                             ),
                           ],
                         ),
@@ -138,11 +148,29 @@ class DetailEventScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      description,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                    // Menggunakan HtmlWidget untuk merender deskripsi
+                    HtmlWidget(
+                      event.deskripsi,
+                      textStyle: theme.textTheme.bodyLarge?.copyWith(
                         height: 1.6,
                         fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 24), // Spasi sebelum tombol
+                    // --- TOMBOL BARU: Lihat Lokasi ---
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _launchMapsUrl(event.latitude, event.longitude),
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Lihat Lokasi di Peta'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -180,7 +208,6 @@ class DetailEventScreen extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 value,
-                // PERBAIKAN: Warna diubah dari hintColor dan ukuran disesuaikan
                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
               ),
             ],
