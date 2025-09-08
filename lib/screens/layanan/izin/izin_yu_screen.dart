@@ -1,28 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:reang_app/screens/layanan/izin/izin_yu_web_screen.dart'; // Import halaman WebView
+import 'package:reang_app/models/info_perizinan_model.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/screens/layanan/izin/izin_yu_web_screen.dart';
+import 'package:reang_app/screens/layanan/izin/detail_izin_screen.dart';
 
-class IzinYuScreen extends StatelessWidget {
+class IzinYuScreen extends StatefulWidget {
   const IzinYuScreen({super.key});
 
-  // Data dummy untuk Info Perizinan
-  final List<Map<String, dynamic>> _articles = const [
-    {
-      'category': 'Izin Mendirikan Bangunan',
-      'timeAgo': '1 hari lalu',
-      'title': 'Panduan Lengkap Mengurus IMB di Indramayu',
-      'description':
-          'Pahami alur, syarat, dan dokumen yang diperlukan untuk mengajukan Izin Mendirikan Bangunan (IMB) secara resmi.',
-      'author': 'DPMPTSP Indramayu',
-    },
-    {
-      'category': 'Izin Usaha',
-      'timeAgo': '3 hari lalu',
-      'title': 'Langkah-langkah Membuat Surat Izin Usaha Perdagangan (SIUP)',
-      'description':
-          'Bagi para wirausahawan, SIUP adalah dokumen wajib. Berikut adalah cara mudah untuk mengurusnya.',
-      'author': 'DPMPTSP Indramayu',
-    },
-  ];
+  @override
+  State<IzinYuScreen> createState() => _IzinYuScreenState();
+}
+
+class _IzinYuScreenState extends State<IzinYuScreen> {
+  late Future<List<InfoPerizinanModel>> _perizinanFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _perizinanFuture = ApiService().fetchInfoPerizinan();
+  }
+
+  void _reloadData() {
+    setState(() {
+      _perizinanFuture = ApiService().fetchInfoPerizinan();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +51,6 @@ class IzinYuScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         physics: const BouncingScrollPhysics(),
         children: [
-          // Tombol untuk pindah ke halaman WebView
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -77,7 +78,6 @@ class IzinYuScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // PERUBAHAN: Teks judul dan subjudul diperbarui
           Text(
             'Informasi Seputar Perizinan',
             style: theme.textTheme.titleLarge?.copyWith(
@@ -90,16 +90,73 @@ class IzinYuScreen extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           ),
           const SizedBox(height: 16),
-          ..._articles.map((a) => _ArticleCard(data: a)).toList(),
+          FutureBuilder<List<InfoPerizinanModel>>(
+            future: _perizinanFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                // --- PERUBAHAN: Memanggil error view tanpa pesan teknis ---
+                return _buildErrorView(context);
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48.0),
+                    child: Text('Tidak ada informasi saat ini.'),
+                  ),
+                );
+              }
+              final articles = snapshot.data!;
+              return Column(
+                children: articles.map((a) => _ArticleCard(data: a)).toList(),
+              );
+            },
+          ),
         ],
+      ),
+    );
+  }
+
+  // --- PERUBAHAN: Widget error view disederhanakan ---
+  Widget _buildErrorView(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal Memuat Data',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Maaf, terjadi kesalahan. Periksa koneksi internet Anda dan coba lagi.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _reloadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// Kartu artikel (sama seperti di PajakYuScreen)
 class _ArticleCard extends StatelessWidget {
-  final Map<String, dynamic> data;
+  final InfoPerizinanModel data;
   const _ArticleCard({required this.data});
 
   @override
@@ -109,91 +166,128 @@ class _ArticleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Stack(
-            children: [
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    data['category'],
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    data['timeAgo'],
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailIzinScreen(perizinanData: data),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Stack(
               children: [
-                Text(
-                  data['title'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Image.network(
+                  data.foto,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    height: 180,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        data.judul,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  data['description'],
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: theme.hintColor),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 14, color: theme.hintColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      data['author'],
-                      style: TextStyle(fontSize: 13, color: theme.hintColor),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Baca selengkapnya ›'),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                    child: Text(
+                      data.timeAgo,
+                      style: const TextStyle(fontSize: 12, color: Colors.white),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      data.kategori.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    data.judul,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    data.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: theme.hintColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 14, color: theme.hintColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        "DPMPTSP Indramayu",
+                        style: TextStyle(fontSize: 13, color: theme.hintColor),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 14,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -14,13 +15,26 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
   // Controller dan State untuk WebView 1 (Simpan Ayu)
   late final WebViewController _simpanAyuController;
   int _simpanAyuLoadingProgress = 0;
+  bool _simpanAyuIsLoading = true;
+  bool _simpanAyuHasError = false;
+  bool _simpanAyuErrorDebounceActive = false;
+  Timer? _simpanAyuLoadTimeout;
+
   final String _simpanAyuUrl = 'https://simpan-ayu.indramayukab.go.id/';
 
   // Controller dan State untuk WebView 2 (MPP)
   WebViewController? _mppController; // Dibuat nullable untuk lazy load
   int _mppLoadingProgress = 0;
+  bool _mppIsLoading = false;
+  bool _mppHasError = false;
+  bool _mppErrorDebounceActive = false;
+  Timer? _mppLoadTimeout;
+
   final String _mppUrl = 'https://mpp.indramayukab.go.id/';
   bool _isMppInitiated = false; // Flag untuk lazy load
+
+  static const Duration _loadTimeout = Duration(seconds: 10);
+  static const Duration _errorDebounce = Duration(milliseconds: 600);
 
   @override
   void initState() {
@@ -28,6 +42,7 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
     _initializeSimpanAyuWebView();
   }
 
+  // ---------- SIMPAN AYU ----------
   void _initializeSimpanAyuWebView() {
     _simpanAyuController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -37,13 +52,100 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
             if (mounted) setState(() => _simpanAyuLoadingProgress = progress);
           },
           onPageStarted: (url) {
-            if (mounted) setState(() => _simpanAyuLoadingProgress = 0);
+            _cancelSimpanAyuTimeout();
+            if (mounted) {
+              setState(() {
+                _simpanAyuIsLoading = true;
+              });
+            }
+            _startSimpanAyuTimeout();
+          },
+          onPageFinished: (url) {
+            _cancelSimpanAyuTimeout();
+            if (mounted) {
+              setState(() {
+                _simpanAyuIsLoading = false;
+                _simpanAyuHasError = false;
+                _simpanAyuLoadingProgress = 100;
+              });
+            }
+          },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame == true) {
+              _cancelSimpanAyuTimeout();
+              if (_simpanAyuErrorDebounceActive) return;
+              _simpanAyuErrorDebounceActive = true;
+              Future.delayed(_errorDebounce, () {
+                if (mounted) {
+                  setState(() {
+                    _simpanAyuIsLoading = false;
+                    _simpanAyuHasError = true;
+                  });
+                }
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  _simpanAyuErrorDebounceActive = false;
+                });
+              });
+            }
           },
         ),
-      )
-      ..loadRequest(Uri.parse(_simpanAyuUrl));
+      );
+
+    _safeLoadSimpanAyu();
   }
 
+  Future<void> _safeLoadSimpanAyu() async {
+    try {
+      // --- PERUBAHAN: Membersihkan cache sebelum memuat halaman ---
+      await _simpanAyuController.clearCache();
+      await _simpanAyuController.clearLocalStorage();
+      // -------------------------------------------------------------
+
+      if (mounted) {
+        setState(() {
+          _simpanAyuIsLoading = true;
+          _simpanAyuHasError = false;
+          _simpanAyuLoadingProgress = 0;
+        });
+      }
+      _startSimpanAyuTimeout();
+      await _simpanAyuController.loadRequest(Uri.parse(_simpanAyuUrl));
+    } catch (_) {
+      _cancelSimpanAyuTimeout();
+      if (_simpanAyuErrorDebounceActive) return;
+      _simpanAyuErrorDebounceActive = true;
+      Future.delayed(_errorDebounce, () {
+        if (mounted) {
+          setState(() {
+            _simpanAyuIsLoading = false;
+            _simpanAyuHasError = true;
+          });
+        }
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _simpanAyuErrorDebounceActive = false;
+        });
+      });
+    }
+  }
+
+  void _startSimpanAyuTimeout() {
+    _cancelSimpanAyuTimeout();
+    _simpanAyuLoadTimeout = Timer(_loadTimeout, () {
+      if (mounted && _simpanAyuIsLoading) {
+        setState(() {
+          _simpanAyuIsLoading = false;
+          _simpanAyuHasError = true;
+        });
+      }
+    });
+  }
+
+  void _cancelSimpanAyuTimeout() {
+    if (_simpanAyuLoadTimeout?.isActive ?? false)
+      _simpanAyuLoadTimeout?.cancel();
+  }
+
+  // ---------- MPP ----------
   void _initializeMppWebView() {
     _mppController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -53,11 +155,130 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
             if (mounted) setState(() => _mppLoadingProgress = progress);
           },
           onPageStarted: (url) {
-            if (mounted) setState(() => _mppLoadingProgress = 0);
+            _cancelMppTimeout();
+            if (mounted) {
+              setState(() {
+                _mppIsLoading = true;
+              });
+            }
+            _startMppTimeout();
+          },
+          onPageFinished: (url) {
+            _cancelMppTimeout();
+            if (mounted) {
+              setState(() {
+                _mppIsLoading = false;
+                _mppHasError = false;
+                _mppLoadingProgress = 100;
+              });
+            }
+          },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame == true) {
+              _cancelMppTimeout();
+              if (_mppErrorDebounceActive) return;
+              _mppErrorDebounceActive = true;
+              Future.delayed(_errorDebounce, () {
+                if (mounted) {
+                  setState(() {
+                    _mppIsLoading = false;
+                    _mppHasError = true;
+                  });
+                }
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  _mppErrorDebounceActive = false;
+                });
+              });
+            }
           },
         ),
-      )
-      ..loadRequest(Uri.parse(_mppUrl));
+      );
+
+    _safeLoadMpp();
+  }
+
+  Future<void> _safeLoadMpp() async {
+    if (_mppController == null) return;
+    try {
+      // --- PERUBAHAN: Membersihkan cache sebelum memuat halaman ---
+      await _mppController!.clearCache();
+      await _mppController!.clearLocalStorage();
+      // -------------------------------------------------------------
+
+      if (mounted) {
+        setState(() {
+          _mppIsLoading = true;
+          _mppHasError = false;
+          _mppLoadingProgress = 0;
+        });
+      }
+      _startMppTimeout();
+      await _mppController!.loadRequest(Uri.parse(_mppUrl));
+    } catch (_) {
+      _cancelMppTimeout();
+      if (_mppErrorDebounceActive) return;
+      _mppErrorDebounceActive = true;
+      Future.delayed(_errorDebounce, () {
+        if (mounted) {
+          setState(() {
+            _mppIsLoading = false;
+            _mppHasError = true;
+          });
+        }
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _mppErrorDebounceActive = false;
+        });
+      });
+    }
+  }
+
+  void _startMppTimeout() {
+    _cancelMppTimeout();
+    _mppLoadTimeout = Timer(_loadTimeout, () {
+      if (mounted && _mppIsLoading) {
+        setState(() {
+          _mppIsLoading = false;
+          _mppHasError = true;
+        });
+      }
+    });
+  }
+
+  void _cancelMppTimeout() {
+    if (_mppLoadTimeout?.isActive ?? false) _mppLoadTimeout?.cancel();
+  }
+
+  // ---------- Retry untuk tab aktif ----------
+  Future<void> _retryActiveTab() async {
+    if (_selectedTabIndex == 0) {
+      await _safeLoadSimpanAyu();
+      if (mounted && _simpanAyuHasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal memuat. Periksa koneksi Anda.')),
+        );
+      }
+    } else {
+      if (!_isMppInitiated) {
+        setState(() {
+          _isMppInitiated = true;
+        });
+        _initializeMppWebView();
+      } else {
+        await _safeLoadMpp();
+      }
+      if (mounted && _mppHasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal memuat. Periksa koneksi Anda.')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelSimpanAyuTimeout();
+    _cancelMppTimeout();
+    super.dispose();
   }
 
   @override
@@ -102,10 +323,14 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
               child: IndexedStack(
                 index: _selectedTabIndex,
                 children: [
-                  WebViewWidget(controller: _simpanAyuController),
-                  _isMppInitiated
-                      ? WebViewWidget(controller: _mppController!)
-                      : Container(),
+                  _simpanAyuHasError
+                      ? _buildErrorView(context, onRetry: _retryActiveTab)
+                      : WebViewWidget(controller: _simpanAyuController),
+                  !_isMppInitiated
+                      ? Container()
+                      : (_mppHasError
+                            ? _buildErrorView(context, onRetry: _retryActiveTab)
+                            : WebViewWidget(controller: _mppController!)),
                 ],
               ),
             ),
@@ -175,6 +400,38 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
                   : theme.colorScheme.onSurfaceVariant,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView(
+    BuildContext context, {
+    required VoidCallback onRetry,
+  }) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 72),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal memuat halaman.\nPeriksa koneksi internet Anda lalu coba lagi.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
         ),
       ),
     );

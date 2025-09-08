@@ -8,6 +8,7 @@ import 'package:reang_app/models/sekolah_model.dart';
 import 'package:reang_app/models/berita_pendidikan_model.dart';
 import 'package:reang_app/models/info_kerja_model.dart';
 import 'package:reang_app/models/event_keagamaan_model.dart';
+import 'package:reang_app/models/info_perizinan_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -17,7 +18,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://945dab703ee3.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://96f88dc3ed61.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -213,6 +214,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data event: $e');
+    }
+  }
+
+  // =======================================================================
+  // API INFO PERIZINAN (BARU)
+  // =======================================================================
+  Future<List<InfoPerizinanModel>> fetchInfoPerizinan() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-perizinan');
+      if (response.statusCode == 200) {
+        final List<InfoPerizinanModel> perizinanList = (response.data as List)
+            .map((item) => InfoPerizinanModel.fromJson(item))
+            .toList();
+        return perizinanList;
+      } else {
+        throw Exception('Gagal memuat info perizinan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil info perizinan: $e');
     }
   }
 }
