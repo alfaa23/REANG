@@ -39,7 +39,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
     // pastikan keyboard/search nonaktif sebelum navigasi (sesuai logika KerjaYu)
     FocusManager.instance.primaryFocus?.unfocus();
 
-    const String apiUrl = 'tempat-pasar?fitur=pasar';
+    const String apiUrl = 'tempat-pasar?kategori=pasar';
     Navigator.push(
       context,
       MaterialPageRoute(

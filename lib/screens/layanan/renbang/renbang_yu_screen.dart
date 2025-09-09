@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/screens/layanan/renbang/usulan_pembangunan_view.dart';
+import 'package:reang_app/screens/layanan/renbang/progress_pembangunan_view.dart';
 
 class RenbangYuScreen extends StatefulWidget {
   const RenbangYuScreen({super.key});
@@ -7,18 +9,19 @@ class RenbangYuScreen extends StatefulWidget {
 }
 
 class _RenbangYuScreenState extends State<RenbangYuScreen> {
-  int _selectedMain = 0; // 0=Rencana, 1=Usulan, 2=Progress
-  int _selectedFilter = 0; // hanya untuk Rencana
-
-  // --- Data hardcoded untuk "Rencana" ---
+  int _selectedMain = 0;
   final List<String> _mainTabs = ['Rencana', 'Usulan', 'Progress'];
-  final List<String> _filters = [
+
+  // --- KODE DARI RENCANA_PEMBANGUNAN_VIEW DIPINDAHKAN KE SINI ---
+  int _selectedFilter = 0;
+
+  final List<String> _filters = const [
     'Semua',
     'Infrastruktur',
     'Pendidikan',
     'Kesehatan',
   ];
-  // PERUBAHAN: Data dikembalikan menjadi Map<String, dynamic>
+
   final List<Map<String, dynamic>> _projects = const [
     {
       'title': 'Jalan Tol Indramayu',
@@ -51,32 +54,7 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
       'headerColor': Color(0xFF1A535C),
     },
   ];
-
-  // --- Data hardcoded untuk "Usulan" ---
-  static const _usulanList = [
-    {
-      'title': 'Pembangunan Jembatan Penghubung',
-      'category': 'Infrastruktur',
-      'description':
-          'Usulan pembangunan jembatan untuk menghubungkan desa A dan B',
-      'user': 'Budi Santoso',
-      'time': '2 hari lalu',
-      'likes': 45,
-      'status': 'Dalam Review',
-      'statusColor': Color(0xFFFFA500),
-    },
-    {
-      'title': 'Renovasi Pasar Tradisional',
-      'category': 'Ekonomi',
-      'description':
-          'Perbaikan fasilitas pasar untuk meningkatkan kenyamanan pedagang',
-      'user': 'Siti Aminah',
-      'time': '5 hari lalu',
-      'likes': 32,
-      'status': 'Disetujui',
-      'statusColor': Color(0xFF4CAF50),
-    },
-  ];
+  // ----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -90,10 +68,7 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
           children: [
             const Text(
               'Renbang–Yu',
-              style: TextStyle(
-                fontWeight:
-                    FontWeight.bold, // Ini untuk membuat teks menjadi tebal
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
             Text(
@@ -108,18 +83,16 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            // TAB UTAMA
             _buildMainTabs(),
             const SizedBox(height: 16),
-
-            // KONTEN BERDASARKAN TAB
             Expanded(
               child: IndexedStack(
                 index: _selectedMain,
                 children: [
+                  // --- PERUBAHAN: Memanggil fungsi internal, bukan view terpisah ---
                   _buildRencanaSection(),
-                  _buildUsulanSection(),
-                  _buildProgressSection(),
+                  const UsulanPembangunanView(),
+                  const ProgressPembangunanView(),
                 ],
               ),
             ),
@@ -129,7 +102,6 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
     );
   }
 
-  /// Segmented control Rencana / Usulan / Progress
   Widget _buildMainTabs() {
     final theme = Theme.of(context);
     return Row(
@@ -165,7 +137,7 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
     );
   }
 
-  /// SECTION “Rencana” (filter + list proyek)
+  // --- FUNGSI BARU: Logika dan UI untuk tab "Rencana" ---
   Widget _buildRencanaSection() {
     final theme = Theme.of(context);
     final filtered = _selectedFilter == 0
@@ -181,7 +153,6 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Judul
         Text(
           'Rencana Pembangunan Indramayu',
           style: theme.textTheme.titleMedium?.copyWith(
@@ -189,11 +160,8 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        // Filter kategori
         _buildFilterTabs(),
-
         const SizedBox(height: 16),
-        // Daftar proyek
         Expanded(
           child: ListView.builder(
             physics: const BouncingScrollPhysics(),
@@ -208,7 +176,6 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
     );
   }
 
-  /// Segmented control untuk kategori di Rencana
   Widget _buildFilterTabs() {
     final theme = Theme.of(context);
     return Row(
@@ -245,85 +212,11 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
     );
   }
 
-  /// SECTION “Usulan”
-  Widget _buildUsulanSection() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header + tombol
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Usulan Masyarakat',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {}, // TODO: tambah usulan
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Tambah Usulan'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // List usulan
-        Expanded(
-          child: ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            itemCount: _usulanList.length,
-            itemBuilder: (_, idx) => _UsulanCard(data: _usulanList[idx]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// SECTION “Progress” (placeholder)
-  Widget _buildProgressSection() {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.construction, size: 64, color: theme.hintColor),
-          const SizedBox(height: 16),
-          Text(
-            "Halaman Progress Pembangunan",
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Fitur ini sedang dalam pengembangan.",
-            style: TextStyle(color: theme.hintColor),
-          ),
-        ],
-      ),
-    );
-  }
+  // --------------------------------------------------------
 }
 
-/// Card proyek di Rencana
+// --- WIDGET CARD UNTUK RENCANA JUGA DIPINDAHKAN KE SINI ---
 class _RencanaProjectCard extends StatelessWidget {
-  // PERUBAHAN: Menerima Map, bukan objek Project
   final Map<String, dynamic> project;
   const _RencanaProjectCard({required this.project});
 
@@ -338,7 +231,6 @@ class _RencanaProjectCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header warna
           Container(
             height: 180,
             padding: const EdgeInsets.all(16),
@@ -360,7 +252,6 @@ class _RencanaProjectCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -429,122 +320,6 @@ class _RencanaProjectCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Card per-usulan di Usulan
-class _UsulanCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const _UsulanCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      color: theme.cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Judul + status
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    data['title'],
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (data['statusColor'] as Color).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    data['status'],
-                    style: TextStyle(
-                      color: data['statusColor'] as Color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Kategori
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                data['category'],
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Deskripsi
-            Text(
-              data['description'],
-              style: theme.textTheme.bodyMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-            // User + waktu
-            Row(
-              children: [
-                Icon(Icons.person_outline, size: 14, color: theme.hintColor),
-                const SizedBox(width: 6),
-                Text(
-                  '${data['user']} • ${data['time']}',
-                  style: TextStyle(fontSize: 13, color: theme.hintColor),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Likes + komentar
-            Row(
-              children: [
-                Icon(
-                  Icons.thumb_up_alt_outlined,
-                  size: 16,
-                  color: theme.hintColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${data['likes']}',
-                  style: TextStyle(fontSize: 13, color: theme.hintColor),
-                ),
-                const SizedBox(width: 16),
-                Icon(Icons.comment_outlined, size: 16, color: theme.hintColor),
-                const SizedBox(width: 4),
-                Text(
-                  'Komentar',
-                  style: TextStyle(fontSize: 13, color: theme.hintColor),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

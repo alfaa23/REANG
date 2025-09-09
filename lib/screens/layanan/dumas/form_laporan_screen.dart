@@ -1,7 +1,8 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 
 class FormLaporanScreen extends StatefulWidget {
   const FormLaporanScreen({Key? key}) : super(key: key);
@@ -26,19 +27,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   String? _selectedKategori;
 
   File? _pickedImage;
-  // PERBAIKAN: Tambahkan variabel untuk mencegah panggilan ganda
   bool _isPickingImage = false;
 
+  bool _isStatementChecked = false;
+
   Future<void> _pickImage() async {
-    // Jika proses memilih gambar sudah berjalan, hentikan fungsi
     if (_isPickingImage) return;
-
     try {
-      // Tandai bahwa proses dimulai
-      setState(() {
-        _isPickingImage = true;
-      });
-
+      setState(() => _isPickingImage = true);
       final picker = ImagePicker();
       final XFile? img = await picker.pickImage(
         source: ImageSource.gallery,
@@ -47,18 +43,92 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         imageQuality: 80,
       );
       if (img != null) {
-        setState(() {
-          _pickedImage = File(img.path);
-        });
+        setState(() => _pickedImage = File(img.path));
       }
     } finally {
-      // Pastikan untuk selalu menandai bahwa proses telah selesai
       if (mounted) {
-        setState(() {
-          _isPickingImage = false;
-        });
+        setState(() => _isPickingImage = false);
       }
     }
+  }
+
+  void _showConfirmationDialog() {
+    // Validasi input sebelum menampilkan dialog
+    if (_jenisController.text.isEmpty ||
+        _selectedKategori == null ||
+        _lokasiController.text.isEmpty ||
+        _deskripsiController.text.isEmpty) {
+      // --- PERUBAHAN: Mengganti SnackBar dengan Toast ---
+      Fluttertoast.showToast(
+        msg: "Harap lengkapi semua kolom yang wajib diisi.",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
+
+    if (!_isStatementChecked) {
+      Fluttertoast.showToast(
+        msg: "Anda harus menyetujui pernyataan pertanggungjawaban.",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Kirim Laporan?'),
+          content: const Text(
+            'Pastikan data yang Anda laporkan sudah benar dan dapat dipertanggungjawabkan.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Batal'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Kirim'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performSubmit();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performSubmit() {
+    // TODO: Tambahkan logika untuk mengirim data laporan ke API di sini
+
+    Fluttertoast.showToast(
+      msg: "Laporan berhasil dikirim!",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+
+    // Kembali ke halaman Dumas-Yu dan langsung buka tab "Laporan Saya"
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => const DumasYuHomeScreen(bukaLaporanSaya: true),
+      ),
+      (Route<dynamic> route) => route.isFirst,
+    );
   }
 
   @override
@@ -72,8 +142,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // PERBAIKAN: Dekorasi untuk box luar dengan shadow
     final boxDecoration = BoxDecoration(
       color: theme.cardColor,
       borderRadius: BorderRadius.circular(12),
@@ -86,7 +154,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
       ],
     );
 
-    // PERBAIKAN: Dekorasi untuk input field di dalam box (dibuat transparan)
     final inputDecoration = InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       filled: true,
@@ -94,7 +161,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
       border: InputBorder.none,
       enabledBorder: InputBorder.none,
       focusedBorder: InputBorder.none,
-      // PERUBAHAN: Menambahkan hintStyle agar lebih samar
       hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
     );
 
@@ -112,8 +178,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             style: TextStyle(fontSize: 14, color: theme.hintColor),
           ),
           const SizedBox(height: 24),
-
-          // Judul Laporan
           Text('Judul Laporan', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
@@ -126,8 +190,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Kategori
           Text('Kategori', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
@@ -151,19 +213,17 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                // PERUBAHAN: Menambahkan hintStyle agar lebih samar
                 hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
               ),
-              dropdownMenuEntries: _kategoriList.map<DropdownMenuEntry<String>>(
-                (String value) {
-                  return DropdownMenuEntry<String>(value: value, label: value);
-                },
-              ).toList(),
+              dropdownMenuEntries: _kategoriList
+                  .map<DropdownMenuEntry<String>>(
+                    (String value) =>
+                        DropdownMenuEntry<String>(value: value, label: value),
+                  )
+                  .toList(),
             ),
           ),
           const SizedBox(height: 24),
-
-          // Lokasi Kejadian
           Text('Lokasi Kejadian', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
@@ -177,8 +237,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Upload Foto
           Text('Upload Foto', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           GestureDetector(
@@ -186,7 +244,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             child: Container(
               height: 140,
               width: double.infinity,
-              decoration: boxDecoration, // Menggunakan box decoration yang sama
+              decoration: boxDecoration,
               child: Center(
                 child: _pickedImage == null
                     ? Column(
@@ -221,8 +279,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Deskripsi Laporan
           Text('Deskripsi Laporan', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
@@ -235,16 +291,28 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 32),
-
-          // Kirim Laporan
+          const SizedBox(height: 16),
+          CheckboxListTile(
+            value: _isStatementChecked,
+            onChanged: (bool? value) {
+              setState(() {
+                _isStatementChecked = value ?? false;
+              });
+            },
+            title: Text(
+              'Saya menyatakan bahwa laporan yang saya berikan adalah benar dan dapat dipertanggungjawabkan.',
+              style: TextStyle(fontSize: 13, color: theme.hintColor),
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            activeColor: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: handle submit
-              },
+              onPressed: _showConfirmationDialog,
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
@@ -258,6 +326,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
               ),
             ),
           ),
+          // --- PERUBAHAN: Menambahkan spasi di bagian bawah ---
+          const SizedBox(height: 30),
         ],
       ),
     );
