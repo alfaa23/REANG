@@ -37,11 +37,14 @@ class _FormUsulanScreenState extends State<FormUsulanScreen> {
     if (_judulController.text.isEmpty ||
         _selectedKategori == null ||
         _deskripsiController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Harap lengkapi semua kolom yang wajib diisi.'),
-          backgroundColor: Colors.red,
-        ),
+      // --- PERUBAHAN: Menggunakan Toast untuk notifikasi error ---
+      Fluttertoast.showToast(
+        msg: "Harap lengkapi semua kolom yang wajib diisi.",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
       );
       return;
     }
@@ -95,6 +98,8 @@ class _FormUsulanScreenState extends State<FormUsulanScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // --- TAMBAHAN: Mendeteksi mode tema saat ini ---
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     final boxDecoration = BoxDecoration(
       color: theme.cardColor,
@@ -129,7 +134,11 @@ class _FormUsulanScreenState extends State<FormUsulanScreen> {
         children: [
           Text(
             'Sampaikan ide dan usulan Anda untuk pembangunan Indramayu yang lebih baik.',
-            style: TextStyle(fontSize: 14, color: theme.hintColor),
+            // --- PERUBAHAN: Warna teks disesuaikan ---
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
           ),
           const SizedBox(height: 24),
           Text('Judul Usulan', style: theme.textTheme.titleMedium),

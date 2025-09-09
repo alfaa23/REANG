@@ -61,7 +61,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.0 
+  
   
   
   
@@ -78,24 +78,7 @@ flutter_launcher_icons:
   image_path: "assets/logos/logo.webp" # Ganti dengan path logo Anda
   min_sdk_android: 21 # (Opsional) pastikan sesuai dengan minSdk Anda
   
-#splash screen
-  # Letakkan ini di level paling luar (sejajar dengan name, flutter, dll)
-flutter_native_splash:
-  # Warna background untuk splash screen native
-  color: "#FFFFFF" # Kode hex untuk warna putih
 
-  # Path ke gambar logo Anda
-  image: assets/wongreang.webp # Pastikan path ini benar
-
-  # (Opsional) Mengatur agar ikon status bar (baterai, sinyal) berwarna gelap
-  android_12:
-    color: "#FFFFFF"
-    image: assets/wongreang.webp
-    icon_background_color: "#FFFFFF"
-
-  # Konfigurasi untuk iOS
-    ios: true
-  
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

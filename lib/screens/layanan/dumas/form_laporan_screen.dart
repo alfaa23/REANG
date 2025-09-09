@@ -29,6 +29,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   File? _pickedImage;
   bool _isPickingImage = false;
 
+  // --- TAMBAHAN BARU: State untuk checkbox pernyataan ---
   bool _isStatementChecked = false;
 
   Future<void> _pickImage() async {
@@ -52,20 +53,16 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     }
   }
 
+  // --- FUNGSI BARU: Menampilkan dialog konfirmasi ---
   void _showConfirmationDialog() {
     // Validasi input sebelum menampilkan dialog
     if (_jenisController.text.isEmpty ||
         _selectedKategori == null ||
         _lokasiController.text.isEmpty ||
         _deskripsiController.text.isEmpty) {
-      // --- PERUBAHAN: Mengganti SnackBar dengan Toast ---
       Fluttertoast.showToast(
         msg: "Harap lengkapi semua kolom yang wajib diisi.",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 16.0,
       );
       return;
     }
@@ -73,11 +70,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     if (!_isStatementChecked) {
       Fluttertoast.showToast(
         msg: "Anda harus menyetujui pernyataan pertanggungjawaban.",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 16.0,
       );
       return;
     }
@@ -93,9 +86,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
           actions: <Widget>[
             TextButton(
               child: const Text('Batal'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
               child: const Text('Kirim'),
@@ -110,6 +101,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     );
   }
 
+  // --- FUNGSI BARU: Logika setelah konfirmasi ---
   void _performSubmit() {
     // TODO: Tambahkan logika untuk mengirim data laporan ke API di sini
 
@@ -142,6 +134,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     final boxDecoration = BoxDecoration(
       color: theme.cardColor,
       borderRadius: BorderRadius.circular(12),
@@ -175,7 +169,11 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         children: [
           Text(
             'Silakan isi form berikut untuk mengirimkan aduan',
-            style: TextStyle(fontSize: 14, color: theme.hintColor),
+            // --- PERUBAHAN: Ukuran dan warna font disesuaikan ---
+            style: TextStyle(
+              fontSize: 15,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
           ),
           const SizedBox(height: 24),
           Text('Judul Laporan', style: theme.textTheme.titleMedium),
@@ -301,7 +299,10 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             },
             title: Text(
               'Saya menyatakan bahwa laporan yang saya berikan adalah benar dan dapat dipertanggungjawabkan.',
-              style: TextStyle(fontSize: 13, color: theme.hintColor),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
@@ -326,8 +327,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
               ),
             ),
           ),
-          // --- PERUBAHAN: Menambahkan spasi di bagian bawah ---
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
         ],
       ),
     );
