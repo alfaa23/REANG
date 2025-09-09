@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -47,16 +46,18 @@ class _PetaScreenState extends State<PetaScreen> {
   }
 
   void _loadLokasiData() {
-    _lokasiFuture = _api_service_fetchWrapper(widget.apiUrl);
+    // --- PERBAIKAN: Menggunakan nama fungsi yang konsisten ---
+    _lokasiFuture = _apiServiceFetchWrapper(widget.apiUrl);
   }
 
   // Wrapper to keep conversion logic separated and easy to read
-  Future<List<LokasiPeta>> _api_service_fetchWrapper(String apiUrl) async {
+  // --- PERBAIKAN: Menggunakan nama fungsi yang konsisten ---
+  Future<List<LokasiPeta>> _apiServiceFetchWrapper(String apiUrl) async {
     final data = await _apiService.fetchLokasiPeta(apiUrl);
     return data.map((item) {
       return LokasiPeta(
-        nama: item['name'] ?? 'Tanpa Nama',
-        alamat: item['address'] ?? 'Tanpa Alamat',
+        nama: item['name'] ?? item['nama'] ?? 'Tanpa Nama',
+        alamat: item['address'] ?? item['alamat'] ?? 'Tanpa Alamat',
         lokasi: LatLng(
           double.tryParse(item['latitude'].toString()) ?? 0.0,
           double.tryParse(item['longitude'].toString()) ?? 0.0,
