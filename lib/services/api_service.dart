@@ -10,6 +10,7 @@ import 'package:reang_app/models/info_kerja_model.dart';
 import 'package:reang_app/models/event_keagamaan_model.dart';
 import 'package:reang_app/models/info_perizinan_model.dart';
 import 'package:reang_app/models/pasar_model.dart';
+import 'package:reang_app/models/info_adminduk_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -19,7 +20,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://2f78491eaa8b.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://32464ce1fdc6.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -253,6 +254,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data pasar: $e');
+    }
+  }
+
+  // =======================================================================
+  // API INFO ADMINDuk (BARU)
+  // =======================================================================
+  Future<List<InfoAdmindukModel>> fetchInfoAdminduk() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-adminduk');
+      if (response.statusCode == 200) {
+        final List<InfoAdmindukModel> list = (response.data as List)
+            .map((item) => InfoAdmindukModel.fromJson(item))
+            .toList();
+        return list;
+      } else {
+        throw Exception('Gagal memuat info adminduk');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil info adminduk: $e');
     }
   }
 }

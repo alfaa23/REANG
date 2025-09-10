@@ -1,76 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/info_adminduk_model.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/screens/layanan/adminduk/detail_adminduk_screen.dart';
 
-class AdmindukScreen extends StatelessWidget {
+class AdmindukScreen extends StatefulWidget {
   const AdmindukScreen({super.key});
 
-  // Data layanan dokumen
-  static const _services = [
-    {
-      'iconWidget': 'ID',
-      'iconBg': Color(0xFFEEE6FF),
-      'iconColor': Color(0xFF9B59B6),
-      'title': 'KTP Elektronik',
-      'subtitle': 'Gratis',
-      'description':
-          'Kartu Tanda Penduduk elektronik untuk warga negara Indonesia',
-      'requirements': ['Fotokopi KK', 'Pas foto 3×4', 'Surat pengantar RT/RW'],
-    },
-    {
-      'iconWidget': '👶',
-      'iconBg': Color(0xFFFFF3E0),
-      'iconColor': Colors.orange,
-      'title': 'Kartu Identitas Anak',
-      'subtitle': 'Gratis',
-      'description': 'Kartu identitas untuk anak usia 0‑17 tahun',
-      'requirements': ['Fotokopi KK', 'Akta kelahiran', 'Pas foto 2×3'],
-    },
-    {
-      'iconWidget': '👪',
-      'iconBg': Color(0xFFE8F5E9),
-      'iconColor': Colors.green,
-      'title': 'Kartu Keluarga',
-      'subtitle': 'Gratis',
-      'description': 'Dokumen yang memuat data tentang susunan keluarga',
-      'requirements': ['KTP suami istri', 'Akta nikah', 'Akta kelahiran anak'],
-    },
-    {
-      'iconWidget': '📄',
-      'iconBg': Color(0xFFFFFDE7),
-      'iconColor': Colors.amber,
-      'title': 'Akta Kelahiran',
-      'subtitle': 'Gratis',
-      'description': 'Dokumen resmi yang mencatat kelahiran seseorang',
-      'requirements': [
-        'Surat kelahiran dari RS/bidan',
-        'KTP orang tua',
-        'KK orang tua',
-      ],
-    },
-    {
-      'iconWidget': '⚰️',
-      'iconBg': Color(0xFFFFEBEE),
-      'iconColor': Colors.redAccent,
-      'title': 'Akta Kematian',
-      'subtitle': 'Gratis',
-      'description': 'Dokumen resmi yang mencatat kematian seseorang',
-      'requirements': [
-        'Surat kematian dari RS/kelurahan',
-        'KTP almarhum',
-        'KTP pelapor',
-      ],
-    },
-    {
-      'iconWidget': '📦',
-      'iconBg': Color(0xFFE0F7FA),
-      'iconColor': Colors.teal,
-      'title': 'Surat Pindah',
-      'subtitle': 'Gratis',
-      'description': 'Surat keterangan pindah domisili antar daerah',
-      'requirements': ['KTP asli', 'KK asli', 'Surat pengantar RT/RW'],
-    },
-  ];
+  @override
+  State<AdmindukScreen> createState() => _AdmindukScreenState();
+}
 
-  // Data informasi layanan
+class _AdmindukScreenState extends State<AdmindukScreen> {
+  late Future<List<InfoAdmindukModel>> _servicesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _servicesFuture = ApiService().fetchInfoAdminduk();
+  }
+
+  void _reloadData() {
+    setState(() {
+      _servicesFuture = ApiService().fetchInfoAdminduk();
+    });
+  }
+
+  // Data informasi layanan tetap statis
   static const _infoItems = [
     {
       'title': 'Jam Operasional',
@@ -118,7 +73,6 @@ class AdmindukScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // PERUBAHAN: Teks judul dibuat tebal
             const Text(
               'Adminduk-Yu',
               style: TextStyle(fontWeight: FontWeight.bold),
@@ -157,16 +111,37 @@ class AdmindukScreen extends StatelessWidget {
               ),
             ),
           ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, i) {
-              final svc = _services[i];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _ServiceCard(data: svc),
+          FutureBuilder<List<InfoAdmindukModel>>(
+            future: _servicesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverToBoxAdapter(
+                  child: Center(
+                    heightFactor: 5,
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return SliverToBoxAdapter(child: _buildErrorView(context));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: Center(child: Text('Tidak ada layanan tersedia.')),
+                );
+              }
+
+              final services = snapshot.data!;
+              return SliverList(
+                delegate: SliverChildBuilderDelegate((context, i) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _ServiceCard(data: services[i]),
+                  );
+                }, childCount: services.length),
               );
-            }, childCount: _services.length),
+            },
           ),
-          // PERUBAHAN: Menambahkan seksi Rekomendasi Aplikasi
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
@@ -185,16 +160,14 @@ class AdmindukScreen extends StatelessWidget {
                 children: [
                   _RecommendationCard(
                     title: 'Identitas Kependudukan Digital',
-                    logoPath:
-                        'assets/logos/ikd.png', // Pastikan path logo benar
+                    logoPath: 'assets/logos/ikd.png',
                     logoBackgroundColor: Colors.blue.shade800,
                     onTap: () {},
                   ),
                   const SizedBox(height: 12),
                   _RecommendationCard(
                     title: 'Layanan BPJS Kesehatan',
-                    logoPath:
-                        'assets/logos/bpjs.png', // Pastikan path logo benar
+                    logoPath: 'assets/logos/bpjs.png',
                     logoBackgroundColor: theme.colorScheme.primary,
                     onTap: () {},
                   ),
@@ -220,7 +193,6 @@ class AdmindukScreen extends StatelessWidget {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                // PERUBAHAN: Aspect ratio diubah agar kartu lebih tinggi
                 childAspectRatio: 0.9,
               ),
               delegate: SliverChildBuilderDelegate(
@@ -233,123 +205,34 @@ class AdmindukScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-/// Kartu satu layanan dokumen
-class _ServiceCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const _ServiceCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildErrorView(BuildContext context) {
     final theme = Theme.of(context);
-    final iconWidget = data['iconWidget'] as String;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: data['iconBg'] as Color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      iconWidget,
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: data['iconColor'] as Color,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['title'],
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        data['subtitle'],
-                        style: TextStyle(fontSize: 12, color: theme.hintColor),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
             Text(
-              data['description'],
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              'Gagal Memuat Data',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Persyaratan:',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              'Maaf, terjadi kesalahan. Periksa koneksi internet Anda.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
             ),
-            const SizedBox(height: 4),
-            ...List<Widget>.from(
-              (data['requirements'] as List<String>).map(
-                (req) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      const Text('• ', style: TextStyle(fontSize: 14)),
-                      Expanded(
-                        child: Text(req, style: theme.textTheme.bodyMedium),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.verified_user_outlined,
-                      size: 14,
-                      color: theme.hintColor,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Admin Desa',
-                      style: TextStyle(fontSize: 13, color: theme.hintColor),
-                    ),
-                  ],
-                ),
-                // PERUBAHAN: Teks tombol diubah
-                TextButton(
-                  onPressed: () {
-                    // TODO: aksi Lihat Informasi
-                  },
-                  child: const Text('Lihat Informasi ›'),
-                ),
-              ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _reloadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
             ),
           ],
         ),
@@ -358,7 +241,107 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-/// Kartu info (Jam, Kontak, Lokasi, Tips)
+class _ServiceCard extends StatelessWidget {
+  final InfoAdmindukModel data;
+  const _ServiceCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailAdmindukScreen(admindukData: data),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Image.network(
+              data.foto,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) => Container(
+                height: 180,
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Center(
+                  child: Icon(
+                    Icons.description_outlined,
+                    size: 48,
+                    color: theme.hintColor,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.judul,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    data.summary,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: theme.hintColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.verified_user_outlined,
+                            size: 14,
+                            color: theme.hintColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Disdukcapil Indramayu',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.hintColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'Lihat Detail ›',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _InfoCard extends StatelessWidget {
   final Map<String, dynamic> data;
   const _InfoCard({required this.data});
@@ -405,7 +388,6 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-// PERUBAHAN: Widget baru untuk kartu rekomendasi
 class _RecommendationCard extends StatelessWidget {
   final String title;
   final String logoPath;
