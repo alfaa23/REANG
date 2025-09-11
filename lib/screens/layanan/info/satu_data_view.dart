@@ -28,15 +28,45 @@ class _SatuDataViewState extends State<SatuDataView> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (url) => setState(() {
-            _isLoading = true;
-            _hasError = false;
-          }),
-          onPageFinished: (url) => setState(() => _isLoading = false),
-          onWebResourceError: (error) => setState(() {
-            _isLoading = false;
-            _hasError = true;
-          }),
+          onPageStarted: (url) {
+            if (mounted) {
+              setState(() {
+                _isLoading = true;
+                _hasError =
+                    false; // Reset status error setiap kali mencoba memuat
+              });
+            }
+          },
+          onPageFinished: (url) {
+            // Cek jika masih loading, berarti terjadi timeout atau error lain
+            if (mounted && !_hasError) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          },
+          onWebResourceError: (error) {
+            // Hanya tampilkan error jika halaman utama yang gagal dimuat,
+            // bukan aset seperti gambar atau iklan.
+            if (error.isForMainFrame ?? true) {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _hasError = true;
+                });
+              }
+            }
+          },
+          // --- TAMBAHAN: Menangkap error HTTP dari server ---
+          onHttpError: (HttpResponseError error) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _hasError = true;
+              });
+            }
+          },
+          // ---------------------------------------------------
         ),
       )
       ..loadRequest(Uri.parse(_url));
@@ -44,11 +74,21 @@ class _SatuDataViewState extends State<SatuDataView> {
     widget.onControllerCreated(_controller);
   }
 
+  void _retryLoading() {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    // Memuat ulang request dari awal untuk penanganan error yang lebih baik
+    _controller.loadRequest(Uri.parse(_url));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_hasError) {
       return _buildErrorView(context);
     }
+
     return Stack(
       children: [
         WebViewWidget(controller: _controller),
@@ -76,7 +116,7 @@ class _SatuDataViewState extends State<SatuDataView> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => _controller.loadRequest(Uri.parse(_url)),
+              onPressed: _retryLoading,
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
             ),
