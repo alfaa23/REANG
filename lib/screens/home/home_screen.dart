@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // PENAMBAHAN BARU: Untuk keluar dari aplikasi
-import 'package:fluttertoast/fluttertoast.dart'; // PENAMBAHAN BARU: Untuk notifikasi toast
+import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:reang_app/models/slider_model.dart';
+import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/semua_layanan_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/sehat_yu_screen.dart';
@@ -11,19 +13,15 @@ import 'package:reang_app/screens/layanan/info/info_yu_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/plesir_yu_screen.dart';
 import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
-import 'package:reang_app/screens/search/search_screen.dart'; // PENAMBAHAN BARU: Import halaman pencarian
+import 'package:reang_app/screens/search/search_screen.dart';
 
-// PENAMBAHAN BARU: Import widget banner dan rekomendasi
+// Import widget banner dan rekomendasi
 import 'package:reang_app/screens/home/widgets/konsultasi_dokter_card.dart';
 import 'package:reang_app/screens/home/widgets/info_banner_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_fitur_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
 
-final List<String> imgList = [
-  'assets/banner.png',
-  'assets-banner_2.png',
-  'assets-banner_3.png',
-];
+// --- PERUBAHAN: Variabel imgList statis dihapus ---
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,15 +32,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late PageController _pageController;
-  late Timer _timer;
+  Timer? _timer; // Diubah menjadi nullable agar bisa di-cancel dan dibuat ulang
   int _current = 0;
   static const int _initialPage = 3000;
 
-  // PERBAIKAN: Variabel baru untuk melacak indeks halaman saat ini dengan aman
+  // PERBAIKAN: Variabel baru untuk melacak indeks halaman saat ini dengan aman mundur dulu
   int _currentPageIndex = _initialPage;
 
   // PERUBAHAN: Variabel untuk logika keluar diubah menjadi boolean
   bool _isExitPressed = false;
+
+  // --- PENAMBAHAN BARU: State untuk menampung data slider dari API ---
+  late Future<List<SliderModel>> _sliderFuture;
+  // ------------------------------------------------------------------
 
   // PENAMBAHAN BARU: Kunci unik untuk me-refresh widget anak
   Key _rekomendasiFiturKey = UniqueKey();
@@ -57,15 +59,22 @@ class _HomeScreenState extends State<HomeScreen> {
       // PERBAIKAN: Nilai viewportFraction diubah agar gambar slider lebih lebar
       viewportFraction: 0.95,
     );
-    _current = _initialPage % imgList.length;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _startAutoScroll();
+    // --- PERUBAHAN: Memuat data slider dari API saat initState ---
+    _sliderFuture = ApiService().fetchSliders().then((sliders) {
+      if (mounted && sliders.isNotEmpty) {
+        _current = _initialPage % sliders.length;
+        _startAutoScroll(sliders.length);
+      }
+      return sliders;
     });
+    // -----------------------------------------------------------
   }
 
   // PERBAIKAN: Logika auto-scroll diubah agar tidak menyebabkan error
-  void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
+  void _startAutoScroll(int itemCount) {
+    if (itemCount == 0) return;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (_pageController.hasClients) {
         // Menggunakan state _currentPageIndex yang aman, bukan _pageController.page
         int nextPage = _currentPageIndex + 1;
@@ -80,21 +89,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
 
   // PENAMBAHAN BARU: Fungsi untuk menangani refresh
   Future<void> _handleRefresh() async {
-    // Tambahkan logika pembaruan data Anda di sini
-    await Future.delayed(const Duration(seconds: 2));
-    // PERBAIKAN: Perbarui kunci untuk memaksa widget anak dibuat ulang
+    // --- PERUBAHAN: Memuat ulang data slider saat refresh ---
     setState(() {
+      _sliderFuture = ApiService().fetchSliders().then((sliders) {
+        if (mounted && sliders.isNotEmpty) {
+          _current = _initialPage % sliders.length;
+          _startAutoScroll(sliders.length);
+        }
+        return sliders;
+      });
+      // ------------------------------------------------------
+
+      // PERBAIKAN: Perbarui kunci untuk memaksa widget anak dibuat ulang
       _rekomendasiFiturKey = UniqueKey();
       _infoBannerKey = UniqueKey();
       _rekomendasiBeritaKey = UniqueKey();
     });
+    await _sliderFuture;
   }
 
   @override
@@ -146,75 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  SizedBox(
-                    height: 230,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: null,
-                      onPageChanged: (index) {
-                        setState(() {
-                          // PERBAIKAN: Memperbarui kedua state indeks
-                          _currentPageIndex = index;
-                          _current = index % imgList.length;
-                        });
-                      },
-                      itemBuilder: (context, index) {
-                        final realIndex = index % imgList.length;
-                        return AnimatedBuilder(
-                          animation: _pageController,
-                          builder: (context, child) {
-                            double scale = 1.0;
-                            if (_pageController.hasClients &&
-                                _pageController.position.hasPixels) {
-                              double page =
-                                  _pageController.page ??
-                                  _initialPage.toDouble();
-                              double value = (page - index).abs();
-                              scale = max(0.85, 1 - value * 0.3);
-                            }
-                            return Transform.scale(scale: scale, child: child);
-                          },
-                          child: Container(
-                            // PERBAIKAN: Margin diperkecil agar slider lebih lebar
-                            margin: const EdgeInsets.symmetric(horizontal: 0.0),
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(12.0),
-                              ),
-                              child: Image.asset(
-                                imgList[realIndex],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[800],
-                                    child: const Center(
-                                      child: Text('Gagal memuat gambar'),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: imgList.asMap().entries.map((entry) {
-                      return Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: (isDarkMode ? Colors.white : Colors.black)
-                              .withOpacity(_current == entry.key ? 0.9 : 0.4),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  // --- PERUBAHAN: Bagian slider sekarang menggunakan FutureBuilder ---
+                  _buildSliderSection(isDarkMode),
+                  // -------------------------------------------------------------
                   const SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -399,6 +351,127 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // --- WIDGET BARU: Membangun slider dengan FutureBuilder ---
+  Widget _buildSliderSection(bool isDarkMode) {
+    return FutureBuilder<List<SliderModel>>(
+      future: _sliderFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return _buildSliderPlaceholder();
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildSliderPlaceholder(isError: true);
+        }
+
+        final sliders = snapshot.data!;
+        return Column(
+          children: [
+            SizedBox(
+              height: 230,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: null, // Loop tak terbatas
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPageIndex = index;
+                    _current = index % sliders.length;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final realIndex = index % sliders.length;
+                  return AnimatedBuilder(
+                    animation: _pageController,
+                    builder: (context, child) {
+                      double scale = 1.0;
+                      if (_pageController.hasClients &&
+                          _pageController.position.hasPixels) {
+                        double page =
+                            _pageController.page ?? _initialPage.toDouble();
+                        double value = (page - index).abs();
+                        scale = max(0.85, 1 - value * 0.3);
+                      }
+                      return Transform.scale(scale: scale, child: child);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 0.0,
+                      ), // slider margin memperbesar
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(12.0),
+                        ),
+                        child: Image.network(
+                          sliders[realIndex].imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child: Text('Gagal memuat gambar'),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: sliders.asMap().entries.map((entry) {
+                return Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: (isDarkMode ? Colors.white : Colors.black)
+                        .withOpacity(_current == entry.key ? 0.9 : 0.4),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Widget placeholder untuk slider saat loading atau error
+  Widget _buildSliderPlaceholder({bool isError = false}) {
+    return Container(
+      height: 230,
+      margin: const EdgeInsets.fromLTRB(16, 40, 16, 12), // Sesuaikan margin
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: isError
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.cloud_off,
+                    color: Theme.of(context).hintColor,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Gagal memuat banner',
+                    style: TextStyle(color: Theme.of(context).hintColor),
+                  ),
+                ],
+              )
+            : const CircularProgressIndicator(),
       ),
     );
   }

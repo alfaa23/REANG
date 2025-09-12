@@ -11,6 +11,7 @@ import 'package:reang_app/models/event_keagamaan_model.dart';
 import 'package:reang_app/models/info_perizinan_model.dart';
 import 'package:reang_app/models/pasar_model.dart';
 import 'package:reang_app/models/info_adminduk_model.dart';
+import 'package:reang_app/models/slider_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -20,7 +21,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://32464ce1fdc6.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://55fd3028e9c4.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -203,6 +204,10 @@ class ApiService {
     }
   }
 
+  // =======================================================================
+  // API Event Keagamaan (BARU)
+  // =======================================================================
+
   Future<List<EventKeagamaanModel>> fetchEventKeagamaan() async {
     try {
       final response = await _dio.get('$_baseUrlBackend/event-agama');
@@ -273,6 +278,26 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil info adminduk: $e');
+    }
+  }
+
+  // =======================================================================
+  // API SLIDERS
+  // =======================================================================
+  Future<List<SliderModel>> fetchSliders() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/sliders');
+      // Cek apakah response sukses dan memiliki data
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<SliderModel> sliderList = (response.data['data'] as List)
+            .map((item) => SliderModel.fromJson(item))
+            .toList();
+        return sliderList;
+      } else {
+        throw Exception('Gagal memuat sliders');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil sliders: $e');
     }
   }
 }
