@@ -15,13 +15,12 @@ import 'package:reang_app/screens/layanan/sekolah/sekolah_yu_screen.dart';
 import 'package:reang_app/screens/layanan/pasar/pasar_yu_screen.dart';
 import 'package:reang_app/screens/search/search_screen.dart';
 
-// Import widget banner dan rekomendasi
+// --- Import widget
 import 'package:reang_app/screens/home/widgets/konsultasi_dokter_card.dart';
 import 'package:reang_app/screens/home/widgets/info_banner_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_fitur_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
-
-// --- PERUBAHAN: Variabel imgList statis dihapus ---
+import 'package:reang_app/screens/home/widgets/panic_button_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -155,198 +154,204 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         }
       },
-      child: SafeArea(
-        top: false,
-        child: Material(
-          color: theme.scaffoldBackgroundColor,
-          child: RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // --- PERUBAHAN: Bagian slider sekarang menggunakan FutureBuilder ---
-                  _buildSliderSection(isDarkMode),
-                  // -------------------------------------------------------------
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GestureDetector(
-                      onTap: () {
-                        // Navigasi ke SearchScreen saat di-tap
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SearchScreen(),
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        // --- PERUBAHAN: Menambahkan tombol panik melayang ---
+        floatingActionButton: const PanicButtonWidget(),
+        // ----------------------------------------------------
+        body: SafeArea(
+          top: false,
+          child: Material(
+            color: theme.scaffoldBackgroundColor,
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    // --- PERUBAHAN: Bagian slider sekarang menggunakan FutureBuilder ---
+                    _buildSliderSection(isDarkMode),
+                    // -------------------------------------------------------------
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          // Navigasi ke SearchScreen saat di-tap
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SearchScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              theme.cardColor, // Dibuat putih/gelap sesuai tema
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: theme.shadowColor.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.search,
-                              color: theme.iconTheme.color?.withAlpha(178),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Cari Layanan di Reang',
-                              style: TextStyle(
-                                color: theme.hintColor.withOpacity(0.4),
-                                fontSize: 15.0,
+                          decoration: BoxDecoration(
+                            color: theme
+                                .cardColor, // Dibuat putih/gelap sesuai tema
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.shadowColor.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.search,
+                                color: theme.iconTheme.color?.withAlpha(178),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Cari Layanan di Reang',
+                                style: TextStyle(
+                                  color: theme.hintColor.withOpacity(0.4),
+                                  fontSize: 15.0,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // PENAMBAHAN BARU: Atur jarak vertikal antara search bar dan menu ikon di sini
-                  const SizedBox(height: 35),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GridView.count(
-                      crossAxisCount: 4,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.75,
-                      children: [
-                        _MenuItem(
-                          assetIcon: 'assets/icons/dumas_yu.png',
-                          label: 'Dumas-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const DumasYuHomeScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/info_yu.png',
-                          label: 'Info-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const InfoYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/sehat_yu.png',
-                          label: 'Sehat-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SehatYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/sekolah_yu.png',
-                          label: 'Sekolah-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SekolahYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/ibadah_yu.png',
-                          label: 'Ibadah-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const IbadahYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/plesir_yu.png',
-                          label: 'Plesir-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PlesirYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          assetIcon: 'assets/icons/pasar_yu.png',
-                          label: 'Pasar-yu',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PasarYuScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          icon: Icons.grid_view,
-                          label: 'Semua',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SemuaLayananScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                    // PENAMBAHAN BARU: Atur jarak vertikal antara search bar dan menu ikon di sini
+                    const SizedBox(height: 35),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GridView.count(
+                        crossAxisCount: 4,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.75,
+                        children: [
+                          _MenuItem(
+                            assetIcon: 'assets/icons/dumas_yu.png',
+                            label: 'Dumas-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DumasYuHomeScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/info_yu.png',
+                            label: 'Info-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const InfoYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/sehat_yu.png',
+                            label: 'Sehat-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SehatYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/sekolah_yu.png',
+                            label: 'Sekolah-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SekolahYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/ibadah_yu.png',
+                            label: 'Ibadah-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const IbadahYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/plesir_yu.png',
+                            label: 'Plesir-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PlesirYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            assetIcon: 'assets/icons/pasar_yu.png',
+                            label: 'Pasar-yu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PasarYuScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _MenuItem(
+                            icon: Icons.grid_view,
+                            label: 'Semua',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SemuaLayananScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // =============================================================
-                  // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
-                  // =============================================================
-                  const SizedBox(height: 2),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: KonsultasiDokterCard(),
-                  ),
-                  const SizedBox(height: 32),
-                  // PERBAIKAN: Memberikan Key agar widget ikut refresh
-                  RekomendasiFiturWidget(key: _rekomendasiFiturKey),
-                  const SizedBox(height: 32),
-                  InfoBannerWidget(key: _infoBannerKey),
-                  const SizedBox(height: 32),
-                  RekomendasiBeritaWidget(key: _rekomendasiBeritaKey),
+                    // =============================================================
+                    // PENAMBAHAN BARU: Memanggil widget banner dan rekomendasi
+                    // =============================================================
+                    const SizedBox(height: 2),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: KonsultasiDokterCard(),
+                    ),
+                    const SizedBox(height: 32),
+                    // PERBAIKAN: Memberikan Key agar widget ikut refresh
+                    RekomendasiFiturWidget(key: _rekomendasiFiturKey),
+                    const SizedBox(height: 32),
+                    InfoBannerWidget(key: _infoBannerKey),
+                    const SizedBox(height: 32),
+                    RekomendasiBeritaWidget(key: _rekomendasiBeritaKey),
 
-                  // =============================================================
-                  const SizedBox(height: 24),
-                ],
+                    // =============================================================
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ),
@@ -398,9 +403,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Transform.scale(scale: scale, child: child);
                     },
                     child: Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 0.0,
-                      ), // slider margin memperbesar
+                      ///meperbesar slider
+                      margin: const EdgeInsets.symmetric(horizontal: 0.0),
                       child: ClipRRect(
                         borderRadius: const BorderRadius.all(
                           Radius.circular(12.0),

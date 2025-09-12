@@ -6,11 +6,11 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
 class DetailEventScreen extends StatelessWidget {
-  // --- PERUBAHAN: Menerima objek EventKeagamaanModel ---
+  // --- Menerima objek EventKeagamaanModel ---
   final EventKeagamaanModel event;
   const DetailEventScreen({super.key, required this.event});
 
-  // --- FUNGSI BARU: Untuk membuka aplikasi peta ---
+  // --- Fungsi untuk membuka aplikasi peta ---
   Future<void> _launchMapsUrl(String lat, String lng) async {
     final Uri url = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
@@ -27,8 +27,6 @@ class DetailEventScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Data sekarang diambil dari objek 'event'
     final String timeAgo = timeago.format(event.eventDateTime, locale: 'id');
 
     return Scaffold(
@@ -40,6 +38,16 @@ class DetailEventScreen extends StatelessWidget {
           SliverAppBar(
             expandedHeight: 220.0,
             pinned: true,
+            // --- PERUBAHAN: Menambahkan tombol kembali kustom ---
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black.withOpacity(0.3),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            // ----------------------------------------------------
             flexibleSpace: FlexibleSpaceBar(
               background: Image.network(
                 event.foto, // Menggunakan foto dari API
@@ -165,12 +173,16 @@ class DetailEventScreen extends StatelessWidget {
                             _launchMapsUrl(event.latitude, event.longitude),
                         icon: const Icon(Icons.map_outlined),
                         label: const Text('Lihat Lokasi di Peta'),
+                        // --- PERUBAHAN: Menyesuaikan gaya tombol ---
                         style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade800,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           textStyle: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        // ----------------------------------------
                       ),
                     ),
                   ],

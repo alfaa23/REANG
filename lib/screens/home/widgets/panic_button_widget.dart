@@ -19,7 +19,6 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
   bool _isOpen = false;
   bool _isLoading = true;
 
-  // Nomor ini nanti akan diambil dari API
   String? _nomorDarurat;
   String? _nomorAmbulans;
 
@@ -30,17 +29,17 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
+    // Menggunakan kurva easeOut untuk animasi yang lebih halus saat muncul
     _animation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOut,
     );
     _fetchEmergencyNumbers();
   }
 
   Future<void> _fetchEmergencyNumbers() async {
-    // Simulasi pengambilan data dari API
-    // Ganti bagian ini dengan panggilan ApiService Anda
     try {
+      // Ganti bagian ini dengan panggilan ApiService Anda
       // final data = await ApiService().fetchEmergencyContacts();
       // _nomorDarurat = data['darurat'];
       // _nomorAmbulans = data['ambulans'];
@@ -94,46 +93,73 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
 
   @override
   Widget build(BuildContext context) {
-    // Menggunakan Stack untuk menumpuk tombol-tombol
     return SizedBox(
-      width: 200,
-      height: 200,
+      width: 250,
+      height: 250,
       child: Stack(
         alignment: Alignment.bottomRight,
         children: [
-          // Tombol Ambulans
           _buildOption(
-            -130.0,
+            -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Ambulans',
             Icons.local_hospital_outlined,
             () => _makePhoneCall(_nomorAmbulans),
           ),
-          // Tombol Panggilan Darurat
           _buildOption(
-            -70.0,
+            -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Panggilan Darurat',
             Icons.phone_in_talk_outlined,
             () => _makePhoneCall(_nomorDarurat),
           ),
-          // Tombol utama (Panic/Close)
-          FloatingActionButton(
-            elevation: 4,
-            backgroundColor: Colors.red,
-            onPressed: _isLoading ? null : _toggleMenu,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: Colors.white,
-                    ),
-                  )
-                : AnimatedIcon(
-                    icon: AnimatedIcons.menu_close,
-                    progress: _animation,
-                    color: Colors.white,
+          SizedBox(
+            width: 50, // PERUBAHAN: Ukuran tombol diubah menjadi 50
+            height: 50, // PERUBAHAN: Ukuran tombol diubah menjadi 50
+            child: Material(
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              elevation: 4.0,
+              child: InkWell(
+                onTap: _isLoading ? null : _toggleMenu,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  // --- PERUBAHAN: Dekorasi dibuat dinamis ---
+                  decoration: BoxDecoration(
+                    color: _isOpen ? Colors.red : Colors.transparent,
+                    image: _isOpen
+                        ? null // Hilangkan gambar saat menu terbuka
+                        : const DecorationImage(
+                            image: AssetImage('assets/icons/darurat.webp'),
+                            fit: BoxFit.cover,
+                          ),
                   ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, animation) {
+                        return ScaleTransition(child: child, scale: animation);
+                      },
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : _isOpen
+                          ? const Icon(
+                              Icons.close,
+                              key: ValueKey('close_icon'),
+                              color: Colors.white,
+                              size: 26,
+                            )
+                          : Container(key: const ValueKey('empty_container')),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -155,7 +181,10 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
         );
       },
       child: InkWell(
-        onTap: onPressed,
+        onTap: () {
+          _toggleMenu();
+          onPressed();
+        },
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
