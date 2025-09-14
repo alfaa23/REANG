@@ -12,6 +12,7 @@ import 'package:reang_app/models/info_perizinan_model.dart';
 import 'package:reang_app/models/pasar_model.dart';
 import 'package:reang_app/models/info_adminduk_model.dart';
 import 'package:reang_app/models/slider_model.dart';
+import 'package:reang_app/models/renbang_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -21,7 +22,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://55fd3028e9c4.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://f7121915196c.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -298,6 +299,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil sliders: $e');
+    }
+  }
+
+  // =======================================================================
+  // API RENCANA PEMBANGUNAN (BARU)
+  // =======================================================================
+  Future<List<RenbangModel>> fetchRencanaPembangunan() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/deskripsi-renbang');
+      if (response.statusCode == 200) {
+        final List<RenbangModel> list = (response.data as List)
+            .map((item) => RenbangModel.fromJson(item))
+            .toList();
+        return list;
+      } else {
+        throw Exception('Gagal memuat Rencana Pembangunan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil Rencana Pembangunan: $e');
     }
   }
 }
