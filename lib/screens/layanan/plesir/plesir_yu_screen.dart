@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-// PERUBAHAN: Import halaman detail plesir
+import 'package:reang_app/models/plesir_model.dart';
+import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/plesir/detail_plesir_screen.dart';
 
 class PlesirYuScreen extends StatefulWidget {
@@ -10,6 +11,8 @@ class PlesirYuScreen extends StatefulWidget {
 }
 
 class _PlesirYuScreenState extends State<PlesirYuScreen> {
+  late Future<List<PlesirModel>> _plesirFuture;
+
   final List<_Category> _categories = [
     _Category('Semua', Icons.beach_access_outlined),
     _Category('Wisata', Icons.landscape_outlined),
@@ -21,6 +24,18 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
   int _selectedCategory = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _plesirFuture = ApiService().fetchInfoPlesir();
+  }
+
+  void _reloadData() {
+    setState(() {
+      _plesirFuture = ApiService().fetchInfoPlesir();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -29,9 +44,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
         child: Column(
           children: [
             _buildHeader(theme),
-            const SizedBox(
-              height: 24,
-            ), // diperbesar agar chips lebih jauh dari header
+            const SizedBox(height: 24),
             _buildCategoryChips(theme),
             const SizedBox(height: 12),
             Expanded(child: _buildDestinationList(theme)),
@@ -124,83 +137,87 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
   }
 
   Widget _buildDestinationList(ThemeData theme) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: const [
-        SizedBox(height: 12),
-        DestinationCard(
-          color: Color(0xFF4A90E2),
-          title: "Borobudur",
-          name: "Candi Borobudur",
-          category: "Wisata Religi",
-          description:
-              "Candi Buddha terbesar di dunia dengan arsitektur yang menakjubkan",
-          admin: "Dinas Pariwisata",
-          price: "Rp 50.000",
-          location: "Magelang, Jawa Tengah",
-          rating: 4.8,
+    return FutureBuilder<List<PlesirModel>>(
+      future: _plesirFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _buildErrorView(context);
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Tidak ada destinasi tersedia.'));
+        }
+
+        final allDestinations = snapshot.data!;
+        List<PlesirModel> filteredList = allDestinations;
+
+        if (_selectedCategory != 0) {
+          final categoryName = _categories[_selectedCategory].name
+              .toLowerCase();
+          filteredList = allDestinations
+              .where((d) => d.kategori.toLowerCase() == categoryName)
+              .toList();
+        }
+
+        if (filteredList.isEmpty) {
+          return const Center(
+            child: Text('Maaf, data untuk kategori ini belum tersedia.'),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: filteredList.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 20),
+          itemBuilder: (context, index) {
+            return DestinationCard(data: filteredList[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorView(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal Memuat Data',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Maaf, terjadi kesalahan. Periksa koneksi internet Anda.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _reloadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
         ),
-        SizedBox(height: 20),
-        DestinationCard(
-          color: Color(0xFFF5A623),
-          title: "Gudeg",
-          name: "Gudeg Yu Djum",
-          category: "Kuliner Tradisional",
-          description:
-              "Nikmati kelezatan gudeg khas Yogyakarta yang legendaris",
-          admin: "Dinas Pariwisata",
-          price: "Rp 30.000",
-          location: "Yogyakarta",
-          rating: 4.7,
-        ),
-        SizedBox(height: 20),
-        DestinationCard(
-          color: Color(0xFF7ED321),
-          title: "Sekaten",
-          name: "Festival Sekaten",
-          category: "Festival Budaya",
-          description: "Festival tradisional Walisongo di Yogyakarta",
-          admin: "Dinas Pariwisata",
-          price: "Gratis",
-          location: "Alun-alun Utara, Yogyakarta",
-          rating: 4.6,
-        ),
-        SizedBox(height: 20),
-        DestinationCard(
-          color: Color(0xFFD0011B),
-          title: "Masjid Agung Demak",
-          name: "Masjid Agung Demak",
-          category: "Religi",
-          description:
-              "Salah satu masjid tertua di Indonesia dengan arsitektur kuno",
-          admin: "Pengelola Masjid",
-          price: "Gratis",
-          location: "Demak, Jawa Tengah",
-          rating: 4.9,
-        ),
-        SizedBox(height: 20),
-      ],
+      ),
     );
   }
 }
 
 class DestinationCard extends StatelessWidget {
-  final Color color;
-  final String title, name, category, description, admin, price, location;
-  final double rating;
+  final PlesirModel data;
 
-  const DestinationCard({
-    super.key,
-    required this.color,
-    required this.title,
-    required this.name,
-    required this.category,
-    required this.description,
-    required this.admin,
-    required this.price,
-    required this.location,
-    required this.rating,
-  });
+  const DestinationCard({super.key, required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -212,43 +229,38 @@ class DestinationCard extends StatelessWidget {
       color: theme.cardColor,
       child: InkWell(
         onTap: () {
-          final Map<String, dynamic> destinationData = {
-            'title': title,
-            'name': name,
-            'category': category,
-            'description': description,
-            'admin': admin,
-            'price': price,
-            'location': location,
-            'rating': rating,
-            'color': color.value,
-          };
           Navigator.push(
             context,
             MaterialPageRoute(
-              // PERBAIKAN: Mengirim data ke DetailPlesirScreen
-              builder: (context) =>
-                  DetailPlesirScreen(destinationData: destinationData),
+              builder: (context) => DetailPlesirScreen(destinationData: data),
             ),
           );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              color: color,
+            Image.network(
+              data.foto,
               height: 200,
-              child: Center(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) {
+                return Container(
+                  height: 200,
+                  color: data.headerColor,
+                  child: Center(
+                    child: Text(
+                      data.judul,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -260,7 +272,7 @@ class DestinationCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          name,
+                          data.judul,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -271,7 +283,7 @@ class DestinationCard extends StatelessWidget {
                           const Icon(Icons.star, size: 18, color: Colors.amber),
                           const SizedBox(width: 4),
                           Text(
-                            rating.toStringAsFixed(1),
+                            data.rating.toStringAsFixed(1),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -282,14 +294,14 @@ class DestinationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    category,
+                    data.formattedKategori,
                     style: TextStyle(color: theme.hintColor, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     constraints: const BoxConstraints(maxHeight: 50),
                     child: Text(
-                      description,
+                      data.summary,
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -298,21 +310,20 @@ class DestinationCard extends StatelessWidget {
                   const Divider(height: 24),
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 9,
-                        backgroundColor: theme.colorScheme.surfaceVariant,
+                      // --- PERUBAHAN: Ikon diubah ---
+                      Icon(
+                        Icons.account_circle_outlined,
+                        size: 18, // Ukuran disesuaikan
+                        color: theme.hintColor,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(admin, style: theme.textTheme.bodyMedium),
-                      ),
-                      if (price.isNotEmpty)
-                        Text(
-                          price,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        // --- PERUBAHAN: Teks diubah ---
+                        child: Text(
+                          "Dispara Indramayu",
+                          style: theme.textTheme.bodyMedium,
                         ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -326,11 +337,12 @@ class DestinationCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          location,
+                          data.alamat,
                           style: theme.textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // PERBAIKAN: TextButton diganti dengan Text
                       Text(
                         "Lihat Detail ›",
                         style: TextStyle(

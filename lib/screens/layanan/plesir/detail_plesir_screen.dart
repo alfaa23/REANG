@@ -1,8 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:reang_app/models/plesir_model.dart';
+import 'package:reang_app/models/ulasan_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class DetailPlesirScreen extends StatefulWidget {
-  // PERBAIKAN: Menerima data destinasi dari halaman sebelumnya
-  final Map<String, dynamic> destinationData;
+  final PlesirModel destinationData;
   const DetailPlesirScreen({super.key, required this.destinationData});
 
   @override
@@ -10,277 +19,354 @@ class DetailPlesirScreen extends StatefulWidget {
 }
 
 class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<UlasanModel> _ulasanList = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
   late double ratingAverage;
-  late int reviewCount;
-  late List<Map<String, dynamic>> _reviews;
+  int _reviewCount = 0;
+  UlasanModel? _myReview;
 
   final TextEditingController _reviewCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi dari data yang dikirim, fallback nilai default
-    ratingAverage = (widget.destinationData['rating'] is num)
-        ? (widget.destinationData['rating'] as num).toDouble()
-        : 0.0;
-    // Asumsi awal jumlah ulasan 120 agar tampilan lama tetap; jika ada key count di data, gunakan itu.
-    reviewCount = (widget.destinationData['review_count'] is int)
-        ? widget.destinationData['review_count'] as int
-        : 120;
+    ratingAverage = widget.destinationData.rating;
+    _loadInitialReviews();
+    _scrollController.addListener(_onScroll);
+  }
 
-    // Inisialisasi daftar ulasan dengan contoh dua ulasan seperti versi sebelumnya
-    _reviews = [
-      {
-        'nama': 'Rimba',
-        'tanggal': '24/07/25',
-        'ulasan':
-            'Tempatnya indah dan bagus, cocok untuk liburan bareng keluarga. Pemandangannya juga sangat memukau.',
-        'rating': 5,
-      },
-      {
-        'nama': 'Siti',
-        'tanggal': '22/07/25',
-        'ulasan':
-            'Akses jalannya mudah dan pantainya bersih. Sangat direkomendasikan!',
-        'rating': 4,
-      },
-    ];
+  Future<void> _loadInitialReviews() async {
+    setState(() {
+      _isLoading = true;
+      _ulasanList = [];
+      _currentPage = 1;
+      _hasMore = true;
+    });
+    try {
+      final response = await _apiService.fetchUlasan(
+        widget.destinationData.id,
+        _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          ratingAverage = response.avgRating;
+          _ulasanList = response.ratings;
+          _hasMore = response.hasMorePages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      Fluttertoast.showToast(msg: "Gagal memuat ulasan.");
+    }
+  }
+
+  Future<void> _loadMoreReviews() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+
+    try {
+      final response = await _apiService.fetchUlasan(
+        widget.destinationData.id,
+        _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          _ulasanList.addAll(response.ratings);
+          _hasMore = response.hasMorePages;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreReviews();
+    }
   }
 
   @override
   void dispose() {
     _reviewCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _launchMapsUrl() async {
+    final lat = widget.destinationData.latitude;
+    final lng = widget.destinationData.longitude;
+    final Uri url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'Tidak dapat membuka aplikasi peta';
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: e.toString());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final data = widget.destinationData;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // Mengambil data dari map yang dikirim
-    final String title = widget.destinationData['title'] ?? 'Detail Wisata';
-    final String locationName = widget.destinationData['name'] ?? 'Lokasi';
-    final String address =
-        widget.destinationData['location'] ?? 'Alamat tidak tersedia';
-    final String description =
-        widget.destinationData['description'] ?? 'Deskripsi tidak tersedia.';
-    final String category = widget.destinationData['category'] ?? 'Kategori';
-    final String imagePath =
-        widget.destinationData['image'] ??
-        'assets/images/pantai_balongan.png'; // Ganti dengan path gambar dinamis jika ada
+    // Memeriksa dan memisahkan ulasan pengguna dari daftar
+    _myReview = null;
+    if (authProvider.isLoggedIn) {
+      try {
+        _myReview = _ulasanList.firstWhere(
+          (r) => r.userId == authProvider.user!.id,
+        );
+      } catch (e) {
+        _myReview = null;
+      }
+    }
+    final otherReviews = _ulasanList
+        .where((r) => r.userId != authProvider.user?.id)
+        .toList();
+    _reviewCount = _ulasanList.length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220.0,
-            pinned: true,
-            stretch: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(
-                  color: theme.colorScheme.surface,
-                  child: Center(
-                    child: Text(
-                      'Article Image',
-                      style: TextStyle(color: theme.hintColor),
+      body: NestedScrollView(
+        controller: _scrollController,
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: 220.0,
+              pinned: true,
+              stretch: true,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withOpacity(0.3),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Image.network(
+                  data.foto,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    color: theme.colorScheme.surface,
+                    child: Center(
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 48,
+                        color: theme.hintColor,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-
-          SliverList(
-            delegate: SliverChildListDelegate([
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ];
+        },
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Text(
+                  data.judul,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    const SizedBox(height: 12),
-                    Text(
-                      title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    // -- KATEGORI: tampilkan tepat di bawah judul --
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Chip(
-                          label: Text(
-                            category,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          backgroundColor: theme.colorScheme.surfaceVariant,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // -- akhir kategori --
-                    const SizedBox(height: 16),
-                    Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: theme.dividerColor),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDetailRow(
-                              theme,
-                              Icons.location_on,
-                              "Lokasi:",
-                              "$locationName\n$address",
-                            ),
-                            const Divider(height: 32),
-                            _buildDetailRow(
-                              theme,
-                              Icons.description,
-                              "Deskripsi:",
-                              description,
-                            ),
-                            const SizedBox(height: 24),
-                            Center(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  // TODO: Aksi untuk membuka peta
-                                },
-                                icon: const Icon(Icons.map_outlined, size: 18),
-                                label: const Text('Lihat Lokasi di Peta'),
-                                style: ElevatedButton.styleFrom(
-                                  // PERUBAHAN: Mengubah warna tombol
-                                  backgroundColor: Colors.blue.shade800,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                    Chip(
+                      label: Text(
+                        data.formattedKategori,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Rating dan Ulasan",
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      backgroundColor: theme.colorScheme.surfaceVariant,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // -- RATING SUMMARY + TOMBOL TAMBAH ULASAN (dengan input bintang) --
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          ratingAverage.toStringAsFixed(1),
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: List.generate(5, (index) {
-                                  if (ratingAverage >= index + 1) {
-                                    return const Icon(
-                                      Icons.star_rounded,
-                                      color: Colors.amber,
-                                      size: 22,
-                                    );
-                                  } else if (ratingAverage > index) {
-                                    return const Icon(
-                                      Icons.star_half_rounded,
-                                      color: Colors.amber,
-                                      size: 22,
-                                    );
-                                  }
-                                  return const Icon(
-                                    Icons.star_border_rounded,
-                                    color: Colors.amber,
-                                    size: 22,
-                                  );
-                                }),
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "dari $reviewCount ulasan",
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.hintColor,
-                                    ),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: _showAddReviewSheet,
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: const Text("Tambah Ulasan"),
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 32),
-
-                    // -- LIST ULASAN (dinamis) --
-                    Column(
-                      children: _reviews.map((r) {
-                        return _buildUlasan(
-                          theme,
-                          r['nama'] as String,
-                          r['tanggal'] as String,
-                          r['ulasan'] as String,
-                          rating: (r['rating'] as int?) ?? 0,
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
                   ],
                 ),
-              ),
-            ]),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: theme.dividerColor),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow(
+                          theme,
+                          Icons.location_on,
+                          "Lokasi:",
+                          data.alamat,
+                        ),
+                        const Divider(height: 32),
+                        _buildDetailRow(
+                          theme,
+                          Icons.description,
+                          "Deskripsi:",
+                          "",
+                          child: HtmlWidget(data.deskripsi),
+                        ),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: ElevatedButton.icon(
+                            onPressed: _launchMapsUrl,
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('Lihat Lokasi di Peta'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade800,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Rating dan Ulasan",
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildRatingSummary(theme, authProvider),
+                const Divider(height: 32),
+                if (_isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (_ulasanList.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text('Jadilah yang pertama memberi ulasan!'),
+                    ),
+                  )
+                else
+                  Column(
+                    children: [
+                      if (_myReview != null)
+                        _buildUlasan(theme, _myReview!, isMyReview: true),
+                      ...otherReviews.map((r) => _buildUlasan(theme, r)),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildRatingSummary(ThemeData theme, AuthProvider authProvider) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          ratingAverage.toStringAsFixed(1),
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: List.generate(5, (index) {
+                  if (ratingAverage >= index + 1)
+                    return const Icon(
+                      Icons.star_rounded,
+                      color: Colors.amber,
+                      size: 22,
+                    );
+                  if (ratingAverage > index)
+                    return const Icon(
+                      Icons.star_half_rounded,
+                      color: Colors.amber,
+                      size: 22,
+                    );
+                  return const Icon(
+                    Icons.star_border_rounded,
+                    color: Colors.amber,
+                    size: 22,
+                  );
+                }),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "dari $_reviewCount ulasan",
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showAddReviewSheet(authProvider),
+                    icon: Icon(
+                      _myReview != null ? Icons.edit_outlined : Icons.add,
+                      size: 18,
+                    ),
+                    label: Text(
+                      _myReview != null ? "Edit Ulasan Anda" : "Tambah Ulasan",
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -288,8 +374,9 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
     ThemeData theme,
     IconData icon,
     String title,
-    String value,
-  ) {
+    String value, {
+    Widget? child,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -306,13 +393,14 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                value,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  height: 1.5,
-                  fontSize: 16,
-                ),
-              ),
+              child ??
+                  Text(
+                    value,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      height: 1.5,
+                      fontSize: 16,
+                    ),
+                  ),
             ],
           ),
         ),
@@ -320,10 +408,15 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
     );
   }
 
-  void _showAddReviewSheet() {
-    _reviewCtrl.clear();
-    // tempRating sekarang diinisialisasi 0 supaya bintang kosong pada awalnya
-    int tempRating = 0;
+  void _showAddReviewSheet(AuthProvider authProvider) {
+    if (!authProvider.isLoggedIn) {
+      Fluttertoast.showToast(msg: "Anda harus login untuk memberi ulasan.");
+      // TODO: Arahkan ke halaman Login
+      return;
+    }
+
+    _reviewCtrl.text = _myReview?.comment ?? '';
+    int tempRating = _myReview?.rating ?? 0;
 
     showModalBottomSheet(
       context: context,
@@ -332,164 +425,149 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final mq = MediaQuery.of(ctx);
-        // Menggunakan SingleChildScrollView dan StatefulBuilder untuk interaksi bintang
         return Padding(
-          padding: EdgeInsets.only(
-            bottom: mq.viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
-          child: SingleChildScrollView(
-            child: StatefulBuilder(
-              builder: (contextSheet, setSheetState) {
-                // canSubmit true jika user sudah memilih bintang (>0)
-                final bool canSubmit = tempRating > 0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(4),
+          child: StatefulBuilder(
+            builder: (contextSheet, setSheetState) {
+              final bool canSubmit = tempRating > 0;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _myReview != null ? 'Edit Ulasan Anda' : 'Tambah Ulasan',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Rating',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: List.generate(5, (i) {
+                      final idx = i + 1;
+                      return IconButton(
+                        onPressed: () => setSheetState(() => tempRating = idx),
+                        icon: Icon(
+                          idx <= tempRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 30,
+                          color: Colors.amber,
                         ),
-                      ),
+                        splashRadius: 20,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _reviewCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Ulasan (opsional)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
                     ),
-                    Text(
-                      'Tambah Ulasan',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    minLines: 3,
+                    maxLines: 6,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: canSubmit
+                          ? () async {
+                              final comment = _reviewCtrl.text.trim();
+                              final userId = authProvider.user!.id;
+                              final token = authProvider.token!;
 
-                    // Baris bintang (rating) — awalnya kosong (tempRating == 0)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Rating',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: List.generate(5, (i) {
-                        final idx = i + 1;
-                        return IconButton(
-                          onPressed: () {
-                            setSheetState(() => tempRating = idx);
-                          },
-                          icon: Icon(
-                            idx <= tempRating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 30,
-                            color: Colors.amber,
-                          ),
-                          splashRadius: 20,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 36),
-                        );
-                      }),
-                    ),
+                              try {
+                                final Map<String, dynamic> response;
+                                if (_myReview != null) {
+                                  // --- EDIT ULASAN ---
+                                  response = await _apiService.updateUlasan(
+                                    ratingId: _myReview!.id,
+                                    rating: tempRating,
+                                    comment: comment,
+                                    token: token,
+                                  );
+                                } else {
+                                  // --- TAMBAH ULASAN BARU ---
+                                  response = await _apiService.postUlasan(
+                                    plesirId: widget.destinationData.id,
+                                    userId: userId,
+                                    rating: tempRating,
+                                    comment: comment,
+                                    token: token,
+                                  );
+                                }
 
-                    const SizedBox(height: 8),
+                                final newAvgRating = response['avg_rating'];
+                                if (newAvgRating is num) {
+                                  setState(
+                                    () =>
+                                        ratingAverage = newAvgRating.toDouble(),
+                                  );
+                                }
 
-                    TextField(
-                      controller: _reviewCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Ulasan',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      minLines: 3,
-                      maxLines: 6,
-                    ),
-                    const SizedBox(height: 12),
-                    // Tombol dikompakkan dan diletakkan segera setelah TextField agar mudah dijangkau
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        // hanya aktif jika tempRating > 0 (user wajib pilih bintang)
-                        onPressed: canSubmit
-                            ? () {
-                                final review = _reviewCtrl.text.trim();
-                                // sekarang ulasan boleh kosong -> tidak ada validasi review.isEmpty
-
-                                final now = DateTime.now();
-                                final tanggal =
-                                    '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)}';
-
-                                setState(() {
-                                  // tambahkan ulasan di awal list (simpan nama kosong -> tampil 'Pengunjung')
-                                  _reviews.insert(0, {
-                                    'nama': '',
-                                    'tanggal': tanggal,
-                                    'ulasan': review,
-                                    'rating': tempRating,
-                                  });
-
-                                  // update jumlah ulasan dan rata-rata rating
-                                  final prevTotal = ratingAverage * reviewCount;
-                                  reviewCount = reviewCount + 1;
-                                  ratingAverage =
-                                      (prevTotal + tempRating) / reviewCount;
-                                });
-
-                                Navigator.of(
-                                  context,
-                                ).pop(); // tutup bottom sheet
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Ulasan berhasil ditambahkan',
-                                    ),
-                                  ),
+                                Fluttertoast.showToast(
+                                  msg: "Ulasan berhasil dikirim!",
+                                  backgroundColor: Colors.green,
+                                );
+                                Navigator.of(context).pop();
+                                _loadInitialReviews();
+                              } catch (e) {
+                                Fluttertoast.showToast(
+                                  msg: e.toString(),
+                                  backgroundColor: Colors.red,
                                 );
                               }
-                            : null,
-                        style: ButtonStyle(
-                          // warna biru saat aktif, abu saat disabled
-                          backgroundColor:
-                              MaterialStateProperty.resolveWith<Color?>((
-                                states,
-                              ) {
-                                if (states.contains(MaterialState.disabled)) {
-                                  return Colors.grey.shade300;
-                                }
-                                return Colors.blue.shade800;
-                              }),
-                          foregroundColor:
-                              MaterialStateProperty.resolveWith<Color?>((
-                                states,
-                              ) {
-                                if (states.contains(MaterialState.disabled)) {
-                                  return Colors.black38;
-                                }
-                                return Colors.white;
-                              }),
-                          shape: MaterialStateProperty.all(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                            }
+                          : null,
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.resolveWith<Color?>(
+                              (states) =>
+                                  states.contains(MaterialState.disabled)
+                                  ? Colors.grey.shade300
+                                  : Colors.blue.shade800,
                             ),
-                          ),
-                          padding: MaterialStateProperty.all(
-                            const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                        child: const Text('Kirim Ulasan'),
+                        foregroundColor:
+                            MaterialStateProperty.resolveWith<Color?>(
+                              (states) =>
+                                  states.contains(MaterialState.disabled)
+                                  ? Colors.black38
+                                  : Colors.white,
+                            ),
                       ),
+                      child: const Text('Kirim Ulasan'),
                     ),
-                    const SizedBox(height: 18),
-                  ],
-                );
-              },
-            ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -498,62 +576,70 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
 
   Widget _buildUlasan(
     ThemeData theme,
-    String nama,
-    String tanggal,
-    String ulasan, {
-    int rating = 0,
+    UlasanModel ulasan, {
+    bool isMyReview = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(nama.isNotEmpty ? nama[0] : '?'),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: isMyReview
+                    ? theme.colorScheme.primaryContainer
+                    : theme.colorScheme.surfaceVariant,
+                child: Text(
+                  ulasan.userName.isNotEmpty
+                      ? ulasan.userName[0].toUpperCase()
+                      : '?',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      nama.isNotEmpty ? nama : 'Pengunjung',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isMyReview ? "Ulasan Anda" : ulasan.userName,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          timeago.format(ulasan.createdAt, locale: 'id'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: List.generate(
+                        5,
+                        (index) => Icon(
+                          index < ulasan.rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: Colors.amber,
+                          size: 16,
+                        ),
                       ),
                     ),
+                    const SizedBox(height: 8),
                     Text(
-                      tanggal,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
-                      ),
+                      ulasan.comment,
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: List.generate(
-                    5,
-                    (index) => Icon(
-                      index < rating
-                          ? Icons.star_rounded
-                          : Icons.star_border_rounded,
-                      color: Colors.amber,
-                      size: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  ulasan,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),

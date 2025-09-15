@@ -13,6 +13,8 @@ import 'package:reang_app/models/pasar_model.dart';
 import 'package:reang_app/models/info_adminduk_model.dart';
 import 'package:reang_app/models/slider_model.dart';
 import 'package:reang_app/models/renbang_model.dart';
+import 'package:reang_app/models/plesir_model.dart';
+import 'package:reang_app/models/ulasan_response_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -22,7 +24,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://f7121915196c.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://098be101644e.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -318,6 +320,194 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil Rencana Pembangunan: $e');
+    }
+  }
+
+  // =======================================================================
+  // API REGISTRASI (BARU)
+  // =======================================================================
+  Future<Map<String, dynamic>> registerUser({
+    required String fullName,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    required String phone,
+    required String noKtp,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/auth/signup',
+        data: {
+          'fullName': fullName,
+          'email': email,
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+          'phone': phone,
+          'noKtp': noKtp,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Mengembalikan seluruh data (termasuk token dan user) jika sukses
+        return response.data;
+      } else {
+        // Menangani status code lain yang tidak diharapkan
+        throw Exception('Gagal melakukan pendaftaran.');
+      }
+    } on DioException catch (e) {
+      // Menangani error validasi dari server (misal: email sudah terdaftar)
+      if (e.response != null && e.response!.data is Map) {
+        final errorMessage =
+            e.response!.data['message'] ?? 'Terjadi kesalahan.';
+        // Jika ada detail error dari validator, ambil yang pertama
+        final errors = e.response!.data['errors'] as Map<String, dynamic>?;
+        if (errors != null && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            throw Exception(firstError.first);
+          }
+        }
+        throw Exception(errorMessage);
+      }
+      // Menangani error koneksi atau timeout
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi Anda.');
+    } catch (e) {
+      // Menangani error tak terduga lainnya
+      throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+    }
+  }
+
+  // =======================================================================
+  // API LOGIN (BARU)
+  // =======================================================================
+  Future<Map<String, dynamic>> loginUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/auth/signin',
+        data: {'email': email, 'password': password},
+      );
+
+      if (response.statusCode == 200) {
+        // Mengembalikan seluruh data (termasuk token dan user) jika sukses
+        return response.data;
+      } else {
+        // Menangani status code lain yang tidak diharapkan
+        throw Exception('Gagal melakukan login.');
+      }
+    } on DioException catch (e) {
+      // Menangani error dari server (misal: email atau password salah)
+      if (e.response != null && e.response!.data is Map) {
+        final errorMessage =
+            e.response!.data['message'] ?? 'Terjadi kesalahan.';
+        throw Exception(errorMessage);
+      }
+      // Menangani error koneksi atau timeout
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi Anda.');
+    } catch (e) {
+      // Menangani error tak terduga lainnya
+      throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+    }
+  }
+
+  // =======================================================================
+  // API INFO PLESIR (BARU)
+  // =======================================================================
+  Future<List<PlesirModel>> fetchInfoPlesir() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-plesir');
+      if (response.statusCode == 200) {
+        final List<PlesirModel> list = (response.data as List)
+            .map((item) => PlesirModel.fromJson(item))
+            .toList();
+        return list;
+      } else {
+        throw Exception('Gagal memuat info plesir');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil info plesir: $e');
+    }
+  }
+
+  // =======================================================================
+  // API RATING & ULASAN (DIPERBARUI)
+  // =======================================================================
+
+  // Fungsi untuk MENGAMBIL ulasan dengan pagination
+  Future<UlasanResponseModel> fetchUlasan(int plesirId, int page) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/info-plesir/$plesirId/ratings?page=$page',
+      );
+      if (response.statusCode == 200) {
+        return UlasanResponseModel.fromJson(response.data);
+      } else {
+        throw Exception('Gagal memuat ulasan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil ulasan: $e');
+    }
+  }
+
+  // Fungsi untuk MENGIRIM ulasan baru
+  Future<Map<String, dynamic>> postUlasan({
+    required int plesirId,
+    required int userId,
+    required int rating,
+    required String comment,
+    required String token, // Token dibutuhkan untuk otentikasi
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/rating',
+        data: {
+          'info_plesir_id': plesirId,
+          'user_id': userId,
+          'rating': rating,
+          'comment': comment,
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data;
+      } else {
+        throw Exception('Gagal mengirim ulasan');
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response!.data is Map) {
+        throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
+      }
+      throw Exception('Tidak dapat terhubung ke server.');
+    }
+  }
+
+  // FUNGSI BARU: Untuk MENGEDIT ulasan yang sudah ada
+  Future<Map<String, dynamic>> updateUlasan({
+    required int ratingId,
+    required int rating,
+    required String comment,
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '$_baseUrlBackend/rating/$ratingId', // Menggunakan method PUT
+        data: {'rating': rating, 'comment': comment},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Gagal memperbarui ulasan');
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response!.data is Map) {
+        throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
+      }
+      throw Exception('Tidak dapat terhubung ke server.');
     }
   }
 }

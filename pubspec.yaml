@@ -48,6 +48,7 @@ dependencies:
   webview_flutter: ^4.13.0
   fluttertoast: ^8.2.5
   location: 8.0.1
+  flutter_secure_storage: ^9.2.4
   
 
 dev_dependencies:

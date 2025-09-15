@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:reang_app/screens/home/home_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:reang_app/models/user_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/screens/main_screen.dart';
 import 'package:reang_app/screens/auth/register_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,7 +16,84 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
   bool _isPasswordVisible = false;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performLogin() async {
+    if (_isLoading) return;
+
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      Fluttertoast.showToast(
+        msg: "Email dan password tidak boleh kosong.",
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final apiService = ApiService();
+      final response = await apiService.loginUser(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+
+      final token = response['access_token'];
+      final userData = response['user'];
+
+      if (token != null && userData != null) {
+        // Simpan token dengan aman
+        const storage = FlutterSecureStorage();
+        await storage.write(key: 'auth_token', value: token);
+
+        // --- PERBAIKAN: Simpan data pengguna ke AuthProvider ---
+        final user = UserModel.fromJson(userData);
+        if (mounted) {
+          Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).setUser(user, token);
+        }
+        // ----------------------------------------------------
+
+        Fluttertoast.showToast(
+          msg: "Login Berhasil!",
+          backgroundColor: Colors.green,
+        );
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      } else {
+        throw Exception("Token atau data pengguna tidak ditemukan.");
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: e.toString(),
+        backgroundColor: Colors.red,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +126,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F2F3),
                     foregroundColor: Colors.black,
-                    // PERUBAIKAN: Membuat tombol responsif
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -64,8 +146,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    labelText: 'Username/email',
+                    labelText: 'Email',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -73,6 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  controller: _passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
@@ -110,15 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
-                      ),
-                      (Route<dynamic> route) => false,
-                    );
-                  },
+                  onPressed: _performLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF212121),
                     foregroundColor: Colors.white,
@@ -127,7 +204,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text('Masuk', style: TextStyle(fontSize: 16)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text('Masuk', style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 24),
                 Row(

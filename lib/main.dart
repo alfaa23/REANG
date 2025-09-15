@@ -3,6 +3,8 @@ import 'package:intl/date_symbol_data_local.dart'; // <-- 1. TAMBAHKAN IMPORT IN
 import 'package:provider/provider.dart';
 import 'package:reang_app/app/theme/app_theme.dart';
 import 'package:reang_app/providers/theme_provider.dart';
+// --- TAMBAHAN BARU: Import AuthProvider ---
+import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/splash_screen.dart';
 
 // 2. UBAH FUNGSI main MENJADI ASYNC
@@ -12,9 +14,14 @@ void main() async {
   await initializeDateFormatting('id_ID', null);
   // AKHIR BAGIAN TAMBAHAN
 
+  // --- PERUBAHAN: Menggunakan MultiProvider ---
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+        // Menambahkan AuthProvider agar bisa diakses di seluruh aplikasi
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -33,7 +40,7 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          // Halaman home sekarang memanggil SplashScreen dari file yang di-import
+          // Halaman home sekarang memanggil SplashScreen dari file yang di-import mundur dulu
           home: const SplashScreen(),
         );
       },

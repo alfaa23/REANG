@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async'; // Diimpor kembali untuk menggunakan Future.delayed
-// PERUBAHAN: Import MainScreen sebagai tujuan navigasi
-import 'package:reang_app/screens/main_screen.dart';
+// PERUBAHAN: Import diubah kembali ke LoginScreen
+import 'package:reang_app/screens/auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -22,9 +22,9 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            // PERUBAHAN: Tujuan diubah dari LoginScreen() menjadi MainScreen()
+            // PERUBAHAN: Tujuan diubah kembali menjadi LoginScreen()
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const MainScreen(),
+                const LoginScreen(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
                   return FadeTransition(opacity: animation, child: child);
@@ -49,4 +49,6 @@ class _SplashScreenState extends State<SplashScreen> {
       ),
     );
   }
+
+  ///mundur dulu
 }

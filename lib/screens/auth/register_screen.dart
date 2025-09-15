@@ -1,4 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
+import 'package:reang_app/models/user_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/screens/main_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,74 +17,85 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final PageController _pageController = PageController();
+
   final GlobalKey<FormState> _nameFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _usernameFormKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _ktpFormKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _phoneFormKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _emailFormKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _passwordFormKey = GlobalKey<FormState>();
 
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _ktpController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _passwordConfirmationController =
+      TextEditingController();
 
   int _currentPage = 0;
   bool _isTermsAgreed = false;
   bool _isPasswordVisible = false;
+  bool _isPasswordConfirmationVisible = false;
 
-  // State untuk validasi setiap input, agar bisa mengubah warna tombol
   bool _isNameValid = false;
-  bool _isUsernameValid = false;
+  bool _isKtpValid = false;
+  bool _isPhoneValid = false;
   bool _isEmailValid = false;
   bool _isPasswordValid = false;
+
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    // Tambahkan listener untuk setiap controller
     _nameController.addListener(() {
       final isValid = _nameController.text.trim().isNotEmpty;
-      if (_isNameValid != isValid) {
-        setState(() => _isNameValid = isValid);
-      }
+      if (_isNameValid != isValid) setState(() => _isNameValid = isValid);
     });
-    _usernameController.addListener(() {
-      final isValid = _usernameController.text.length >= 6;
-      if (_isUsernameValid != isValid) {
-        setState(() => _isUsernameValid = isValid);
-      }
+    _ktpController.addListener(() {
+      final isValid = _ktpController.text.length == 16;
+      if (_isKtpValid != isValid) setState(() => _isKtpValid = isValid);
+    });
+    _phoneController.addListener(() {
+      final isValid = _phoneController.text.length >= 10;
+      if (_isPhoneValid != isValid) setState(() => _isPhoneValid = isValid);
     });
     _emailController.addListener(() {
       final isValid =
           _emailController.text.contains('@') &&
           _emailController.text.contains('.');
-      if (_isEmailValid != isValid) {
-        setState(() => _isEmailValid = isValid);
-      }
+      if (_isEmailValid != isValid) setState(() => _isEmailValid = isValid);
     });
-    _passwordController.addListener(() {
-      final isValid = _passwordController.text.length >= 6;
-      if (_isPasswordValid != isValid) {
+    void passwordListener() {
+      final isValid =
+          _passwordController.text.length >= 6 &&
+          _passwordConfirmationController.text == _passwordController.text;
+      if (_isPasswordValid != isValid)
         setState(() => _isPasswordValid = isValid);
-      }
-    });
+    }
+
+    _passwordController.addListener(passwordListener);
+    _passwordConfirmationController.addListener(passwordListener);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
-    _usernameController.dispose();
+    _ktpController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
+    _passwordConfirmationController.dispose();
     super.dispose();
   }
 
   void _nextPage() {
     bool isValid = false;
     if (_currentPage == 0) isValid = _nameFormKey.currentState!.validate();
-    if (_currentPage == 1) isValid = _usernameFormKey.currentState!.validate();
-    if (_currentPage == 2) isValid = _emailFormKey.currentState!.validate();
-    if (_currentPage == 3) isValid = _passwordFormKey.currentState!.validate();
+    if (_currentPage == 1) isValid = _ktpFormKey.currentState!.validate();
+    if (_currentPage == 2) isValid = _phoneFormKey.currentState!.validate();
+    if (_currentPage == 3) isValid = _emailFormKey.currentState!.validate();
+    if (_currentPage == 4) isValid = _passwordFormKey.currentState!.validate();
 
     if (isValid) {
       _pageController.nextPage(
@@ -86,22 +105,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _submitRegistration() {
-    if (!_isTermsAgreed) return;
+  Future<void> _submitRegistration() async {
+    if (!_isTermsAgreed || _isSubmitting) return;
 
-    print("======================================");
-    print("PROSES REGISTRASI FINAL");
-    print("Nama Lengkap: ${_nameController.text}");
-    print("Username:     ${_usernameController.text}");
-    print("Email:        ${_emailController.text}");
-    print("Password:     ${_passwordController.text}");
-    print("======================================");
+    setState(() => _isSubmitting = true);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Pendaftaran Berhasil!')));
+    try {
+      final apiService = ApiService();
+      final response = await apiService.registerUser(
+        fullName: _nameController.text,
+        noKtp: _ktpController.text,
+        phone: _phoneController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        passwordConfirmation: _passwordConfirmationController.text,
+      );
 
-    Navigator.of(context).pop();
+      final token = response['access_token'];
+      final userData = response['user'];
+
+      if (token != null && userData != null) {
+        // --- PERBAIKAN: Menyimpan token dan data pengguna ---
+        const storage = FlutterSecureStorage();
+        await storage.write(key: 'auth_token', value: token);
+
+        final user = UserModel.fromJson(userData);
+        if (mounted) {
+          Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).setUser(user, token);
+        }
+        // ---------------------------------------------
+
+        Fluttertoast.showToast(
+          msg: "Pendaftaran berhasil!",
+          backgroundColor: Colors.green,
+        );
+
+        // --- PERUBAHAN: Navigasi ke MainScreen setelah registrasi ---
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      } else {
+        throw Exception("Token atau data pengguna tidak ditemukan.");
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: e.toString(),
+        backgroundColor: Colors.red,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -134,14 +196,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (int page) {
-                  setState(() {
-                    _currentPage = page;
-                  });
+                  setState(() => _currentPage = page);
                 },
                 children: [
                   _buildStep(
                     formKey: _nameFormKey,
-                    title: 'siapa nama kamu?',
+                    title: 'Siapa nama lengkap kamu?',
                     child: TextFormField(
                       controller: _nameController,
                       decoration: _buildInputDecoration(
@@ -157,21 +217,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isStepValid: _isNameValid,
                   ),
                   _buildStep(
-                    formKey: _usernameFormKey,
-                    title: 'username apa yang ingin kamu gunakan?',
+                    formKey: _ktpFormKey,
+                    title: 'Masukkan nomor KTP kamu',
                     child: TextFormField(
-                      controller: _usernameController,
-                      decoration: _buildInputDecoration(hintText: 'Username'),
+                      controller: _ktpController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(16),
+                      ],
+                      decoration: _buildInputDecoration(hintText: 'Nomor KTP'),
                       validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return 'Username minimal 6 karakter';
+                        if (value == null || value.length != 16) {
+                          return 'Nomor KTP harus 16 digit';
                         }
                         return null;
                       },
                     ),
-                    infoText:
-                        'huruf (a-z), angka (0-9), titik (.) atau garis bawah (_)',
-                    isStepValid: _isUsernameValid,
+                    infoText: 'Pastikan nomor KTP terdiri dari 16 digit angka.',
+                    isStepValid: _isKtpValid,
+                  ),
+                  _buildStep(
+                    formKey: _phoneFormKey,
+                    title: 'Berapa nomor telepon kamu?',
+                    child: TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: _buildInputDecoration(
+                        hintText: 'Nomor Telepon',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.length < 10) {
+                          return 'Masukkan nomor telepon yang valid';
+                        }
+                        return null;
+                      },
+                    ),
+                    isStepValid: _isPhoneValid,
                   ),
                   _buildStep(
                     formKey: _emailFormKey,
@@ -194,33 +277,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _buildStep(
                     formKey: _passwordFormKey,
                     title: 'Buat password kamu',
-                    child: TextFormField(
-                      controller: _passwordController,
-                      obscureText: !_isPasswordVisible,
-                      decoration: _buildInputDecoration(
-                        hintText: 'Password',
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.grey[600],
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: !_isPasswordVisible,
+                          decoration: _buildInputDecoration(
+                            hintText: 'Password',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: Colors.grey[600],
+                              ),
+                              onPressed: () => setState(
+                                () => _isPasswordVisible = !_isPasswordVisible,
+                              ),
+                            ),
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
+                          validator: (value) {
+                            if (value == null || value.length < 6) {
+                              return 'Password minimal 6 karakter';
+                            }
+                            return null;
                           },
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return 'Password minimal 6 karakter';
-                        }
-                        return null;
-                      },
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordConfirmationController,
+                          obscureText: !_isPasswordConfirmationVisible,
+                          decoration: _buildInputDecoration(
+                            hintText: 'Konfirmasi password',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordConfirmationVisible
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: Colors.grey[600],
+                              ),
+                              onPressed: () => setState(
+                                () => _isPasswordConfirmationVisible =
+                                    !_isPasswordConfirmationVisible,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value != _passwordController.text) {
+                              return 'Password tidak cocok';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                     ),
-                    infoText: 'password dapat berupa huruf, angka atau simbol',
+                    infoText: 'Password dapat berupa huruf, angka atau simbol',
                     isStepValid: _isPasswordValid,
                   ),
                   _buildTermsStep(),
@@ -264,7 +375,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isActive: isStepValid,
                   activeColor: Colors.blue,
                 ),
-                child: Text('lanjutkan', style: _buttonTextStyle()),
+                child: Text('Lanjutkan', style: _buttonTextStyle()),
               ),
             ),
             const SizedBox(height: 24),
@@ -321,9 +432,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Checkbox(
                   value: _isTermsAgreed,
                   onChanged: (bool? value) {
-                    setState(() {
-                      _isTermsAgreed = value ?? false;
-                    });
+                    setState(() => _isTermsAgreed = value ?? false);
                   },
                   activeColor: Colors.blue,
                 ),
@@ -339,12 +448,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isTermsAgreed ? _submitRegistration : null,
+              onPressed: (_isTermsAgreed && !_isSubmitting)
+                  ? _submitRegistration
+                  : null,
               style: _buttonStyle(
                 isActive: _isTermsAgreed,
                 activeColor: Colors.blue,
               ),
-              child: Text('Daftar', style: _buttonTextStyle()),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : Text('Daftar', style: _buttonTextStyle()),
             ),
           ),
           const SizedBox(height: 24),
@@ -402,15 +522,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
 class _ProgressIndicator extends StatelessWidget {
   final int currentStep;
-  // PERBAIKAN: Menghapus parameter `totalSteps` yang tidak digunakan
+  static const int totalSteps = 6;
+
   const _ProgressIndicator({required this.currentStep});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      // PERBAIKAN: Menggunakan nilai 5 secara langsung
-      children: List.generate(5, (index) {
+      children: List.generate(totalSteps, (index) {
         return Container(
           width: 50,
           height: 4,
