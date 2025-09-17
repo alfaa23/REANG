@@ -15,6 +15,7 @@ import 'package:reang_app/models/slider_model.dart';
 import 'package:reang_app/models/renbang_model.dart';
 import 'package:reang_app/models/plesir_model.dart';
 import 'package:reang_app/models/ulasan_response_model.dart';
+import 'package:reang_app/models/pagination_response_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -24,7 +25,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://098be101644e.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://20df368f7d62.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -208,17 +209,163 @@ class ApiService {
   }
 
   // =======================================================================
-  // API Event Keagamaan (BARU)
+  // API TEMPAT IBADAH (DIPERBARUI DENGAN PAGINATION & FILTER)
   // =======================================================================
-
-  Future<List<EventKeagamaanModel>> fetchEventKeagamaan() async {
+  Future<PaginationResponseModel<Map<String, dynamic>>>
+  fetchTempatIbadahPaginated({
+    required int page,
+    String? kategori,
+    String? query,
+  }) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/event-agama');
+      // Menyiapkan parameter untuk dikirim ke API
+      final Map<String, dynamic> queryParams = {'page': page};
+
+      // --- PERBAIKAN: Mengganti kunci parameter 'kategori' menjadi 'fitur' ---
+      if (kategori != null && kategori != 'Semua') {
+        queryParams['fitur'] = kategori;
+      }
+      // ------------------------------------------------------------------
+
+      if (query != null && query.isNotEmpty) {
+        queryParams['search'] =
+            query; // 'search' untuk query pencarian (backend expects 'search' for paginated search)
+        // Note: kita tidak menghapus 'q' supaya backward-compatible dengan server yang mungkin memakai 'q' sebagai filter,
+        // tapi prioritas utama adalah 'search' agar server melakukan paginated search.
+        queryParams['q'] = query;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/tempat-ibadah',
+        queryParameters: queryParams,
+      );
+
       if (response.statusCode == 200) {
-        final List<EventKeagamaanModel> eventList = (response.data as List)
-            .map((item) => EventKeagamaanModel.fromJson(item))
-            .toList();
-        return eventList;
+        final responseData = response.data;
+
+        // CASE A: server mengembalikan List (non-paginated / already all results)
+        if (responseData is List) {
+          final List<Map<String, dynamic>> listData =
+              List<Map<String, dynamic>>.from(responseData);
+          return PaginationResponseModel<Map<String, dynamic>>(
+            currentPage: 1,
+            lastPage: 1,
+            data: listData,
+          );
+        }
+
+        // CASE B: server mengembalikan object paginated { current_page, data, last_page, ... }
+        if (responseData is Map && responseData.containsKey('data')) {
+          // jika tidak ada query (normal listing) atau ada query tapi server sudah paginates,
+          // kita bisa pakai langsung data dari response. Namun jika user melakukan pencarian (query != null),
+          // kita perlu menggabungkan semua halaman agar hasil pencarian "mencari semua page".
+          final int currentPage = (responseData['current_page'] ?? 1) as int;
+          final int lastPage = (responseData['last_page'] ?? 1) as int;
+          final List<Map<String, dynamic>> pageData =
+              List<Map<String, dynamic>>.from(responseData['data'] ?? []);
+
+          // jika ini adalah pencarian (query != null & non-empty) dan ada lebih dari 1 halaman,
+          // fetch halaman selanjutnya dan gabungkan.
+          if (query != null && query.isNotEmpty && lastPage > 1) {
+            final List<Map<String, dynamic>> combined = [...pageData];
+
+            // loop page 2..lastPage
+            for (int p = 2; p <= lastPage; p++) {
+              final pageParams = Map<String, dynamic>.from(queryParams);
+              pageParams['page'] = p;
+
+              final pageResp = await _dio.get(
+                '$_baseUrlBackend/tempat-ibadah',
+                queryParameters: pageParams,
+              );
+
+              if (pageResp.statusCode == 200) {
+                final pageDataRaw = pageResp.data;
+                // jika server tiba-tiba mengembalikan list, gabungkan langsung
+                if (pageDataRaw is List) {
+                  combined.addAll(List<Map<String, dynamic>>.from(pageDataRaw));
+                } else if (pageDataRaw is Map &&
+                    pageDataRaw.containsKey('data')) {
+                  combined.addAll(
+                    List<Map<String, dynamic>>.from(pageDataRaw['data'] ?? []),
+                  );
+                } else {
+                  // jika bentuk tak terduga, skip
+                }
+              } else {
+                // jika salah satu page gagal, throw agar caller tahu
+                throw Exception('Gagal memuat halaman $p dari hasil pencarian');
+              }
+            }
+
+            return PaginationResponseModel<Map<String, dynamic>>(
+              currentPage: 1,
+              lastPage: lastPage,
+              data: combined,
+            );
+          }
+
+          // bukan pencarian atau pencarian tapi hanya 1 halaman => kembalikan apa adanya
+          return PaginationResponseModel<Map<String, dynamic>>(
+            currentPage: currentPage,
+            lastPage: lastPage,
+            data: pageData,
+          );
+        }
+
+        // CASE C: struktur lain (tidak terduga) -> coba map ke list jika mungkin
+        if (responseData is Map && responseData.containsKey('items')) {
+          final List<Map<String, dynamic>> listData =
+              List<Map<String, dynamic>>.from(responseData['items']);
+          return PaginationResponseModel<Map<String, dynamic>>(
+            currentPage: 1,
+            lastPage: 1,
+            data: listData,
+          );
+        }
+
+        // fallback: tidak dapat memproses response
+        throw Exception('Format response API tidak dikenali');
+      } else {
+        throw Exception('Gagal memuat tempat ibadah');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error: $e');
+    }
+  }
+
+  // =======================================================================
+  // API EVENT KEAGAMAAN (DIPERBARUI DENGAN PAGINATION & FILTER)
+  // =======================================================================
+  Future<PaginationResponseModel<EventKeagamaanModel>>
+  fetchEventKeagamaanPaginated({
+    required int page,
+    String? kategori,
+    String? query,
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {'page': page};
+      if (kategori != null && kategori != 'Semua') {
+        queryParams['kategori'] = kategori;
+      }
+      if (query != null && query.isNotEmpty) {
+        queryParams['q'] = query; // 'q' untuk query pencarian
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/event-agama',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        return PaginationResponseModel<EventKeagamaanModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => EventKeagamaanModel.fromJson(item))
+              .toList(),
+        );
       } else {
         throw Exception('Gagal memuat data event');
       }

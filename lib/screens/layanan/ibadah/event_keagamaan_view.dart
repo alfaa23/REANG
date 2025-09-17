@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:reang_app/models/event_keagamaan_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/ibadah/detail_event_screen.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class EventKeagamaanView extends StatefulWidget {
   const EventKeagamaanView({super.key});
@@ -11,6 +13,15 @@ class EventKeagamaanView extends StatefulWidget {
 }
 
 class _EventKeagamaanViewState extends State<EventKeagamaanView> {
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<EventKeagamaanModel> _eventList = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
   int _selectedAgama = 0;
   final List<String> _agamaFilters = [
     "Semua",
@@ -23,25 +34,83 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   String _searchQuery = '';
-
-  late Future<List<EventKeagamaanModel>> _eventsFuture;
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
-  void _loadData() {
+  Future<void> _loadInitialData() async {
     setState(() {
-      _eventsFuture = ApiService().fetchEventKeagamaan();
+      _isLoading = true;
+      _eventList = [];
+      _currentPage = 1;
+      _hasMore = true;
     });
+    try {
+      final response = await _apiService.fetchEventKeagamaanPaginated(
+        page: _currentPage,
+        kategori: _agamaFilters[_selectedAgama],
+        query: _searchQuery,
+      );
+      if (mounted) {
+        setState(() {
+          _eventList = response.data;
+          _hasMore = response.hasMorePages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      Fluttertoast.showToast(msg: "Gagal memuat data event.");
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+
+    try {
+      final response = await _apiService.fetchEventKeagamaanPaginated(
+        page: _currentPage,
+        kategori: _agamaFilters[_selectedAgama],
+        query: _searchQuery,
+      );
+      if (mounted) {
+        setState(() {
+          _eventList.addAll(response.data);
+          _hasMore = response.hasMorePages;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreData();
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
+    _scrollController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -52,98 +121,88 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final String searchHint = _selectedAgama == 0
+        ? "Cari semua event..."
+        : "Cari event ${_agamaFilters[_selectedAgama]}...";
 
     return GestureDetector(
       onTap: _unfocusGlobal,
-      child: FutureBuilder<List<EventKeagamaanModel>>(
-        future: _eventsFuture,
-        builder: (context, snapshot) {
-          // --- PERUBAHAN: Wrapper Column dipindahkan ke dalam kondisi sukses ---
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _buildFeedbackView(
-              theme: theme,
-              icon: Icons.cloud_off,
-              title: 'Gagal Terhubung',
-              subtitle: 'Periksa koneksi internet Anda dan coba lagi.',
-              showRetryButton: true,
-            );
-          }
-
-          final allEvents = snapshot.data ?? [];
-          List<EventKeagamaanModel> filteredEvents = allEvents;
-
-          if (_selectedAgama != 0) {
-            filteredEvents = allEvents
-                .where(
-                  (event) => event.kategori == _agamaFilters[_selectedAgama],
-                )
-                .toList();
-          }
-          if (_searchQuery.isNotEmpty) {
-            filteredEvents = filteredEvents
-                .where(
-                  (event) =>
-                      event.judul.toLowerCase().contains(
-                        _searchQuery.toLowerCase(),
-                      ) ||
-                      event.lokasi.toLowerCase().contains(
-                        _searchQuery.toLowerCase(),
-                      ),
-                )
-                .toList();
-          }
-
-          final String searchHint = _selectedAgama == 0
-              ? "Cari semua event..."
-              : "Cari event ${_agamaFilters[_selectedAgama]}...";
-
-          // Tampilan utama hanya dibangun jika ada data
-          return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              const SizedBox(height: 8),
-              _buildSearchBar(theme, searchHint),
-              const SizedBox(height: 12),
-              _buildFilterChips(),
-              const SizedBox(height: 24),
-              if (filteredEvents.isNotEmpty)
-                ...filteredEvents.map(
-                  (eventData) => _EventCard(
-                    event: eventData,
-                    onTap: () {
-                      _unfocusGlobal();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DetailEventScreen(event: eventData),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              else
-                _buildFeedbackView(
+      child: RefreshIndicator(
+        onRefresh: _loadInitialData,
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            SliverToBoxAdapter(child: _buildStaticHeader(theme, searchHint)),
+            if (_isLoading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_eventList.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildFeedbackView(
                   theme: theme,
                   icon: Icons.search_off_rounded,
-                  title: _searchQuery.isNotEmpty
-                      ? 'Event tidak ditemukan'
-                      : 'Belum Ada Event',
-                  subtitle: _searchQuery.isNotEmpty
-                      ? 'Maaf, coba perbaiki kata kunci pencarian Anda.'
-                      : 'Saat ini belum ada event untuk kategori ${_agamaFilters[_selectedAgama]}.',
+                  title: 'Event tidak ditemukan',
+                  subtitle: 'Maaf, coba perbaiki kata kunci atau filter Anda.',
                 ),
-            ],
-          );
-        },
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  if (index == _eventList.length) {
+                    return _isLoadingMore
+                        ? const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : const SizedBox.shrink();
+                  }
+                  final eventData = _eventList[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _EventCard(
+                      event: eventData,
+                      onTap: () {
+                        _unfocusGlobal();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DetailEventScreen(event: eventData),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }, childCount: _eventList.length + (_hasMore ? 1 : 0)),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  // --- WIDGET BARU: Menggabungkan empty state dan error state ---
+  Widget _buildStaticHeader(ThemeData theme, String searchHint) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _buildSearchBar(theme, searchHint),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: _buildFilterChips(),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
   Widget _buildFeedbackView({
     required ThemeData theme,
     required IconData icon,
@@ -174,7 +233,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
             if (showRetryButton) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _loadData,
+                onPressed: _loadInitialData,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Coba Lagi'),
               ),
@@ -202,13 +261,32 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
         focusNode: _searchFocus,
         controller: _searchController,
         onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
+          if (_debounce?.isActive ?? false) _debounce!.cancel();
+          _debounce = Timer(const Duration(milliseconds: 750), () {
+            if (_searchQuery != value) {
+              setState(() {
+                _searchQuery = value;
+                _loadInitialData();
+              });
+            }
           });
         },
         decoration: InputDecoration(
           hintText: hintText,
           prefixIcon: Icon(Icons.search, color: theme.hintColor),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    _unfocusGlobal();
+                    setState(() {
+                      _searchQuery = '';
+                      _loadInitialData();
+                    });
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
@@ -229,7 +307,14 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
             selected: _selectedAgama == i,
             onSelected: (selected) {
               _unfocusGlobal();
-              if (selected) setState(() => _selectedAgama = i);
+              if (selected) {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                  _selectedAgama = i;
+                  _loadInitialData();
+                });
+              }
             },
           );
         },
@@ -254,121 +339,136 @@ class _EventCard extends StatelessWidget {
     final theme = Theme.of(context);
     final status = event.isUpcoming ? "Akan Datang" : "Selesai";
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      elevation: 3,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Icon(
-                  event.icon,
-                  size: 20,
-                  color: theme.colorScheme.onPrimaryContainer,
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.1),
+            blurRadius: 12,
+            spreadRadius: 1,
+            offset: const Offset(0, 0),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(
+                    event.icon,
+                    size: 20,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                title: Text(
+                  event.judul,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  event.lokasi,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+                trailing: Chip(
+                  label: Text(status),
+                  backgroundColor: event.isUpcoming
+                      ? Colors.green.withOpacity(0.2)
+                      : theme.colorScheme.surfaceContainerHighest,
+                  labelStyle: TextStyle(
+                    color: event.isUpcoming
+                        ? Colors.green.shade800
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              title: Text(
-                event.judul,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                event.lokasi,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.hintColor,
-                ),
-              ),
-              trailing: Chip(
-                label: Text(status),
-                backgroundColor: event.isUpcoming
-                    ? Colors.green.withOpacity(0.2)
-                    : theme.colorScheme.surfaceContainerHighest,
-                labelStyle: TextStyle(
-                  color: event.isUpcoming
-                      ? Colors.green.shade800
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Image.network(
-              event.foto,
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  height: 180,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: const Center(child: CircularProgressIndicator()),
-                );
-              },
-              errorBuilder: (context, error, stack) {
-                return Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: event.color,
-                  alignment: Alignment.center,
-                  child: Text(
-                    event.kategori,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+              Image.network(
+                event.foto,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    height: 180,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stack) {
+                  return Container(
+                    height: 180,
+                    width: double.infinity,
+                    color: event.color,
+                    alignment: Alignment.center,
+                    child: Text(
+                      event.kategori,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 26,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: theme.hintColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        event.formattedDate,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(Icons.access_time, size: 16, color: theme.hintColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        event.formattedTime,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _stripHtml(event.deskripsi),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  );
+                },
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: theme.hintColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          event.formattedDate,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: theme.hintColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          event.formattedTime,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _stripHtml(event.deskripsi),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
