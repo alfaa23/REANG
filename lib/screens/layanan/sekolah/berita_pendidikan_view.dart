@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/berita_pendidikan_model.dart';
-import 'package:reang_app/screens/layanan/sekolah/detail_berita_pendidikan_screen.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:timeago/timeago.dart' as timeago;
-import 'package:html_unescape/html_unescape.dart'; // PENAMBAHAN BARU
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:reang_app/screens/layanan/sekolah/detail_berita_pendidikan_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class BeritaPendidikanView extends StatefulWidget {
   const BeritaPendidikanView({super.key});
@@ -14,92 +15,149 @@ class BeritaPendidikanView extends StatefulWidget {
 
 class _BeritaPendidikanViewState extends State<BeritaPendidikanView> {
   final ApiService _apiService = ApiService();
-  Future<List<BeritaPendidikanModel>>? _beritaFuture;
+  final ScrollController _scrollController = ScrollController();
+
+  List<BeritaPendidikanModel> _beritaList = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _loadBerita();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
   }
 
-  void _loadBerita() {
+  Future<void> _loadInitialData() async {
     setState(() {
-      _beritaFuture = _apiService.fetchBeritaPendidikan();
+      _isLoading = true;
+      _beritaList = [];
+      _currentPage = 1;
+      _hasMore = true;
     });
-    timeago.setLocaleMessages('id', timeago.IdMessages());
+    try {
+      final response = await _apiService.fetchBeritaPendidikanPaginated(
+        page: _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          _beritaList = response.data;
+          _hasMore = response.hasMorePages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      Fluttertoast.showToast(msg: "Gagal memuat berita pendidikan.");
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+    try {
+      final response = await _apiService.fetchBeritaPendidikanPaginated(
+        page: _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          _beritaList.addAll(response.data);
+          _hasMore = response.hasMorePages;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_beritaFuture == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return FutureBuilder<List<BeritaPendidikanModel>>(
-      future: _beritaFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Gagal memuat berita.'),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _loadBerita,
-                  child: const Text('Coba Lagi'),
-                ),
-              ],
+    return RefreshIndicator(
+      onRefresh: _loadInitialData,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _beritaList.isEmpty
+          ? const Center(child: Text('Tidak ada berita tersedia.'))
+          : ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: _beritaList.length + (_hasMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _beritaList.length) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final berita = _beritaList[index];
+                return _BeritaCard(
+                  berita: berita,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        // --- PERBAIKAN: Menggunakan parameter 'artikel' ---
+                        builder: (context) =>
+                            DetailBeritaPendidikanScreen(artikel: berita),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-          );
-        }
-        final articles = snapshot.data!;
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: articles.length,
-          itemBuilder: (context, index) => Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: _BeritaCard(berita: articles[index]),
-          ),
-        );
-      },
     );
   }
 }
 
 class _BeritaCard extends StatelessWidget {
   final BeritaPendidikanModel berita;
-  const _BeritaCard({required this.berita});
+  final VoidCallback? onTap;
 
-  // PENAMBAHAN BARU: Fungsi untuk membersihkan HTML
-  String _cleanHtml(String htmlString) {
+  const _BeritaCard({required this.berita, this.onTap});
+
+  String get summary {
     final unescape = HtmlUnescape();
-    final String clean = htmlString.replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
-    return unescape.convert(clean);
+    final cleanHtml = unescape.convert(berita.deskripsi);
+    final RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
+    return cleanHtml.replaceAll(exp, ' ').replaceAll('&nbsp;', ' ').trim();
+  }
+
+  String get formattedDate {
+    try {
+      // --- PERBAIKAN: Menggunakan properti 'tanggal' dari model ---
+      return DateFormat('d MMMM y', 'id_ID').format(berita.tanggal);
+    } catch (e) {
+      return 'Tanggal tidak valid';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // PERBAIKAN: Mengambil deskripsi bersih dari HTML
-    final String cleanDescription = _cleanHtml(berita.deskripsi);
-
     return Card(
-      clipBehavior: Clip.hardEdge,
-      margin: EdgeInsets.zero,
+      margin: const EdgeInsets.only(bottom: 20),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  DetailBeritaPendidikanScreen(artikel: berita),
-            ),
-          );
-        },
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -110,29 +168,17 @@ class _BeritaCard extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (c, e, s) => Container(
                 height: 180,
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Center(
-                  child: Icon(
-                    Icons.article_outlined,
-                    color: theme.hintColor,
-                    size: 48,
-                  ),
+                color: theme.colorScheme.surfaceVariant,
+                child: const Center(
+                  child: Icon(Icons.school_outlined, size: 48),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Pendidikan', // Kategori statis
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   Text(
                     berita.judul,
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -141,24 +187,28 @@ class _BeritaCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  // PERBAIKAN: Menambahkan deskripsi singkat 2 baris
+                  const SizedBox(height: 8),
                   Text(
-                    cleanDescription,
-                    style: TextStyle(color: theme.hintColor, height: 1.5),
-                    maxLines: 2,
+                    summary,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text(
-                        'Dinas Pendidikan • ${timeago.format(berita.tanggal, locale: 'id')}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
-                        ),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: theme.hintColor,
                       ),
-                      // PERBAIKAN: Spacer dan "Lihat Selengkapnya" dihapus
+                      const SizedBox(width: 6),
+                      Text(
+                        formattedDate,
+                        style: TextStyle(fontSize: 13, color: theme.hintColor),
+                      ),
                     ],
                   ),
                 ],

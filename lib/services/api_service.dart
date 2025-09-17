@@ -171,16 +171,23 @@ class ApiService {
   }
 
   // =======================================================================
-  // API BERITA PENDIDIKAN (BARU)
+  // API BERITA PENDIDIKAN (DIPERBARUI DENGAN PAGINATION)
   // =======================================================================
-  Future<List<BeritaPendidikanModel>> fetchBeritaPendidikan() async {
+  Future<PaginationResponseModel<BeritaPendidikanModel>>
+  fetchBeritaPendidikanPaginated({required int page}) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/info-sekolah');
+      final response = await _dio.get(
+        '$_baseUrlBackend/info-sekolah?page=$page',
+      );
       if (response.statusCode == 200) {
-        final List<BeritaPendidikanModel> beritaList = (response.data as List)
-            .map((item) => BeritaPendidikanModel.fromJson(item))
-            .toList();
-        return beritaList;
+        final responseData = response.data;
+        return PaginationResponseModel<BeritaPendidikanModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => BeritaPendidikanModel.fromJson(item))
+              .toList(),
+        );
       } else {
         throw Exception('Gagal memuat berita pendidikan');
       }

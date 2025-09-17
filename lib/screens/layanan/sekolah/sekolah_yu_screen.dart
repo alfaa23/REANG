@@ -13,7 +13,7 @@ class SekolahYuScreen extends StatefulWidget {
 
 class _SekolahYuScreenState extends State<SekolahYuScreen> {
   int _selectedTab = 0;
-  // --- PERUBAHAN 1: Tambahkan state untuk menyimpan jumlah sekolah ---
+  // --- PERUBAHAN 1: Tambahkan state untuk menyimpan jumlah sekolah --- hehehe
   Map<String, int> _schoolCounts = {};
   // -----------------------------------------------------------------
 
@@ -24,6 +24,8 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   ];
 
   bool _isPpdbInitiated = false;
+  // --- TAMBAHAN BARU: State untuk lazy load Berita Pendidikan ---
+  bool _isBeritaInitiated = false;
   WebViewController? _ppdbWebViewController;
 
   final List<Map<String, dynamic>> _schools = const [
@@ -171,7 +173,10 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                           },
                         )
                       : Container(),
-                  const BeritaPendidikanView(),
+                  // --- PERUBAHAN: Menerapkan lazy load ---
+                  _isBeritaInitiated
+                      ? const BeritaPendidikanView()
+                      : Container(),
                 ],
               ),
             ),
@@ -198,6 +203,10 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                 _selectedTab = i;
                 if (i == 1 && !_isPpdbInitiated) {
                   _isPpdbInitiated = true;
+                }
+                // --- PERUBAHAN: Mengaktifkan lazy load untuk Berita ---
+                if (i == 2 && !_isBeritaInitiated) {
+                  _isBeritaInitiated = true;
                 }
               });
             },
