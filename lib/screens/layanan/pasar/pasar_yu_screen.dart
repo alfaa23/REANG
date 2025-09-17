@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/pasar_model.dart';
 import 'package:reang_app/services/api_service.dart';
@@ -14,8 +15,19 @@ class PasarYuScreen extends StatefulWidget {
 }
 
 class _PasarYuScreenState extends State<PasarYuScreen> {
-  Future<List<PasarModel>>? _pasarFuture;
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<PasarModel> _pasarList = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
+  Future<List<String>>? _kategoriFuture;
+  List<String> _dynamicCategories = ['Semua'];
   int _selectedCategoryIndex = 0;
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -23,18 +35,83 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   @override
   void initState() {
     super.initState();
-    _pasarFuture = ApiService().fetchTempatPasar();
+    _kategoriFuture = _apiService.fetchPasarKategori();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
-  void _reloadData() {
+  Future<void> _loadInitialData() async {
     setState(() {
-      _pasarFuture = ApiService().fetchTempatPasar();
+      _isLoading = true;
+      _pasarList = [];
+      _currentPage = 1;
+      _hasMore = true;
     });
+    try {
+      final response = await _apiService.fetchPasarPaginated(
+        page: _currentPage,
+        kategori:
+            _selectedCategoryIndex == 0 ||
+                _selectedCategoryIndex >= _dynamicCategories.length
+            ? null
+            : _dynamicCategories[_selectedCategoryIndex],
+        query: _searchQuery,
+      );
+
+      if (mounted) {
+        setState(() {
+          _pasarList = response.data;
+          _hasMore = response.hasMorePages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      Fluttertoast.showToast(msg: "Gagal memuat data pasar.");
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+    try {
+      final response = await _apiService.fetchPasarPaginated(
+        page: _currentPage,
+        kategori:
+            _selectedCategoryIndex == 0 ||
+                _selectedCategoryIndex >= _dynamicCategories.length
+            ? null
+            : _dynamicCategories[_selectedCategoryIndex],
+        query: _searchQuery,
+      );
+      if (mounted) {
+        setState(() {
+          _pasarList.addAll(response.data);
+          _hasMore = response.hasMorePages;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreData();
+    }
   }
 
   void _openMapForPasar(BuildContext context) {
     FocusManager.instance.primaryFocus?.unfocus();
-    const String apiUrl = 'tempat-pasar?kategori=pasar';
+    const String apiUrl = 'tempat-pasar/all?fitur=pasar';
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -64,44 +141,15 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
 
   @override
-  void deactivate() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    super.deactivate();
-  }
-
-  void _handleTapDown(TapDownDetails details) {
-    final focused = FocusManager.instance.primaryFocus;
-    if (focused != null && focused.context != null) {
-      try {
-        final renderObject = focused.context!.findRenderObject();
-        if (renderObject is RenderBox && renderObject.hasSize) {
-          final box = renderObject;
-          final topLeft = box.localToGlobal(Offset.zero);
-          final rect = topLeft & box.size;
-          if (!rect.contains(details.globalPosition)) {
-            FocusManager.instance.primaryFocus?.unfocus();
-          }
-        } else {
-          FocusManager.instance.primaryFocus?.unfocus();
-        }
-      } catch (_) {
-        FocusManager.instance.primaryFocus?.unfocus();
-      }
-    } else {
-      FocusManager.instance.primaryFocus?.unfocus();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -122,130 +170,122 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
       ),
       body: SafeArea(
         child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapDown: _handleTapDown,
-          // --- PERUBAHAN: FutureBuilder hanya membungkus bagian dinamis ---
-          child: FutureBuilder<List<PasarModel>>(
-            future: _pasarFuture,
-            builder: (context, snapshot) {
-              // Bagian statis tetap dibangun bahkan saat loading atau error
-              final List<String> dynamicCategories;
-              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                final uniqueCategories = snapshot.data!
-                    .map((p) => p.kategori)
-                    .toSet()
-                    .toList();
-                dynamicCategories = ['Semua', ...uniqueCategories];
-              } else {
-                // Gunakan filter default jika data belum ada
-                dynamicCategories = ['Semua'];
-              }
-
-              final String rekomendasiTitle = _selectedCategoryIndex == 0
-                  ? 'Rekomendasi untuk Anda'
-                  : 'Rekomendasi ${dynamicCategories[_selectedCategoryIndex]}';
-
-              return ListView(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
-                ),
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  const SizedBox(height: 16),
-                  Text(
-                    'Akses Cepat',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: RefreshIndicator(
+            onRefresh: _loadInitialData,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                SliverToBoxAdapter(child: _buildStaticHeader(theme)),
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_pasarList.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(theme),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      if (index == _pasarList.length) {
+                        return _isLoadingMore
+                            ? const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : const SizedBox.shrink();
+                      }
+                      final pasar = _pasarList[index];
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: _PasarCard(
+                          data: pasar,
+                          onTap: () =>
+                              _launchMapsUrl(pasar.latitude, pasar.longitude),
+                        ),
+                      );
+                    }, childCount: _pasarList.length + (_hasMore ? 1 : 0)),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Temukan pasar terdekat atau lihat harga pangan terbaru.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.hintColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActionButtons(),
-                  const SizedBox(height: 24),
-                  _buildCategoryChips(dynamicCategories),
-                  const SizedBox(height: 16),
-                  _buildSearchField(dynamicCategories),
-                  const SizedBox(height: 24),
-                  Text(
-                    rekomendasiTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // --- Bagian Dinamis (Rekomendasi) ---
-                  _buildRecommendationSection(snapshot, dynamicCategories),
-                ],
-              );
-            },
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRecommendationSection(
-    AsyncSnapshot<List<PasarModel>> snapshot,
-    List<String> dynamicCategories,
-  ) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (snapshot.hasError) {
-      return _buildErrorView(context);
-    }
-    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-      return const Center(child: Text('Tidak ada data pasar tersedia.'));
-    }
-
-    final allPasar = snapshot.data!;
-    List<PasarModel> filteredList = allPasar;
-
-    if (_selectedCategoryIndex != 0) {
-      if (_selectedCategoryIndex < dynamicCategories.length) {
-        final selectedCategory = dynamicCategories[_selectedCategoryIndex];
-        filteredList = allPasar
-            .where((p) => p.kategori == selectedCategory)
-            .toList();
-      }
-    }
-    if (_searchQuery.isNotEmpty) {
-      filteredList = filteredList
-          .where(
-            (p) => p.nama.toLowerCase().contains(_searchQuery.toLowerCase()),
-          )
-          .toList();
-    }
-
-    if (filteredList.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Text('Tidak ada data yang cocok.'),
-        ),
-      );
-    }
+  Widget _buildStaticHeader(ThemeData theme) {
+    final String rekomendasiTitle =
+        _selectedCategoryIndex == 0 ||
+            _selectedCategoryIndex >= _dynamicCategories.length
+        ? 'Rekomendasi untuk Anda'
+        : 'Rekomendasi ${_dynamicCategories[_selectedCategoryIndex]}';
 
     return Column(
-      children: filteredList
-          .map(
-            (pasar) => Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: _PasarCard(
-                data: pasar,
-                onTap: () => _launchMapsUrl(pasar.latitude, pasar.longitude),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                'Akses Cepat',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          )
-          .toList(),
+              const SizedBox(height: 4),
+              Text(
+                'Temukan pasar terdekat atau lihat harga pangan terbaru.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildActionButtons(),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        FutureBuilder<List<String>>(
+          future: _kategoriFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done &&
+                snapshot.hasData &&
+                snapshot.data!.isNotEmpty) {
+              _dynamicCategories = ['Semua', ...snapshot.data!];
+            }
+            return _buildCategoryChips(_dynamicCategories);
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              _buildSearchField(_dynamicCategories),
+              const SizedBox(height: 24),
+              Text(
+                rekomendasiTitle,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -253,6 +293,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
     return SizedBox(
       height: 36,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -263,12 +304,10 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
             selected: isSelected,
             onSelected: (selected) {
               if (selected) {
-                FocusManager.instance.primaryFocus?.unfocus();
                 _searchController.clear();
-                setState(() {
-                  _selectedCategoryIndex = i;
-                  _searchQuery = '';
-                });
+                _searchQuery = '';
+                setState(() => _selectedCategoryIndex = i);
+                _loadInitialData();
               }
             },
             backgroundColor: Theme.of(
@@ -289,21 +328,37 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
 
   Widget _buildSearchField(List<String> categories) {
     final String searchHint =
-        (_selectedCategoryIndex == 0 ||
-            _selectedCategoryIndex >= categories.length)
+        _selectedCategoryIndex == 0 ||
+            _selectedCategoryIndex >= categories.length
         ? 'Cari di Semua...'
         : 'Cari di ${categories[_selectedCategoryIndex]}...';
 
     return TextField(
       controller: _searchController,
       focusNode: _searchFocus,
-      autofocus: false,
-      onChanged: (value) => setState(() => _searchQuery = value),
+      textInputAction: TextInputAction.search,
+      onSubmitted: (value) {
+        setState(() => _searchQuery = value);
+        _loadInitialData();
+      },
       decoration: InputDecoration(
         hintText: searchHint,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _searchController.clear();
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  setState(() {
+                    _searchQuery = '';
+                  });
+                  _loadInitialData();
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
@@ -360,33 +415,26 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
     );
   }
 
-  Widget _buildErrorView(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildEmptyState(ThemeData theme) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            Icon(Icons.search_off_rounded, size: 64, color: theme.hintColor),
             const SizedBox(height: 16),
             Text(
-              'Gagal Memuat Data',
+              'Data tidak ditemukan',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Maaf, terjadi kesalahan. Periksa koneksi internet Anda.',
+              'Maaf, tidak ada data yang cocok dengan filter atau pencarian Anda.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.hintColor),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _reloadData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
             ),
           ],
         ),
@@ -410,10 +458,7 @@ class _PasarCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          FocusManager.instance.primaryFocus?.unfocus();
-          onTap();
-        },
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

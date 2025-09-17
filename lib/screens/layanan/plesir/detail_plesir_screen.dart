@@ -120,13 +120,56 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
     }
   }
 
+  void _showDeleteConfirmationDialog(int ratingId) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Ulasan?'),
+        content: const Text(
+          'Apakah Anda yakin ingin menghapus ulasan ini? Tindakan ini tidak dapat diurungkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await _apiService.deleteUlasan(
+                  ratingId: ratingId,
+                  token: authProvider.token!,
+                );
+                Fluttertoast.showToast(
+                  msg: "Ulasan berhasil dihapus",
+                  backgroundColor: Colors.green,
+                );
+                _loadInitialReviews();
+              } catch (e) {
+                Fluttertoast.showToast(
+                  msg: e.toString(),
+                  backgroundColor: Colors.red,
+                );
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = widget.destinationData;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // Memeriksa dan memisahkan ulasan pengguna dari daftar
     _myReview = null;
     if (authProvider.isLoggedIn) {
       try {
@@ -506,7 +549,6 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                               try {
                                 final Map<String, dynamic> response;
                                 if (_myReview != null) {
-                                  // --- EDIT ULASAN ---
                                   response = await _apiService.updateUlasan(
                                     ratingId: _myReview!.id,
                                     rating: tempRating,
@@ -514,7 +556,6 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                                     token: token,
                                   );
                                 } else {
-                                  // --- TAMBAH ULASAN BARU ---
                                   response = await _apiService.postUlasan(
                                     plesirId: widget.destinationData.id,
                                     userId: userId,
@@ -581,44 +622,33 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: isMyReview
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceVariant,
-                child: Text(
-                  ulasan.userName.isNotEmpty
-                      ? ulasan.userName[0].toUpperCase()
-                      : '?',
+          CircleAvatar(
+            backgroundColor: isMyReview
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.surfaceVariant,
+            child: Text(
+              ulasan.userName.isNotEmpty
+                  ? ulasan.userName[0].toUpperCase()
+                  : '?',
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isMyReview ? "Ulasan Anda" : ulasan.userName,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 4),
+                Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isMyReview ? "Ulasan Anda" : ulasan.userName,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          timeago.format(ulasan.createdAt, locale: 'id'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.hintColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
                     Row(
                       children: List.generate(
                         5,
@@ -631,16 +661,45 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(width: 8),
                     Text(
-                      ulasan.comment,
-                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                      timeago.format(ulasan.createdAt, locale: 'id'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  ulasan.comment,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                ),
+              ],
+            ),
           ),
+          if (isMyReview)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'hapus') {
+                  _showDeleteConfirmationDialog(ulasan.id);
+                }
+              },
+              offset: const Offset(0, 40),
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'hapus',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 20),
+                      SizedBox(width: 8),
+                      Text('Hapus'),
+                    ],
+                  ),
+                ),
+              ],
+              icon: Icon(Icons.more_vert, color: theme.hintColor),
+            ),
         ],
       ),
     );

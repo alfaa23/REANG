@@ -25,7 +25,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://20df368f7d62.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://f7682703a45a.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -394,21 +394,66 @@ class ApiService {
   }
 
   // =======================================================================
-  // API TEMPAT PASAR
+  // API PASAR-YU (DIPERBARUI DENGAN PAGINATION & FILTER)
   // =======================================================================
-  Future<List<PasarModel>> fetchTempatPasar() async {
+  Future<PaginationResponseModel<PasarModel>> fetchPasarPaginated({
+    required int page,
+    String? kategori,
+    String? query,
+  }) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/tempat-pasar');
+      String endpoint = 'tempat-pasar';
+      final Map<String, dynamic> queryParams = {'page': page};
+
+      if (query != null && query.isNotEmpty) {
+        endpoint = 'tempat-pasar/search';
+        queryParams['q'] = query;
+      } else if (kategori != null && kategori != 'Semua') {
+        queryParams['fitur'] = kategori;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/$endpoint',
+        queryParameters: queryParams,
+      );
+
       if (response.statusCode == 200) {
-        final List<PasarModel> pasarList = (response.data as List)
-            .map((item) => PasarModel.fromJson(item))
-            .toList();
-        return pasarList;
+        final responseData = response.data;
+        return PaginationResponseModel<PasarModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => PasarModel.fromJson(item))
+              .toList(),
+        );
       } else {
         throw Exception('Gagal memuat data pasar');
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data pasar: $e');
+    }
+  }
+
+  // --- FUNGSI DIPERBARUI: Untuk mengambil daftar kategori pasar ---
+  Future<List<String>> fetchPasarKategori() async {
+    try {
+      // PERBAIKAN: Menggunakan endpoint /pasar/kategori yang benar
+      final response = await _dio.get('$_baseUrlBackend/pasar/kategori');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Membaca list 'categories' dari dalam respons
+        final categoriesData =
+            response.data['categories'] as List<dynamic>? ?? [];
+        // Mengambil hanya 'nama' dari setiap objek kategori
+        final List<String> categoryList = categoriesData
+            .map((item) => item['nama'].toString())
+            .toList();
+        return categoryList;
+      } else {
+        throw Exception('Gagal memuat kategori pasar');
+      }
+    } catch (e) {
+      // Mengembalikan list kosong jika gagal
+      return [];
     }
   }
 
@@ -649,6 +694,29 @@ class ApiService {
         return response.data;
       } else {
         throw Exception('Gagal memperbarui ulasan');
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response!.data is Map) {
+        throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
+      }
+      throw Exception('Tidak dapat terhubung ke server.');
+    }
+  }
+
+  // FUNGSI BARU: Untuk MENGHAPUS ulasan yang sudah ada
+  Future<void> deleteUlasan({
+    required int ratingId,
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        '$_baseUrlBackend/rating/$ratingId', // Menggunakan method DELETE
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      // 200 (OK) atau 204 (No Content) adalah respons sukses untuk delete
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Gagal menghapus ulasan');
       }
     } on DioException catch (e) {
       if (e.response != null && e.response!.data is Map) {

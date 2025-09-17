@@ -238,7 +238,6 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  // --- PERBAIKAN: Menggunakan endpoint /all untuk peta ---
   void _openMap(BuildContext context, String fitur, String judulHalaman) {
     final String apiUrl = 'tempat-ibadah/all?fitur=$fitur';
     Navigator.push(
@@ -389,15 +388,11 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
               focusNode: _searchFocus,
               controller: _searchController,
               textInputAction: TextInputAction.search,
-              onChanged: (value) {
-                if (_debounce?.isActive ?? false) _debounce!.cancel();
-                _debounce = Timer(const Duration(milliseconds: 750), () {
-                  if (_searchQuery != value) {
-                    setState(() {
-                      _searchQuery = value;
-                      _loadInitialData();
-                    });
-                  }
+              // --- PERBAIKAN: Menggunakan onSubmitted ---
+              onSubmitted: (value) {
+                setState(() {
+                  _searchQuery = value;
+                  _loadInitialData();
                 });
               },
               decoration: InputDecoration(
