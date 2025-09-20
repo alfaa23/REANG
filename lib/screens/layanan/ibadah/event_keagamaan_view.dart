@@ -5,6 +5,14 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/ibadah/detail_event_screen.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
+// --- TAMBAHAN: Kelas helper untuk menyimpan data cache per kategori ---
+class _CachedEventData {
+  List<EventKeagamaanModel> items = [];
+  int currentPage = 1;
+  bool hasMore = true;
+  bool isInitiated = false; // Menandai apakah data awal sudah pernah dimuat
+}
+
 class EventKeagamaanView extends StatefulWidget {
   const EventKeagamaanView({super.key});
 
@@ -16,11 +24,10 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
 
-  List<EventKeagamaanModel> _eventList = [];
-  bool _isLoading = true;
+  // --- PERUBAHAN: State untuk caching ---
+  final Map<String, _CachedEventData> _cache = {};
   bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _currentPage = 1;
+  // ------------------------------------
 
   int _selectedAgama = 0;
   final List<String> _agamaFilters = [
@@ -39,7 +46,8 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    // Memuat data untuk kategori "Semua" saat pertama kali
+    _loadInitialDataForCategory("Semua");
     _scrollController.addListener(_onScroll);
     _searchController.addListener(() {
       if (mounted) {
@@ -48,48 +56,60 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
     });
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _loadInitialDataForCategory(String category) async {
+    // Memulai loading state dengan membuat cache baru (isInitiated = false)
     setState(() {
-      _isLoading = true;
-      _eventList = [];
-      _currentPage = 1;
-      _hasMore = true;
+      _cache[category] = _CachedEventData();
     });
+
     try {
       final response = await _apiService.fetchEventKeagamaanPaginated(
-        page: _currentPage,
-        kategori: _agamaFilters[_selectedAgama],
+        page: 1,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
       if (mounted) {
         setState(() {
-          _eventList = response.data;
-          _hasMore = response.hasMorePages;
-          _isLoading = false;
+          final cacheData = _cache[category]!;
+          cacheData.items = response.data;
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = 1;
+          cacheData.isInitiated = true; // Tandai sudah dimuat
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _cache[category]!.isInitiated = true; // Tandai selesai walau error
+        });
+      }
       Fluttertoast.showToast(msg: "Gagal memuat data event.");
     }
   }
 
   Future<void> _loadMoreData() async {
-    if (_isLoadingMore || !_hasMore) return;
+    final category = _agamaFilters[_selectedAgama];
+    final cacheData = _cache[category];
+
+    if (cacheData == null ||
+        !cacheData.hasMore ||
+        (cacheData.items.isNotEmpty && _isLoadingMore))
+      return;
 
     setState(() => _isLoadingMore = true);
-    _currentPage++;
+    final nextPage = cacheData.currentPage + 1;
 
     try {
       final response = await _apiService.fetchEventKeagamaanPaginated(
-        page: _currentPage,
-        kategori: _agamaFilters[_selectedAgama],
+        page: nextPage,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
       if (mounted) {
         setState(() {
-          _eventList.addAll(response.data);
-          _hasMore = response.hasMorePages;
+          cacheData.items.addAll(response.data);
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = nextPage;
           _isLoadingMore = false;
         });
       }
@@ -125,23 +145,31 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
         ? "Cari semua event..."
         : "Cari event ${_agamaFilters[_selectedAgama]}...";
 
+    final selectedCategoryName = _agamaFilters[_selectedAgama];
+    final currentCache = _cache[selectedCategoryName] ?? _CachedEventData();
+    final currentList = currentCache.items;
+    final bool currentHasMore = currentCache.hasMore;
+    final bool isCurrentCategoryLoading = !currentCache.isInitiated;
+
+    final scrollPhysics = isCurrentCategoryLoading || currentList.isNotEmpty
+        ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+        : const NeverScrollableScrollPhysics();
+
     return GestureDetector(
       onTap: _unfocusGlobal,
       child: RefreshIndicator(
-        onRefresh: _loadInitialData,
+        onRefresh: () => _loadInitialDataForCategory(selectedCategoryName),
         child: CustomScrollView(
           controller: _scrollController,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
+          physics: scrollPhysics,
           slivers: [
             SliverToBoxAdapter(child: _buildStaticHeader(theme, searchHint)),
-            if (_isLoading)
+            if (isCurrentCategoryLoading)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (_eventList.isEmpty)
+            else if (currentList.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: _buildFeedbackView(
@@ -154,7 +182,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  if (index == _eventList.length) {
+                  if (index == currentList.length) {
                     return _isLoadingMore
                         ? const Padding(
                             padding: EdgeInsets.all(16.0),
@@ -162,7 +190,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
                           )
                         : const SizedBox.shrink();
                   }
-                  final eventData = _eventList[index];
+                  final eventData = currentList[index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: _EventCard(
@@ -178,7 +206,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
                       },
                     ),
                   );
-                }, childCount: _eventList.length + (_hasMore ? 1 : 0)),
+                }, childCount: currentList.length + (currentHasMore ? 1 : 0)),
               ),
           ],
         ),
@@ -233,7 +261,8 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
             if (showRetryButton) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _loadInitialData,
+                onPressed: () =>
+                    _loadInitialDataForCategory(_agamaFilters[_selectedAgama]),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Coba Lagi'),
               ),
@@ -266,7 +295,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
             if (_searchQuery != value) {
               setState(() {
                 _searchQuery = value;
-                _loadInitialData();
+                _loadInitialDataForCategory(_agamaFilters[_selectedAgama]);
               });
             }
           });
@@ -282,7 +311,9 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
                     _unfocusGlobal();
                     setState(() {
                       _searchQuery = '';
-                      _loadInitialData();
+                      _loadInitialDataForCategory(
+                        _agamaFilters[_selectedAgama],
+                      );
                     });
                   },
                 )
@@ -312,8 +343,11 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
                   _searchController.clear();
                   _searchQuery = '';
                   _selectedAgama = i;
-                  _loadInitialData();
                 });
+                final categoryName = _agamaFilters[i];
+                if (_cache[categoryName]?.isInitiated != true) {
+                  _loadInitialDataForCategory(categoryName);
+                }
               }
             },
           );

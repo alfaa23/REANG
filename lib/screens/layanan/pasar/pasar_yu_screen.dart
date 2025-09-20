@@ -7,6 +7,14 @@ import 'package:reang_app/screens/peta/peta_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
+// Kelas helper untuk menyimpan data cache per kategori
+class _CachedCategoryData {
+  List<PasarModel> items = [];
+  int currentPage = 1;
+  bool hasMore = true;
+  bool isInitiated = false; // Menandai apakah data awal sudah pernah dimuat
+}
+
 class PasarYuScreen extends StatefulWidget {
   const PasarYuScreen({Key? key}) : super(key: key);
 
@@ -18,11 +26,10 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
 
-  List<PasarModel> _pasarList = [];
-  bool _isLoading = true;
+  // State untuk caching
+  final Map<String, _CachedCategoryData> _cache = {};
+  // PERBAIKAN: Variabel _isLoading yang tidak terpakai dihapus
   bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _currentPage = 1;
 
   Future<List<String>>? _kategoriFuture;
   List<String> _dynamicCategories = ['Semua'];
@@ -35,9 +42,9 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   @override
   void initState() {
     super.initState();
-    _kategoriFuture = _apiService.fetchPasarKategori();
-    _loadInitialData();
+    _initializeData();
     _scrollController.addListener(_onScroll);
+    // Listener untuk menampilkan/menyembunyikan tombol 'X' secara real-time
     _searchController.addListener(() {
       if (mounted) {
         setState(() {});
@@ -45,55 +52,79 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
     });
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _initializeData() async {
+    await _loadCategories();
+    // Memuat data untuk kategori "Semua" saat pertama kali
+    await _loadInitialDataForCategory('Semua');
+  }
+
+  Future<void> _loadCategories() async {
+    _kategoriFuture = _apiService.fetchPasarKategori();
+    final categories = await _kategoriFuture;
+    // PERBAIKAN: Menambahkan null check sebelum mengakses properti
+    if (mounted && categories != null && categories.isNotEmpty) {
+      setState(() {
+        _dynamicCategories = ['Semua', ...categories];
+      });
+    }
+  }
+
+  Future<void> _loadInitialDataForCategory(String category) async {
+    // Memulai loading state dengan membuat cache baru (isInitiated = false)
     setState(() {
-      _isLoading = true;
-      _pasarList = [];
-      _currentPage = 1;
-      _hasMore = true;
+      _cache[category] = _CachedCategoryData();
     });
+
     try {
       final response = await _apiService.fetchPasarPaginated(
-        page: _currentPage,
-        kategori:
-            _selectedCategoryIndex == 0 ||
-                _selectedCategoryIndex >= _dynamicCategories.length
-            ? null
-            : _dynamicCategories[_selectedCategoryIndex],
+        page: 1,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
 
       if (mounted) {
         setState(() {
-          _pasarList = response.data;
-          _hasMore = response.hasMorePages;
-          _isLoading = false;
+          final cacheData = _cache[category]!;
+          cacheData.items = response.data;
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = 1;
+          cacheData.isInitiated = true; // Tandai sudah dimuat
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        // Jika error, tetap tandai sebagai initiated agar tidak loading terus
+        setState(() {
+          _cache[category]!.isInitiated = true;
+        });
+      }
       Fluttertoast.showToast(msg: "Gagal memuat data pasar.");
     }
   }
 
   Future<void> _loadMoreData() async {
-    if (_isLoadingMore || !_hasMore) return;
+    final category = _dynamicCategories[_selectedCategoryIndex];
+    final cacheData = _cache[category];
+
+    if (cacheData == null ||
+        !cacheData.hasMore ||
+        (cacheData.items.isNotEmpty && _isLoadingMore))
+      return;
+
     setState(() => _isLoadingMore = true);
-    _currentPage++;
+    final nextPage = cacheData.currentPage + 1;
+
     try {
       final response = await _apiService.fetchPasarPaginated(
-        page: _currentPage,
-        kategori:
-            _selectedCategoryIndex == 0 ||
-                _selectedCategoryIndex >= _dynamicCategories.length
-            ? null
-            : _dynamicCategories[_selectedCategoryIndex],
+        page: nextPage,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
       if (mounted) {
         setState(() {
-          _pasarList.addAll(response.data);
-          _hasMore = response.hasMorePages;
+          cacheData.items.addAll(response.data);
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = nextPage;
           _isLoadingMore = false;
         });
       }
@@ -150,6 +181,13 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    final selectedCategoryName = _dynamicCategories[_selectedCategoryIndex];
+    final currentCache = _cache[selectedCategoryName] ?? _CachedCategoryData();
+    final currentList = currentCache.items;
+    final bool currentHasMore = currentCache.hasMore;
+    final bool isCurrentCategoryLoading = !currentCache.isInitiated;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -172,7 +210,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
         child: GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           child: RefreshIndicator(
-            onRefresh: _loadInitialData,
+            onRefresh: () => _loadInitialDataForCategory(selectedCategoryName),
             child: CustomScrollView(
               controller: _scrollController,
               physics: const BouncingScrollPhysics(
@@ -180,38 +218,41 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
               ),
               slivers: [
                 SliverToBoxAdapter(child: _buildStaticHeader(theme)),
-                if (_isLoading)
+                if (isCurrentCategoryLoading)
                   const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator()),
                   )
-                else if (_pasarList.isEmpty)
+                else if (currentList.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: _buildEmptyState(theme),
                   )
                 else
                   SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      if (index == _pasarList.length) {
-                        return _isLoadingMore
-                            ? const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : const SizedBox.shrink();
-                      }
-                      final pasar = _pasarList[index];
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: _PasarCard(
-                          data: pasar,
-                          onTap: () =>
-                              _launchMapsUrl(pasar.latitude, pasar.longitude),
-                        ),
-                      );
-                    }, childCount: _pasarList.length + (_hasMore ? 1 : 0)),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index == currentList.length) {
+                          return _isLoadingMore
+                              ? const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                )
+                              : const SizedBox.shrink();
+                        }
+                        final pasar = currentList[index];
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: _PasarCard(
+                            data: pasar,
+                            onTap: () =>
+                                _launchMapsUrl(pasar.latitude, pasar.longitude),
+                          ),
+                        );
+                      },
+                      childCount: currentList.length + (currentHasMore ? 1 : 0),
+                    ),
                   ),
               ],
             ),
@@ -307,7 +348,10 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
                 _searchController.clear();
                 _searchQuery = '';
                 setState(() => _selectedCategoryIndex = i);
-                _loadInitialData();
+                final categoryName = _dynamicCategories[i];
+                if (_cache[categoryName]?.isInitiated != true) {
+                  _loadInitialDataForCategory(categoryName);
+                }
               }
             },
             backgroundColor: Theme.of(
@@ -339,7 +383,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
       textInputAction: TextInputAction.search,
       onSubmitted: (value) {
         setState(() => _searchQuery = value);
-        _loadInitialData();
+        _loadInitialDataForCategory(_dynamicCategories[_selectedCategoryIndex]);
       },
       decoration: InputDecoration(
         hintText: searchHint,
@@ -355,7 +399,9 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
                   setState(() {
                     _searchQuery = '';
                   });
-                  _loadInitialData();
+                  _loadInitialDataForCategory(
+                    _dynamicCategories[_selectedCategoryIndex],
+                  );
                 },
               )
             : null,

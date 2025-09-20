@@ -22,6 +22,19 @@ class DetailAdmindukScreen extends StatelessWidget {
             expandedHeight: 250.0,
             pinned: true,
             stretch: true,
+            // --- PERUBAHAN: Menambahkan tombol kembali kustom ---
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withOpacity(0.3),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Kembali',
+                ),
+              ),
+            ),
+            // ----------------------------------------------------
             flexibleSpace: FlexibleSpaceBar(
               background: Image.network(
                 admindukData.foto,
@@ -105,5 +118,3 @@ class DetailAdmindukScreen extends StatelessWidget {
     );
   }
 }
-
-// --- PERBAIKAN: _MyWidgetFactory dihapus ---

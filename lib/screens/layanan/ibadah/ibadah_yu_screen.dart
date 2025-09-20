@@ -8,6 +8,14 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
+// --- TAMBAHAN: Kelas helper untuk menyimpan data cache per kategori ---
+class _CachedCategoryData {
+  List<TempatIbadahModel> items = [];
+  int currentPage = 1;
+  bool hasMore = true;
+  bool isInitiated = false; // Menandai apakah data awal sudah pernah dimuat
+}
+
 class IbadahYuScreen extends StatefulWidget {
   const IbadahYuScreen({super.key});
 
@@ -133,11 +141,9 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
 
-  List<TempatIbadahModel> _ibadahList = [];
-  bool _isLoading = true;
+  // --- PERUBAHAN: State untuk caching ---
+  final Map<String, _CachedCategoryData> _cache = {};
   bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _currentPage = 1;
 
   int _selectedAgama = 0;
   final List<Map<String, String>> _agamaFilters = [
@@ -156,7 +162,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _loadInitialDataForCategory('Semua');
     _scrollController.addListener(_onScroll);
     _searchController.addListener(() {
       if (mounted) {
@@ -165,42 +171,52 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
     });
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _loadInitialDataForCategory(String category) async {
     setState(() {
-      _isLoading = true;
-      _ibadahList = [];
-      _currentPage = 1;
-      _hasMore = true;
+      _cache[category] = _CachedCategoryData();
     });
     try {
       final response = await _apiService.fetchTempatIbadahPaginated(
-        page: _currentPage,
-        kategori: _agamaFilters[_selectedAgama]['nama'],
+        page: 1,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
       if (mounted) {
         setState(() {
-          _ibadahList = response.data
+          final cacheData = _cache[category]!;
+          cacheData.items = response.data
               .map((item) => TempatIbadahModel.fromJson(item))
               .toList();
-          _hasMore = response.hasMorePages;
-          _isLoading = false;
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = 1;
+          cacheData.isInitiated = true;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _cache[category]!.isInitiated = true; // Tandai selesai walau error
+        });
+      }
       Fluttertoast.showToast(msg: "Gagal memuat data.");
     }
   }
 
   Future<void> _loadMoreData() async {
-    if (_isLoadingMore || !_hasMore) return;
+    final category = _agamaFilters[_selectedAgama]['nama']!;
+    final cacheData = _cache[category];
+
+    if (cacheData == null ||
+        !cacheData.hasMore ||
+        (cacheData.items.isNotEmpty && _isLoadingMore))
+      return;
+
     setState(() => _isLoadingMore = true);
-    _currentPage++;
+    final nextPage = cacheData.currentPage + 1;
     try {
       final response = await _apiService.fetchTempatIbadahPaginated(
-        page: _currentPage,
-        kategori: _agamaFilters[_selectedAgama]['nama'],
+        page: nextPage,
+        kategori: category == 'Semua' ? null : category,
         query: _searchQuery,
       );
       if (mounted) {
@@ -208,8 +224,9 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
           final moreData = response.data
               .map((item) => TempatIbadahModel.fromJson(item))
               .toList();
-          _ibadahList.addAll(moreData);
-          _hasMore = response.hasMorePages;
+          cacheData.items.addAll(moreData);
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = nextPage;
           _isLoadingMore = false;
         });
       }
@@ -273,24 +290,30 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
         ? 'Cari semua tempat ibadah...'
         : 'Cari di ${_agamaFilters[_selectedAgama]['nama']}...';
 
-    final scrollPhysics = _isLoading || _ibadahList.isNotEmpty
+    final selectedCategoryName = _agamaFilters[_selectedAgama]['nama']!;
+    final currentCache = _cache[selectedCategoryName] ?? _CachedCategoryData();
+    final currentList = currentCache.items;
+    final bool currentHasMore = currentCache.hasMore;
+    final bool isCurrentCategoryLoading = !currentCache.isInitiated;
+
+    final scrollPhysics = isCurrentCategoryLoading || currentList.isNotEmpty
         ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
         : const NeverScrollableScrollPhysics();
 
     return GestureDetector(
       onTap: _unfocusGlobal,
       child: RefreshIndicator(
-        onRefresh: _loadInitialData,
+        onRefresh: () => _loadInitialDataForCategory(selectedCategoryName),
         child: CustomScrollView(
           controller: _scrollController,
           physics: scrollPhysics,
           slivers: [
             SliverToBoxAdapter(child: _buildStaticHeader(theme, searchHint)),
-            if (_isLoading)
+            if (isCurrentCategoryLoading)
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (_ibadahList.isEmpty)
+            else if (currentList.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: _buildEmptyState(theme),
@@ -298,7 +321,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  if (index == _ibadahList.length) {
+                  if (index == currentList.length) {
                     return _isLoadingMore
                         ? const Padding(
                             padding: EdgeInsets.all(16.0),
@@ -306,7 +329,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
                           )
                         : const SizedBox.shrink();
                   }
-                  final data = _ibadahList[index];
+                  final data = currentList[index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: _MasjidCard(
@@ -315,7 +338,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
                           _launchMapsUrl(data.latitude, data.longitude),
                     ),
                   );
-                }, childCount: _ibadahList.length + (_hasMore ? 1 : 0)),
+                }, childCount: currentList.length + (currentHasMore ? 1 : 0)),
               ),
           ],
         ),
@@ -388,11 +411,12 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
               focusNode: _searchFocus,
               controller: _searchController,
               textInputAction: TextInputAction.search,
-              // --- PERBAIKAN: Menggunakan onSubmitted ---
               onSubmitted: (value) {
                 setState(() {
                   _searchQuery = value;
-                  _loadInitialData();
+                  _loadInitialDataForCategory(
+                    _agamaFilters[_selectedAgama]['nama']!,
+                  );
                 });
               },
               decoration: InputDecoration(
@@ -406,7 +430,9 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
                           _unfocusGlobal();
                           setState(() {
                             _searchQuery = '';
-                            _loadInitialData();
+                            _loadInitialDataForCategory(
+                              _agamaFilters[_selectedAgama]['nama']!,
+                            );
                           });
                         },
                       )
@@ -434,8 +460,11 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
                         _searchController.clear();
                         _searchQuery = '';
                         _selectedAgama = i;
-                        _loadInitialData();
                       });
+                      final categoryName = _agamaFilters[i]['nama']!;
+                      if (_cache[categoryName]?.isInitiated != true) {
+                        _loadInitialDataForCategory(categoryName);
+                      }
                     }
                   },
                 );
