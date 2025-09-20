@@ -136,16 +136,22 @@ class ApiService {
   }
 
   // =======================================================================
-  // API INFO PAJAK (BARU)
+  // API INFO PAJAK (DIPERBARUI DENGAN PAGINATION)
   // =======================================================================
-  Future<List<InfoPajak>> fetchInfoPajak() async {
+  Future<PaginationResponseModel<InfoPajak>> fetchInfoPajakPaginated({
+    required int page,
+  }) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/info-pajak');
+      final response = await _dio.get('$_baseUrlBackend/info-pajak?page=$page');
       if (response.statusCode == 200) {
-        final List<InfoPajak> infoList = (response.data as List)
-            .map((item) => InfoPajak.fromJson(item))
-            .toList();
-        return infoList;
+        final responseData = response.data;
+        return PaginationResponseModel<InfoPajak>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => InfoPajak.fromJson(item))
+              .toList(),
+        );
       } else {
         throw Exception('Gagal memuat info pajak');
       }
@@ -153,6 +159,10 @@ class ApiService {
       throw Exception('Terjadi error saat mengambil info pajak: $e');
     }
   }
+
+  // =======================================================================
+  // API INFO sekolah (BARU)
+  // =======================================================================
 
   Future<List<SekolahModel>> fetchTempatSekolah() async {
     try {
@@ -197,21 +207,64 @@ class ApiService {
   }
 
   // =======================================================================
-  // API INFO KERJA (BARU)
+  // API INFO KERJA (DIPERBARUI DENGAN PAGINATION & FILTER)
   // =======================================================================
-  Future<List<InfoKerjaModel>> fetchInfoKerja() async {
+  Future<PaginationResponseModel<InfoKerjaModel>> fetchInfoKerjaPaginated({
+    required int page,
+    String? kategori,
+    String? query,
+  }) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/info-kerja');
+      String endpoint = 'info-kerja';
+      final Map<String, dynamic> queryParams = {'page': page};
+
+      // Tentukan endpoint dan parameter berdasarkan input
+      if (query != null && query.isNotEmpty) {
+        // Menggunakan endpoint search khusus jika ada query
+        endpoint = 'info-kerja/search';
+        queryParams['q'] = query;
+      } else if (kategori != null && kategori != 'Semua') {
+        queryParams['fitur'] = kategori;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/$endpoint',
+        queryParameters: queryParams,
+      );
+
       if (response.statusCode == 200) {
-        final List<InfoKerjaModel> infoKerjaList = (response.data as List)
-            .map((item) => InfoKerjaModel.fromJson(item))
-            .toList();
-        return infoKerjaList;
+        final responseData = response.data;
+        return PaginationResponseModel<InfoKerjaModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => InfoKerjaModel.fromJson(item))
+              .toList(),
+        );
       } else {
-        throw Exception('Gagal memuat data pekerjaan');
+        throw Exception('Gagal memuat data lowongan kerja');
       }
     } catch (e) {
-      throw Exception('Terjadi error saat mengambil data pekerjaan: $e');
+      throw Exception('Terjadi error saat mengambil data lowongan kerja: $e');
+    }
+  }
+
+  // Fungsi untuk mengambil daftar kategori lowongan kerja
+  Future<List<String>> fetchInfoKerjaKategori() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-kerja/kategori');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final categoriesData =
+            response.data['categories'] as List<dynamic>? ?? [];
+        final List<String> categoryList = categoriesData
+            .map((item) => item['nama'].toString())
+            .toList();
+        return categoryList;
+      } else {
+        throw Exception('Gagal memuat kategori lowongan kerja');
+      }
+    } catch (e) {
+      return []; // Mengembalikan list kosong jika gagal
     }
   }
 
@@ -504,16 +557,51 @@ class ApiService {
   }
 
   // =======================================================================
-  // API RENCANA PEMBANGUNAN (BARU)
+  // API RENCANA PEMBANGUNAN (BARU DENGAN PAGINASI)
   // =======================================================================
-  Future<List<RenbangModel>> fetchRencanaPembangunan() async {
+
+  /// Mengambil daftar fitur/kategori yang tersedia untuk Renbang.
+  Future<List<String>> fetchRenbangFitur() async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/deskripsi-renbang');
+      final response = await _dio.get('$_baseUrlBackend/renbang/fitur');
+      if (response.statusCode == 200 && response.data is List) {
+        // Konversi List<dynamic> menjadi List<String>
+        return List<String>.from(response.data);
+      } else {
+        throw Exception('Gagal memuat daftar fitur Renbang');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil fitur Renbang: $e');
+    }
+  }
+
+  /// Mengambil data Rencana Pembangunan dengan paginasi dan filter.
+  Future<PaginationResponseModel<RenbangModel>>
+  fetchRencanaPembangunanPaginated({required int page, String? fitur}) async {
+    try {
+      // Bangun query parameters
+      final Map<String, dynamic> queryParameters = {'page': page};
+      if (fitur != null && fitur != 'Semua') {
+        queryParameters['fitur'] = fitur;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/renbang',
+        queryParameters: queryParameters,
+      );
+
       if (response.statusCode == 200) {
-        final List<RenbangModel> list = (response.data as List)
+        final responseData = response.data;
+        final List<RenbangModel> list = (responseData['data'] as List)
             .map((item) => RenbangModel.fromJson(item))
             .toList();
-        return list;
+
+        // --- PERUBAHAN: Menggunakan PaginationResponseModel yang baru ---
+        return PaginationResponseModel<RenbangModel>(
+          currentPage: responseData['current_page'],
+          lastPage: responseData['last_page'],
+          data: list,
+        );
       } else {
         throw Exception('Gagal memuat Rencana Pembangunan');
       }
@@ -612,21 +700,52 @@ class ApiService {
   }
 
   // =======================================================================
-  // API INFO PLESIR (BARU)
+  // API INFO PLESIR (BARU - DIPERBARUI UNTUK PAGINASI)
   // =======================================================================
-  Future<List<PlesirModel>> fetchInfoPlesir() async {
+  Future<PaginationResponseModel<PlesirModel>> fetchInfoPlesirPaginated({
+    int page = 1,
+    String? fitur,
+  }) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/info-plesir');
-      if (response.statusCode == 200) {
-        final List<PlesirModel> list = (response.data as List)
+      final params = <String, dynamic>{'page': page};
+      if (fitur != null && fitur != 'Semua') {
+        params['fitur'] = fitur;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/info-plesir',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200 && response.data is Map) {
+        final List<PlesirModel> list = (response.data['data'] as List)
             .map((item) => PlesirModel.fromJson(item))
             .toList();
-        return list;
+
+        return PaginationResponseModel<PlesirModel>(
+          currentPage: response.data['current_page'] ?? 0,
+          lastPage: response.data['last_page'] ?? 0,
+          data: list,
+        );
       } else {
-        throw Exception('Gagal memuat info plesir');
+        throw Exception('Gagal memuat info plesir: Format respons tidak valid');
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil info plesir: $e');
+    }
+  }
+
+  // --- FUNGSI BARU UNTUK MENGAMBIL FITUR/KATEGORI ---
+  Future<List<String>> fetchInfoPlesirFitur() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/info-plesir/fitur');
+      if (response.statusCode == 200 && response.data is List) {
+        return List<String>.from(response.data);
+      } else {
+        throw Exception('Gagal memuat fitur plesir');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil fitur plesir: $e');
     }
   }
 

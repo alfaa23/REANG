@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/info_pajak_model.dart';
 import 'package:reang_app/screens/layanan/pajak/cek_pajak_webview.dart';
@@ -5,6 +6,7 @@ import 'package:reang_app/screens/layanan/pajak/detail_pajak_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:html_unescape/html_unescape.dart'; // Import untuk membersihkan HTML
+import 'package:fluttertoast/fluttertoast.dart';
 
 class PajakYuScreen extends StatefulWidget {
   const PajakYuScreen({super.key});
@@ -16,31 +18,10 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
   int _selectedTab = 0;
   bool _isWebViewInitiated = false;
 
-  // State untuk memanggil API
-  final ApiService _apiService = ApiService();
-  late Future<List<InfoPajak>> _infoPajakFuture;
-
   @override
   void initState() {
     super.initState();
-    _loadInfoPajak();
-  }
-
-  void _loadInfoPajak() {
-    _infoPajakFuture = _apiService.fetchInfoPajak();
     timeago.setLocaleMessages('id', timeago.IdMessages());
-  }
-
-  Future<void> _handleRefresh() async {
-    setState(() {
-      _loadInfoPajak();
-    });
-    // Pastikan FutureBuilder menunggu future baru kalau diperlukan
-    try {
-      await _infoPajakFuture;
-    } catch (_) {
-      // biarkan saja, tampilan error akan ditangani oleh FutureBuilder
-    }
   }
 
   @override
@@ -116,7 +97,7 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
             child: IndexedStack(
               index: _selectedTab,
               children: [
-                _buildInfoPajakView(theme),
+                const _InfoPajakView(),
                 _isWebViewInitiated ? const CekPajakWebView() : Container(),
               ],
             ),
@@ -125,106 +106,184 @@ class _PajakYuScreenState extends State<PajakYuScreen> {
       ),
     );
   }
+}
 
-  Widget _buildInfoPajakView(ThemeData theme) {
-    return FutureBuilder<List<InfoPajak>>(
-      future: _infoPajakFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+// --- PERUBAHAN: Widget ini diubah menjadi StatefulWidget untuk menangani state pagination ---
+class _InfoPajakView extends StatefulWidget {
+  const _InfoPajakView();
 
-        // Error, null, atau empty -> tampilkan UI "gagal" dengan ikon awan dan tombol coba lagi
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: ListView(
-              // Gunakan ListView agar RefreshIndicator dan scroll tetap berfungsi
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+  @override
+  State<_InfoPajakView> createState() => _InfoPajakViewState();
+}
+
+class _InfoPajakViewState extends State<_InfoPajakView> {
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<InfoPajak> _pajakList = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() {
+      _isLoading = true;
+      _pajakList = [];
+      _currentPage = 1;
+      _hasMore = true;
+    });
+    try {
+      final response = await _apiService.fetchInfoPajakPaginated(
+        page: _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          _pajakList = response.data;
+          _hasMore = response.hasMorePages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      Fluttertoast.showToast(msg: "Gagal memuat info pajak.");
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+    try {
+      final response = await _apiService.fetchInfoPajakPaginated(
+        page: _currentPage,
+      );
+      if (mounted) {
+        setState(() {
+          _pajakList.addAll(response.data);
+          _hasMore = response.hasMorePages;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: _loadInitialData,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _pajakList.isEmpty
+          ? _buildErrorState(theme)
+          : ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
               children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Ikon awan gagal — menggantikan asset agar tidak perlu file tambahan
-                        Icon(
-                          Icons.cloud_off_outlined,
-                          size: 96,
-                          color: theme.hintColor,
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Maaf, tidak ada jaringan atau layanan sedang bermasalah.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: theme.hintColor,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Periksa koneksi internet Anda atau coba lagi.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: theme.hintColor.withOpacity(0.9),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        SizedBox(
-                          width: 160,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              _handleRefresh();
-                            },
-                            child: const Text('Coba Lagi'),
-                          ),
-                        ),
-                      ],
-                    ),
+                Text(
+                  'Informasi Seputar Pajak',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                // Beri sedikit space di bawah agar bisa di-pull
-                SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                const SizedBox(height: 4),
+                Text(
+                  'Ketahui jenis pajak yang berlaku di daerah Anda dan cara mengurusnya.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._pajakList.map((a) => _ArticleCard(data: a)).toList(),
+                if (_isLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
               ],
             ),
-          );
-        }
+    );
+  }
 
-        final articles = snapshot.data!;
-        return RefreshIndicator(
-          onRefresh: _handleRefresh,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              Text(
-                'Informasi Seputar Pajak',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+  Widget _buildErrorState(ThemeData theme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_outlined,
+                      size: 96,
+                      color: theme.hintColor,
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Maaf, tidak ada jaringan atau layanan sedang bermasalah.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: theme.hintColor, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Periksa koneksi internet Anda atau coba lagi.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: theme.hintColor.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: 160,
+                      child: ElevatedButton(
+                        onPressed: _loadInitialData,
+                        child: const Text('Coba Lagi'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Ketahui jenis pajak yang berlaku di daerah Anda dan cara mengurusnya.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.hintColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...articles.map((a) => _ArticleCard(data: a)).toList(),
-            ],
+            ),
           ),
         );
       },
     );
   }
 }
+// -----------------------------------------------------------------------------------
 
 /// Kartu artikel pajak dengan tampilan baru
 class _ArticleCard extends StatelessWidget {
@@ -253,6 +312,7 @@ class _ArticleCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
+              // --- PERBAIKAN: Menggunakan parameter 'artikel' ---
               builder: (context) => DetailPajakScreen(artikel: data),
             ),
           );
@@ -308,7 +368,6 @@ class _ArticleCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  // PERBAIKAN: Menambahkan kembali deskripsi singkat
                   const SizedBox(height: 6),
                   Text(
                     excerpt,

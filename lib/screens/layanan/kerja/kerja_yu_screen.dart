@@ -1,9 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/info_kerja_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:html_unescape/html_unescape.dart';
+
+// --- TAMBAHAN: Kelas helper untuk menyimpan data cache per kategori ---
+class _CachedKerjaData {
+  List<InfoKerjaModel> items = [];
+  int currentPage = 1;
+  bool hasMore = true;
+  bool isInitiated = false; // Menandai apakah data awal sudah pernah dimuat
+}
 
 class KerjaYuScreen extends StatefulWidget {
   const KerjaYuScreen({super.key});
@@ -13,50 +24,13 @@ class KerjaYuScreen extends StatefulWidget {
 
 class _KerjaYuScreenState extends State<KerjaYuScreen> {
   int _mainTab = 0;
-  int _selectedFilterTab = 0;
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocus = FocusNode();
-  String _searchQuery = '';
   WebViewController? _silelakerjaController;
   bool _isSilelakerjaInitiated = false;
-
-  Future<List<InfoKerjaModel>>? _infoKerjaFuture;
 
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
     {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
   ];
-
-  final Map<String, IconData> _categoryIcons = {
-    'lowongan': Icons.apartment_outlined,
-    'job fair': Icons.event_available_outlined,
-    'pelatihan': Icons.model_training_outlined,
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _infoKerjaFuture = ApiService().fetchInfoKerja();
-  }
-
-  // --- TAMBAHAN: Fungsi untuk memuat ulang data ---
-  void _reloadData() {
-    setState(() {
-      _infoKerjaFuture = ApiService().fetchInfoKerja();
-    });
-  }
-  // --------------------------------------------------
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
-  void _unfocusGlobal() {
-    FocusManager.instance.primaryFocus?.unfocus();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,31 +64,27 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
             ],
           ),
         ),
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: _unfocusGlobal,
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              _buildMainTabs(theme),
-              const SizedBox(height: 24),
-              Expanded(
-                child: IndexedStack(
-                  index: _mainTab,
-                  children: [
-                    _buildBerandaView(theme),
-                    _isSilelakerjaInitiated
-                        ? SilelakerjaView(
-                            onWebViewCreated: (controller) {
-                              _silelakerjaController = controller;
-                            },
-                          )
-                        : Container(),
-                  ],
-                ),
+        body: Column(
+          children: [
+            const SizedBox(height: 12),
+            _buildMainTabs(theme),
+            const SizedBox(height: 24),
+            Expanded(
+              child: IndexedStack(
+                index: _mainTab,
+                children: [
+                  const _BerandaKerjaView(),
+                  _isSilelakerjaInitiated
+                      ? SilelakerjaView(
+                          onWebViewCreated: (controller) {
+                            _silelakerjaController = controller;
+                          },
+                        )
+                      : Container(),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -137,7 +107,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                     _isSilelakerjaInitiated = true;
                   }
                 });
-                _unfocusGlobal();
+                FocusManager.instance.primaryFocus?.unfocus();
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -179,113 +149,228 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
       ),
     );
   }
+}
 
-  Widget _buildBerandaView(ThemeData theme) {
-    return FutureBuilder<List<InfoKerjaModel>>(
-      future: _infoKerjaFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        // --- PERUBAHAN: Menambahkan tampilan error dengan tombol ---
-        if (snapshot.hasError) {
-          return _buildErrorView(
-            context,
-            'Gagal memuat data. Periksa koneksi internet Anda.',
-          );
-        }
-        // ---------------------------------------------------------
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Text(
-              'Tidak ada lowongan tersedia saat ini',
-              style: TextStyle(color: theme.hintColor),
+class _BerandaKerjaView extends StatefulWidget {
+  const _BerandaKerjaView();
+
+  @override
+  State<_BerandaKerjaView> createState() => _BerandaKerjaViewState();
+}
+
+class _BerandaKerjaViewState extends State<_BerandaKerjaView> {
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  final Map<String, _CachedKerjaData> _cache = {};
+  bool _isLoadingMore = false;
+
+  Future<List<String>>? _kategoriFuture;
+  List<String> _dynamicCategories = ['Semua'];
+  int _selectedFilterTab = 0;
+
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  String _searchQuery = '';
+
+  final Map<String, IconData> _categoryIcons = {
+    'lowongan': Icons.apartment_outlined,
+    'job fair': Icons.event_available_outlined,
+    'pelatihan': Icons.model_training_outlined,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+    _scrollController.addListener(_onScroll);
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  Future<void> _initializeData() async {
+    await _loadCategories();
+    await _loadInitialDataForCategory('Semua');
+  }
+
+  Future<void> _loadCategories() async {
+    _kategoriFuture = _apiService.fetchInfoKerjaKategori();
+    final categories = await _kategoriFuture;
+    if (mounted && categories != null && categories.isNotEmpty) {
+      setState(() {
+        _dynamicCategories = ['Semua', ...categories];
+      });
+    }
+  }
+
+  Future<void> _loadInitialDataForCategory(String category) async {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+
+    setState(() {
+      _cache[category] = _CachedKerjaData();
+    });
+    try {
+      final response = await _apiService.fetchInfoKerjaPaginated(
+        page: 1,
+        kategori: category == 'Semua' ? null : category,
+        query: _searchQuery,
+      );
+      if (mounted) {
+        setState(() {
+          final cacheData = _cache[category]!;
+          cacheData.items = response.data;
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = 1;
+          cacheData.isInitiated = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cache[category]!.isInitiated = true;
+        });
+      }
+      Fluttertoast.showToast(msg: "Gagal memuat data.");
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    final category = _dynamicCategories[_selectedFilterTab];
+    final cacheData = _cache[category];
+
+    if (cacheData == null ||
+        !cacheData.hasMore ||
+        (cacheData.items.isNotEmpty && _isLoadingMore))
+      return;
+
+    setState(() => _isLoadingMore = true);
+    final nextPage = cacheData.currentPage + 1;
+    try {
+      final response = await _apiService.fetchInfoKerjaPaginated(
+        page: nextPage,
+        kategori: category == 'Semua' ? null : category,
+        query: _searchQuery,
+      );
+      if (mounted) {
+        setState(() {
+          cacheData.items.addAll(response.data);
+          cacheData.hasMore = response.hasMorePages;
+          cacheData.currentPage = nextPage;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _unfocusGlobal() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final selectedCategoryName = _dynamicCategories[_selectedFilterTab];
+    final currentCache = _cache[selectedCategoryName] ?? _CachedKerjaData();
+    final currentList = currentCache.items;
+    final bool currentHasMore = currentCache.hasMore;
+    final bool isCurrentCategoryLoading = !currentCache.isInitiated;
+
+    return RefreshIndicator(
+      onRefresh: () => _loadInitialDataForCategory(selectedCategoryName),
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: _buildSearchBar(theme),
             ),
-          );
-        }
-
-        final allJobs = snapshot.data!;
-        final Set<String> uniqueCategories = allJobs
-            .map((job) => job.kategori)
-            .toSet();
-        final List<Map<String, dynamic>> dynamicFilterTabs = [
-          {'label': 'Semua', 'icon': Icons.work_outline},
-        ];
-        for (String category in uniqueCategories) {
-          dynamicFilterTabs.add({
-            'label':
-                category[0].toUpperCase() + category.substring(1), // Capitalize
-            'icon':
-                _categoryIcons[category.toLowerCase()] ?? Icons.work_outline,
-          });
-        }
-
-        List<InfoKerjaModel> filteredJobs = allJobs;
-
-        if (_selectedFilterTab != 0) {
-          if (_selectedFilterTab < dynamicFilterTabs.length) {
-            final categoryToFilter =
-                dynamicFilterTabs[_selectedFilterTab]['label'];
-            filteredJobs = allJobs
-                .where(
-                  (j) =>
-                      j.kategori.toLowerCase() ==
-                      categoryToFilter.toLowerCase(),
-                )
-                .toList();
-          }
-        }
-
-        if (_searchQuery.isNotEmpty) {
-          filteredJobs = filteredJobs
-              .where(
-                (j) =>
-                    j.posisi.toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ) ||
-                    j.namaPerusahaan.toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ),
-              )
-              .toList();
-        }
-
-        final String searchHint =
-            (_selectedFilterTab == 0 ||
-                _selectedFilterTab >= dynamicFilterTabs.length)
-            ? 'Cari semua...'
-            : 'Cari di ${dynamicFilterTabs[_selectedFilterTab]['label']}...';
-
-        return Column(
-          children: [
-            _buildSearchBar(theme, searchHint),
-            const SizedBox(height: 16),
-            _buildFilterTabs(theme, dynamicFilterTabs),
-            const SizedBox(height: 16),
-            Expanded(
-              child: filteredJobs.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Tidak ada data yang cocok',
-                        style: TextStyle(color: theme.hintColor),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: filteredJobs.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 16),
-                      itemBuilder: (_, i) => _JobCard(data: filteredJobs[i]),
-                    ),
+          ),
+          SliverToBoxAdapter(child: const SizedBox(height: 16)),
+          SliverToBoxAdapter(
+            child: FutureBuilder<List<String>>(
+              future: _kategoriFuture,
+              builder: (context, snapshot) {
+                if (snapshot.hasData &&
+                    snapshot.data != null &&
+                    snapshot.data!.isNotEmpty) {
+                  _dynamicCategories = ['Semua', ...snapshot.data!];
+                }
+                return _buildFilterTabs(theme, _dynamicCategories);
+              },
             ),
-          ],
-        );
-      },
+          ),
+          SliverToBoxAdapter(child: const SizedBox(height: 16)),
+          if (isCurrentCategoryLoading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (currentList.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _buildErrorView(
+                context,
+                _searchQuery.isNotEmpty
+                    ? 'Pencarian untuk "$_searchQuery" tidak ditemukan.'
+                    : 'Tidak ada lowongan tersedia saat ini',
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, i) {
+                  if (i == currentList.length) {
+                    return _isLoadingMore
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: _JobCard(data: currentList[i]),
+                  );
+                }, childCount: currentList.length + (currentHasMore ? 1 : 0)),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  // --- TAMBAHAN: Widget untuk menampilkan error ---
   Widget _buildErrorView(BuildContext context, String message) {
     final theme = Theme.of(context);
     return Center(
@@ -294,7 +379,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off, color: theme.hintColor, size: 64),
+            Icon(Icons.search_off_rounded, color: theme.hintColor, size: 64),
             const SizedBox(height: 16),
             Text(
               message,
@@ -305,7 +390,9 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _reloadData,
+              onPressed: () => _loadInitialDataForCategory(
+                _dynamicCategories[_selectedFilterTab],
+              ),
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
             ),
@@ -314,9 +401,14 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
       ),
     );
   }
-  // ------------------------------------------------
 
-  Widget _buildSearchBar(ThemeData theme, String hintText) {
+  Widget _buildSearchBar(ThemeData theme) {
+    final String searchHint =
+        _selectedFilterTab == 0 ||
+            _selectedFilterTab >= _dynamicCategories.length
+        ? 'Cari semua...'
+        : 'Cari di ${_dynamicCategories[_selectedFilterTab]}...';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Container(
@@ -335,14 +427,27 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
           autofocus: false,
           focusNode: _searchFocus,
           controller: _searchController,
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value;
-            });
+          textInputAction: TextInputAction.search,
+          onSubmitted: (value) {
+            setState(() => _searchQuery = value);
+            _loadInitialDataForCategory(_dynamicCategories[_selectedFilterTab]);
           },
           decoration: InputDecoration(
-            hintText: hintText,
+            hintText: searchHint,
             prefixIcon: Icon(Icons.search, color: theme.hintColor),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear, color: theme.hintColor),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                      _loadInitialDataForCategory(
+                        _dynamicCategories[_selectedFilterTab],
+                      );
+                      _unfocusGlobal();
+                    },
+                  )
+                : null,
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
           ),
@@ -351,10 +456,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
     );
   }
 
-  Widget _buildFilterTabs(
-    ThemeData theme,
-    List<Map<String, dynamic>> filterTabs,
-  ) {
+  Widget _buildFilterTabs(ThemeData theme, List<String> filterTabs) {
     return SizedBox(
       height: 44,
       child: ListView.separated(
@@ -363,12 +465,16 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
         itemCount: filterTabs.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final tabData = filterTabs[i];
+          final label = filterTabs[i];
           final sel = i == _selectedFilterTab;
           return GestureDetector(
             onTap: () {
               if (i < filterTabs.length) {
                 setState(() => _selectedFilterTab = i);
+                final categoryName = _dynamicCategories[i];
+                if (_cache[categoryName]?.isInitiated != true) {
+                  _loadInitialDataForCategory(categoryName);
+                }
               }
               _unfocusGlobal();
             },
@@ -384,7 +490,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    tabData['icon'] as IconData,
+                    _categoryIcons[label.toLowerCase()] ?? Icons.work_outline,
                     size: 20,
                     color: sel
                         ? theme.colorScheme.onPrimary
@@ -392,7 +498,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    tabData['label'] as String,
+                    label[0].toUpperCase() + label.substring(1),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: sel ? FontWeight.bold : FontWeight.normal,
@@ -415,9 +521,11 @@ class _JobCard extends StatelessWidget {
   final InfoKerjaModel data;
   const _JobCard({required this.data});
 
-  String _stripHtml(String htmlText) {
+  String get summary {
+    final unescape = HtmlUnescape();
+    final cleanHtml = unescape.convert(data.deskripsi);
     final RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlText.replaceAll(exp, ' ').replaceAll('&nbsp;', ' ').trim();
+    return cleanHtml.replaceAll(exp, ' ').replaceAll('&nbsp;', ' ').trim();
   }
 
   @override
@@ -448,32 +556,32 @@ class _JobCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 120.0),
+              // --- PERUBAHAN: Menghilangkan latar belakang gambar & mempertahankan sudut lengkung ---
+              SizedBox(
+                width: 80,
+                height: 80,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
                     data.foto,
-                    width: 80,
+                    fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        width: 80,
-                        height: 80,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.business,
                           size: 40,
-                          color: Colors.grey.shade400,
+                          color: Color(0xFFBDBDBD),
                         ),
                       );
                     },
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 data.posisi,
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -535,7 +643,7 @@ class _JobCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                _stripHtml(data.deskripsi),
+                summary,
                 style: TextStyle(
                   color: subtleTextColor,
                   height: 1.5,
