@@ -5,6 +5,7 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
 import 'package:reang_app/screens/layanan/dumas/detail_laporan_screen.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:provider/provider.dart';
 import 'package:reang_app/screens/auth/login_screen.dart'; // Import LoginScreen
@@ -21,11 +22,17 @@ class DumasYuHomeScreen extends StatefulWidget {
 
 class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
   late bool isBerandaSelected;
+  // --- PERBAIKAN: Menambahkan kembali flag untuk lazy load ---
+  bool _isLaporanSayaInitiated = false;
 
   @override
   void initState() {
     super.initState();
     isBerandaSelected = !widget.bukaLaporanSaya;
+    // Jika halaman dibuka langsung ke 'Laporan Saya', inisialisasi langsung
+    if (widget.bukaLaporanSaya) {
+      _isLaporanSayaInitiated = true;
+    }
     timeago.setLocaleMessages('id', timeago.IdMessages());
   }
 
@@ -91,7 +98,15 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() => isBerandaSelected = false),
+                    // --- PERBAIKAN: Menambahkan logika untuk mengaktifkan lazy load ---
+                    onTap: () {
+                      setState(() {
+                        isBerandaSelected = false;
+                        if (!_isLaporanSayaInitiated) {
+                          _isLaporanSayaInitiated = true;
+                        }
+                      });
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
@@ -124,10 +139,11 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
                   index: isBerandaSelected ? 0 : 1,
                   children: [
                     const _BerandaDumasView(),
-                    // --- PERBAIKAN: Memberikan Key unik ---
-                    // Ini akan memaksa widget untuk di-rebuild dan memanggil initState-nya
-                    // setiap kali status login berubah.
-                    _LaporanSayaView(key: ValueKey(auth.isLoggedIn)),
+                    // --- PERBAIKAN: Menggunakan kondisi untuk lazy load ---
+                    if (_isLaporanSayaInitiated)
+                      _LaporanSayaView(key: ValueKey(auth.isLoggedIn))
+                    else
+                      Container(), // Tampilkan container kosong sebelum diinisialisasi
                   ],
                 );
               },
