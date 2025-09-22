@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:io';
 import 'package:intl/intl.dart'; // Diperlukan untuk format tanggal
 import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/models/jdih_model.dart';
@@ -16,6 +17,7 @@ import 'package:reang_app/models/renbang_model.dart';
 import 'package:reang_app/models/plesir_model.dart';
 import 'package:reang_app/models/ulasan_response_model.dart';
 import 'package:reang_app/models/pagination_response_model.dart';
+import 'package:reang_app/models/dumas_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -25,7 +27,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://7f56ae6d3ca1.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://a5647ec17176.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -846,6 +848,114 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null && e.response!.data is Map) {
+        throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
+      }
+      throw Exception('Tidak dapat terhubung ke server.');
+    }
+  }
+
+  // =======================================================================
+  // API DUMAS (BARU)
+  // =======================================================================
+
+  // PERBAIKAN: Fungsi ini sekarang bisa menangani semua laporan dan laporan milik user
+  Future<PaginationResponseModel<DumasModel>> fetchDumasPaginated({
+    required int page,
+    int? userId, // Parameter opsional untuk filter
+    String? token, // Token dibutuhkan untuk mengambil laporan milik user
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {'page': page};
+      if (userId != null) {
+        queryParams['user_id'] = userId;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrlBackend/dumas', // Selalu menggunakan endpoint utama
+        queryParameters: queryParams,
+        options: Options(
+          headers: (token != null) ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        return PaginationResponseModel<DumasModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => DumasModel.fromJson(item))
+              .toList(),
+        );
+      } else {
+        throw Exception('Gagal memuat laporan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil laporan: $e');
+    }
+  }
+
+  // Mengambil detail satu laporan
+  Future<DumasModel> fetchDumasDetail(int id) async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/dumas/$id');
+      if (response.statusCode == 200) {
+        // --- PERBAIKAN: Langsung membaca dari response.data ---
+        // Tidak perlu lagi mencari kunci 'data' di dalamnya.
+        return DumasModel.fromJson(response.data);
+      } else {
+        throw Exception('Gagal memuat detail laporan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil detail laporan: $e');
+    }
+  }
+
+  // Mengirim laporan baru (dengan foto)
+  Future<Map<String, dynamic>> postDumas({
+    required Map<String, String> data,
+    File? image,
+    required String token,
+  }) async {
+    try {
+      // Menggunakan FormData untuk mengirim file dan teks
+      final formData = FormData.fromMap(data);
+      if (image != null) {
+        formData.files.add(
+          MapEntry(
+            'bukti_laporan',
+            await MultipartFile.fromFile(
+              image.path,
+              filename: image.path.split('/').last,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/dumas',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data;
+      } else {
+        throw Exception('Gagal mengirim laporan');
+      }
+    } on DioException catch (e) {
+      if (e.response?.data is Map) {
+        final errors = e.response!.data['errors'] as Map<String, dynamic>?;
+        if (errors != null && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            throw Exception(firstError.first);
+          }
+        }
         throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
       }
       throw Exception('Tidak dapat terhubung ke server.');

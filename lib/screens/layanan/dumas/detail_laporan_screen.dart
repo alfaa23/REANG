@@ -1,211 +1,185 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/dumas_model.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class DetailLaporanScreen extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const DetailLaporanScreen({super.key, required this.data});
+  final int dumasId;
+  const DetailLaporanScreen({super.key, required this.dumasId});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Gunakan null-aware operator agar tidak error
-    final String imageUrl = data['imagePath'] as String? ?? '';
-    final String id = data['id'] as String? ?? '-';
-    final String status = data['status'] as String? ?? '-';
-    final Color statusColor = data['statusColor'] as Color? ?? Colors.grey;
-    final String title = data['title'] as String? ?? '-';
-    final String category = data['category'] as String? ?? '-';
-    final String address = data['address'] as String? ?? '-';
-    final String description = data['description'] as String? ?? '-';
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        top: true,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              Stack(
-                children: [
-                  Image.asset(
-                    imageUrl,
-                    width: double.infinity,
-                    height: 240,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 240,
-                        color: theme.colorScheme.surface,
-                        child: Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            size: 48,
-                            color: theme.hintColor,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      body: FutureBuilder<DumasModel>(
+        future: ApiService().fetchDumasDetail(dumasId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return const Center(child: Text('Gagal memuat detail laporan.'));
+          }
 
-              const SizedBox(height: 16),
+          final data = snapshot.data!;
+          final theme = Theme.of(context);
 
-              // ID & Status
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'ID Laporan',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(id),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Status',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(status),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    Icons.circle,
-                                    size: 12,
-                                    color: statusColor,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: theme.dividerColor),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(16),
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildSliverAppBar(context, theme, data),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailRow(theme, 'Judul Laporan:', title),
-                      _buildDetailRow(theme, 'Kategori:', category),
-                      _buildDetailRow(theme, 'Alamat:', address),
-                      _buildDetailRow(theme, 'Deskripsi:', description),
+                      _buildHeaderCard(theme, data),
+                      const SizedBox(height: 24),
+                      _buildDetailInfo(theme, data),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Status Laporan',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // --- PERBAIKAN: Timeline sekarang dinamis ---
+                      _buildDynamicTimeline(theme, data),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Status Laporan',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _TimelineEntry(
-                      dotColor: Colors.green,
-                      title: 'Selesai',
-                      subtitle:
-                          'Laporan dinyatakan selesai oleh BIRO PEMERINTAHAN',
-                      timestamp: '24 Jul 2025 • 08:46',
-                      comment:
-                          'Komentar petugas: tindak lanjut sudah sesuai dengan laporan. terima kasih',
-                    ),
-                    _TimelineEntry(
-                      dotColor: Colors.blue,
-                      title: 'Validasi',
-                      subtitle:
-                          'Tindak lanjut laporan sedang divalidasi oleh BIRO PEMERINTAHAN',
-                      timestamp: '23 Jul 2025 • 19:40',
-                    ),
-                    _TimelineEntry(
-                      dotColor: Colors.red,
-                      title: 'Menunggu',
-                      subtitle: 'Laporan diterima oleh KELURAHAN PEGADUNGAN',
-                      timestamp: '27 Jul 2025 • 18:45',
-                      isLast: true,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(
+    BuildContext context,
+    ThemeData theme,
+    DumasModel data,
+  ) {
+    return SliverAppBar(
+      expandedHeight: 240.0,
+      pinned: true,
+      stretch: true,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: CircleAvatar(
+          backgroundColor: Colors.black.withOpacity(0.5),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+            tooltip: 'Kembali',
           ),
+        ),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        background: (data.buktiLaporan != null && data.buktiLaporan!.isNotEmpty)
+            ? Image.network(
+                data.buktiLaporan!,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => _buildImageError(theme),
+              )
+            : _buildImageError(theme),
+      ),
+    );
+  }
+
+  Widget _buildImageError(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.surface,
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          size: 48,
+          color: theme.hintColor,
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(ThemeData theme, String title, String value) {
+  Widget _buildHeaderCard(ThemeData theme, DumasModel data) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ID Laporan',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('#${data.id}'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Status',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(data.status),
+                      const SizedBox(width: 6),
+                      Icon(Icons.circle, size: 12, color: data.statusColor),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailInfo(ThemeData theme, DumasModel data) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDetailRow(theme, 'Judul Laporan:', data.jenisLaporan),
+          _buildDetailRow(theme, 'Kategori:', data.kategoriLaporan),
+          _buildDetailRow(theme, 'Alamat:', data.lokasiLaporan),
+          _buildDetailRow(theme, 'Deskripsi:', data.deskripsi, isLast: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    ThemeData theme,
+    String title,
+    String value, {
+    bool isLast = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -221,8 +195,86 @@ class DetailLaporanScreen extends StatelessWidget {
       ),
     );
   }
+
+  // --- FUNGSI BARU: Untuk membangun timeline secara dinamis ---
+  Widget _buildDynamicTimeline(ThemeData theme, DumasModel data) {
+    final statusOrder = ['menunggu', 'diproses', 'selesai'];
+    final currentStatus = data.status.toLowerCase();
+    int currentStatusIndex = statusOrder.indexOf(currentStatus);
+
+    // Jika statusnya ditolak, tampilkan 'Menunggu' dan 'Ditolak'
+    if (currentStatus == 'ditolak') {
+      return Column(
+        children: [
+          _TimelineEntry(
+            dotColor: Colors.grey, // Menunggu dianggap selesai
+            title: 'Menunggu',
+            subtitle: 'Laporan diterima oleh sistem',
+            timestamp: timeago.format(data.createdAt, locale: 'id'),
+          ),
+          _TimelineEntry(
+            dotColor: Colors.red,
+            title: 'Ditolak',
+            subtitle: 'Laporan ditolak oleh instansi terkait.',
+            timestamp: timeago.format(
+              data.createdAt,
+              locale: 'id',
+            ), // Gunakan tanggal yang sama jika tidak ada tanggal update
+            comment: data.tanggapan,
+            isLast: true,
+          ),
+        ],
+      );
+    }
+
+    // Jika status tidak dikenali atau tidak ada di urutan
+    if (currentStatusIndex == -1) {
+      return _TimelineEntry(
+        dotColor: data.statusColor,
+        title: data.status,
+        subtitle: 'Status laporan saat ini.',
+        timestamp: timeago.format(data.createdAt, locale: 'id'),
+        isLast: true,
+      );
+    }
+
+    final List<Map<String, dynamic>> timelineConfig = [
+      {
+        'status': 'Menunggu',
+        'subtitle': 'Laporan diterima oleh sistem',
+        'color': Colors.orange,
+      },
+      {
+        'status': 'Diproses',
+        'subtitle': 'Laporan sedang ditindaklanjuti oleh instansi terkait',
+        'color': Colors.blue,
+      },
+      {
+        'status': 'Selesai',
+        'subtitle': 'Laporan telah selesai ditindaklanjuti',
+        'color': Colors.green,
+      },
+    ];
+
+    return Column(
+      children: List.generate(currentStatusIndex + 1, (index) {
+        final step = timelineConfig[index];
+        final bool isLast = index == currentStatusIndex;
+
+        return _TimelineEntry(
+          dotColor: isLast ? step['color'] : Colors.grey,
+          title: step['status'],
+          subtitle: step['subtitle'],
+          timestamp: timeago.format(data.createdAt, locale: 'id'),
+          isLast: isLast,
+          comment: (isLast) ? data.tanggapan : null,
+        );
+      }),
+    );
+  }
 }
 
+// --- Widget Timeline Entry (Tidak Berubah) ---
 class _TimelineEntry extends StatelessWidget {
   final Color dotColor;
   final String title;
@@ -258,7 +310,7 @@ class _TimelineEntry extends StatelessWidget {
               ),
             ),
             if (!isLast)
-              Container(width: 2, height: 100, color: theme.dividerColor),
+              Container(width: 2, height: 120, color: theme.dividerColor),
           ],
         ),
         const SizedBox(width: 12),
@@ -282,13 +334,15 @@ class _TimelineEntry extends StatelessWidget {
                   color: theme.hintColor,
                 ),
               ),
-              if (comment != null) ...[
-                const SizedBox(height: 8),
+              if (comment != null && comment!.isNotEmpty) ...[
+                const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: theme.dividerColor),
                   ),
                   child: Text(comment!, style: theme.textTheme.bodyMedium),
                 ),

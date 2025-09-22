@@ -9,7 +9,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  // --- TAMBAHAN: Parameter baru untuk mengontrol navigasi ---
+  final bool popOnSuccess;
+
+  const LoginScreen({
+    super.key,
+    this.popOnSuccess =
+        false, // Defaultnya false, agar perilaku lama tidak berubah
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -53,11 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final userData = response['user'];
 
       if (token != null && userData != null) {
-        // Simpan token dengan aman
         const storage = FlutterSecureStorage();
         await storage.write(key: 'auth_token', value: token);
 
-        // --- PERBAIKAN: Simpan data pengguna ke AuthProvider ---
         final user = UserModel.fromJson(userData);
         if (mounted) {
           Provider.of<AuthProvider>(
@@ -65,7 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
             listen: false,
           ).setUser(user, token);
         }
-        // ----------------------------------------------------
 
         Fluttertoast.showToast(
           msg: "Login Berhasil!",
@@ -73,11 +77,18 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-            (Route<dynamic> route) => false,
-          );
+          // --- PERBAIKAN: Logika navigasi cerdas ---
+          if (widget.popOnSuccess) {
+            // Jika dipanggil dari Dumas, kembali ke Dumas dengan sinyal sukses
+            Navigator.pop(context, true);
+          } else {
+            // Perilaku default: pergi ke halaman utama
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+              (Route<dynamic> route) => false,
+            );
+          }
         }
       } else {
         throw Exception("Token atau data pengguna tidak ditemukan.");
@@ -97,6 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (Sisa kode tampilan login_screen.dart tidak ada yang berubah)
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),

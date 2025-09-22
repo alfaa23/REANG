@@ -1,22 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
+import 'package:reang_app/screens/main_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // Dummy data
-  final String _name = 'Abdee';
-  final String _role = 'Warga';
-  final String _avatarUrl =
-      'https://i.pinimg.com/564x/eb/43/44/eb4344d5f4d31dadd4efa0cf12b70bf3.jpg';
+  // Fungsi untuk menampilkan dialog konfirmasi logout
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final theme = Theme.of(context);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              const Text('Yakin ingin keluar?'),
+            ],
+          ),
+          content: const Text(
+            'Anda akan keluar dari akun ini dan kembali ke halaman utama.',
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Tidak, tetap di sini'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                // Tutup dialog terlebih dahulu
+                Navigator.of(ctx).pop();
+
+                // --- PERBAIKAN: API call di-nonaktifkan sementara ---
+                // try {
+                //   // KOMENTAR: Baris ini akan digunakan untuk memanggil API logout di server.
+                //   // Pastikan endpoint dan fungsi logoutUser() sudah siap di ApiService.
+                //   await ApiService().logoutUser(token: authProvider.token!);
+                // } catch (e) {
+                //   debugPrint("Server logout error (diabaikan): $e");
+                // }
+                // ----------------------------------------------------
+
+                // Hapus token dari penyimpanan aman
+                await const FlutterSecureStorage().delete(key: 'auth_token');
+                // Hapus data pengguna dari provider
+                authProvider.logout();
+
+                Fluttertoast.showToast(msg: "Anda telah keluar.");
+
+                // Navigasi ke halaman utama dan hapus semua halaman sebelumnya
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                  (Route<dynamic> route) => false,
+                );
+              },
+              child: const Text('Ya, keluar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
 
-    // PERUBAHAN: Widget tidak lagi memiliki Scaffold atau AppBar sendiri
+    // --- PERBAIKAN: Menggunakan properti 'name' dan menghapus 'avatar' ---
+    final String name = authProvider.isLoggedIn
+        ? authProvider.user!.name
+        : 'Pengunjung';
+    final String role = authProvider.isLoggedIn ? 'Warga' : 'Guest';
+    // UserModel tidak memiliki avatar, jadi kita gunakan URL statis
+    const String avatarUrl =
+        'https://i.pinimg.com/564x/eb/43/44/eb4344d5f4d31dadd4efa0cf12b70bf3.jpg';
+    // ----------------------------------------------------
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
@@ -31,18 +108,20 @@ class ProfileScreen extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 40,
-                backgroundImage: NetworkImage(_avatarUrl),
+                backgroundImage: NetworkImage(avatarUrl),
+                onBackgroundImageError:
+                    (_, __) {}, // Mencegah error jika gambar gagal dimuat
               ),
               const SizedBox(height: 12),
               Text(
-                _name,
+                name,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                _role,
+                role,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                 ),
@@ -54,7 +133,12 @@ class ProfileScreen extends StatelessWidget {
                   _ActionButton(
                     icon: Icons.edit_outlined,
                     label: 'Ubah Profil',
-                    onTap: () {},
+                    onTap: () {
+                      // TODO: Navigasi ke halaman ubah profil
+                      Fluttertoast.showToast(
+                        msg: "Fitur ini akan segera tersedia.",
+                      );
+                    },
                   ),
                 ],
               ),
@@ -151,9 +235,16 @@ class ProfileScreen extends StatelessWidget {
             ),
             icon: const Icon(Icons.exit_to_app),
             label: const Text('Keluar Akun'),
-            onPressed: () {},
+            onPressed: () {
+              if (authProvider.isLoggedIn) {
+                _showLogoutConfirmationDialog(context);
+              } else {
+                Fluttertoast.showToast(msg: "Anda belum login.");
+              }
+            },
           ),
         ),
+        const SizedBox(height: 25),
       ],
     );
   }

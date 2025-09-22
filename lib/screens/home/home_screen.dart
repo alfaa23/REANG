@@ -171,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // --- PERUBAHAN: Bagian slider sekarang menggunakan FutureBuilder ---
                     _buildSliderSection(isDarkMode),
                     // -------------------------------------------------------------
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 15),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: GestureDetector(
@@ -360,8 +360,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- WIDGET BARU: Membangun slider dengan FutureBuilder ---
   Widget _buildSliderSection(bool isDarkMode) {
+    // Gunakan rasio 2:1 untuk banner (1080x540, 1920x960, dll.)
+    final double imageAspect = 2.0; // ubah kalau pakai rasio lain
+    final double sliderHeight = MediaQuery.of(context).size.width / imageAspect;
+
     return FutureBuilder<List<SliderModel>>(
       future: _sliderFuture,
       builder: (context, snapshot) {
@@ -374,13 +377,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         final sliders = snapshot.data!;
+
         return Column(
           children: [
             SizedBox(
-              height: 230,
+              height: sliderHeight,
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: null, // Loop tak terbatas
+                itemCount: null, // loop tak terbatas
                 onPageChanged: (index) {
                   setState(() {
                     _currentPageIndex = index;
@@ -398,12 +402,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         double page =
                             _pageController.page ?? _initialPage.toDouble();
                         double value = (page - index).abs();
-                        scale = max(0.85, 1 - value * 0.3);
+                        // Kurangi efek scale sedikit agar tepi gambar tidak terpotong
+                        scale = max(0.93, 1 - value * 0.2);
                       }
                       return Transform.scale(scale: scale, child: child);
                     },
                     child: Container(
-                      ///meperbesar slider
                       margin: const EdgeInsets.symmetric(horizontal: 0.0),
                       child: ClipRRect(
                         borderRadius: const BorderRadius.all(
@@ -411,7 +415,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         child: Image.network(
                           sliders[realIndex].imageUrl,
-                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit
+                              .cover, // aman karena container sesuai aspect
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
                               color: Colors.grey[800],
