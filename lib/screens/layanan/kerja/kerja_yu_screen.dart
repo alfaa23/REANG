@@ -4,6 +4,8 @@ import 'package:reang_app/models/info_kerja_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
+// --- PERUBAHAN: Mengimpor file view GLIK yang baru ---
+import 'package:reang_app/screens/layanan/kerja/glik_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:html_unescape/html_unescape.dart';
@@ -25,11 +27,16 @@ class KerjaYuScreen extends StatefulWidget {
 class _KerjaYuScreenState extends State<KerjaYuScreen> {
   int _mainTab = 0;
   WebViewController? _silelakerjaController;
+  // --- PERUBAHAN: Menambahkan controller dan flag untuk tab GLIK ---
+  WebViewController? _glikController;
   bool _isSilelakerjaInitiated = false;
+  bool _isGlikInitiated = false;
 
+  // --- PERUBAHAN: Menambahkan tab 'GLIK' ---
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
     {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
+    {'label': 'GLIK', 'icon': Icons.public_outlined},
   ];
 
   @override
@@ -38,9 +45,16 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
 
     return WillPopScope(
       onWillPop: () async {
+        // --- PERUBAHAN: Menambahkan logika back untuk WebView GLIK ---
         if (_mainTab == 1 && _silelakerjaController != null) {
           if (await _silelakerjaController!.canGoBack()) {
             await _silelakerjaController!.goBack();
+            return false;
+          }
+        }
+        if (_mainTab == 2 && _glikController != null) {
+          if (await _glikController!.canGoBack()) {
+            await _glikController!.goBack();
             return false;
           }
         }
@@ -81,6 +95,14 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                           },
                         )
                       : Container(),
+                  // --- PERUBAHAN: Menambahkan GlikView ke IndexedStack ---
+                  _isGlikInitiated
+                      ? GlikView(
+                          onWebViewCreated: (controller) {
+                            _glikController = controller;
+                          },
+                        )
+                      : Container(),
                 ],
               ),
             ),
@@ -106,6 +128,10 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                   if (i == 1 && !_isSilelakerjaInitiated) {
                     _isSilelakerjaInitiated = true;
                   }
+                  // --- PERUBAHAN: Menambahkan logika lazy load untuk GLIK ---
+                  if (i == 2 && !_isGlikInitiated) {
+                    _isGlikInitiated = true;
+                  }
                 });
                 FocusManager.instance.primaryFocus?.unfocus();
               },
@@ -116,7 +142,8 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                   color: isSelected
                       ? theme.colorScheme.primary
                       : theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+                  // --- PERUBAHAN: Sudut dibuat lebih melengkung ---
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -556,7 +583,6 @@ class _JobCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- PERUBAHAN: Menghilangkan latar belakang gambar & mempertahankan sudut lengkung ---
               SizedBox(
                 width: 80,
                 height: 80,

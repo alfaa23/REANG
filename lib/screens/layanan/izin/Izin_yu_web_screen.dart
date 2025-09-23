@@ -33,7 +33,7 @@ class _IzinYuWebScreenState extends State<IzinYuWebScreen> {
   final String _mppUrl = 'https://mpp.indramayukab.go.id/';
   bool _isMppInitiated = false; // Flag untuk lazy load
 
-  static const Duration _loadTimeout = Duration(seconds: 10);
+  static const Duration _loadTimeout = Duration(seconds: 20);
   static const Duration _errorDebounce = Duration(milliseconds: 600);
 
   @override
