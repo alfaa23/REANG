@@ -13,6 +13,8 @@ class DumasModel {
   final String status;
   final String? tanggapan;
   final DateTime createdAt;
+  final int? userRating;
+  final String? userComment;
 
   DumasModel({
     required this.id,
@@ -25,6 +27,8 @@ class DumasModel {
     required this.status,
     this.tanggapan,
     required this.createdAt,
+    this.userRating,
+    this.userComment,
   });
 
   // Helper untuk membersihkan deskripsi dari tag HTML
@@ -76,6 +80,7 @@ class DumasModel {
 
   factory DumasModel.fromJson(Map<String, dynamic> json) {
     var unescape = HtmlUnescape();
+
     return DumasModel(
       id: json['id'] ?? 0,
       jenisLaporan: json['jenis_laporan'] ?? 'Tidak ada jenis laporan',
@@ -87,15 +92,17 @@ class DumasModel {
       status: (json['status'] as String?)?.capitalize() ?? 'Menunggu',
       tanggapan: json['tanggapan'],
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      userRating: json['user_rating'],
+      userComment: json['user_comment'],
     );
   }
 }
 
 extension StringExtension on String {
   String capitalize() {
-    if (this.isEmpty) {
+    if (isEmpty) {
       return this;
     }
-    return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
 }

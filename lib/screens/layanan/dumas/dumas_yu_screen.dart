@@ -572,7 +572,10 @@ class _LaporanSayaViewState extends State<_LaporanSayaView> {
                       : const SizedBox.shrink();
                 }
                 final dumas = _myDumasList[index];
-                return _ReportCard(data: dumas);
+                return _ReportCard(
+                  data: dumas,
+                  isMyReport: true, // Beri tanda ini laporan milik user
+                );
               },
             ),
     );
@@ -728,7 +731,9 @@ class _ErrorView extends StatelessWidget {
 
 class _ReportCard extends StatelessWidget {
   final DumasModel data;
-  const _ReportCard({required this.data});
+  final bool isMyReport;
+
+  const _ReportCard({required this.data, this.isMyReport = false});
 
   @override
   Widget build(BuildContext context) {
@@ -743,7 +748,8 @@ class _ReportCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DetailLaporanScreen(dumasId: data.id),
+              builder: (context) =>
+                  DetailLaporanScreen(dumasId: data.id, isMyReport: isMyReport),
             ),
           );
         },

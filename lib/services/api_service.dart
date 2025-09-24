@@ -27,7 +27,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://ad90cd85a5a4.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://2a6f3b7ba53e.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -895,12 +895,18 @@ class ApiService {
   }
 
   // Mengambil detail satu laporan
-  Future<DumasModel> fetchDumasDetail(int id) async {
+  // --- PERBAIKAN KUNCI: Menambahkan parameter token opsional ---
+  Future<DumasModel> fetchDumasDetail(int id, {String? token}) async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/dumas/$id');
+      final response = await _dio.get(
+        '$_baseUrlBackend/dumas/$id',
+        // --- PENAMBAHAN: Mengirim token jika ada ---
+        options: Options(
+          headers: (token != null) ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
       if (response.statusCode == 200) {
-        // --- PERBAIKAN: Langsung membaca dari response.data ---
-        // Tidak perlu lagi mencari kunci 'data' di dalamnya.
+        // Langsung membaca dari response.data
         return DumasModel.fromJson(response.data);
       } else {
         throw Exception('Gagal memuat detail laporan');
@@ -959,6 +965,60 @@ class ApiService {
         throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
       }
       throw Exception('Tidak dapat terhubung ke server.');
+    }
+  }
+
+  // --- FUNGSI BARU: Untuk mengirim rating ---
+  Future<void> postDumasRating({
+    required int dumasId,
+    required double rating,
+    String? comment,
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/dumas/$dumasId/rating',
+        data: {
+          'rating': rating,
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode != 200) {
+        throw Exception(response.data['message'] ?? 'Gagal mengirim ulasan.');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Terjadi kesalahan server.',
+      );
+    }
+  }
+
+  // --- PENAMBAHAN: Fungsi untuk menghapus rating ---
+  Future<void> deleteDumasRating({
+    required int dumasId,
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        '$_baseUrlBackend/dumas/$dumasId/rating',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode != 200) {
+        throw Exception(response.data['message'] ?? 'Gagal menghapus ulasan.');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal menghapus ulasan.');
     }
   }
 }
