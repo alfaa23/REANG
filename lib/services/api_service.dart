@@ -27,7 +27,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://2a6f3b7ba53e.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://c2310d45e7bf.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)

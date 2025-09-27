@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:reang_app/screens/home/panic_hold_screen.dart'; // <-- PENAMBAHAN: Import layar baru
 // import 'package:reang_app/services/api_service.dart'; // Aktifkan jika sudah siap
 
 class PanicButtonWidget extends StatefulWidget {
@@ -74,21 +74,22 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     });
   }
 
-  Future<void> _makePhoneCall(String? phoneNumber) async {
-    if (phoneNumber == null) {
+  // --- PERUBAHAN: Fungsi panggilan langsung ini tidak lagi diperlukan di sini ---
+  // Fungsi ini sekarang ditangani oleh PanicHoldScreen
+  // Future<void> _makePhoneCall(String? phoneNumber) async { ... }
+
+  // --- PENAMBAHAN: Fungsi baru untuk menavigasi ke layar konfirmasi ---
+  void _navigateToHoldScreen(PanicService service) {
+    if (service.phoneNumber.isEmpty) {
       Fluttertoast.showToast(msg: 'Nomor tidak tersedia');
       return;
     }
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        throw 'Tidak dapat melakukan panggilan';
-      }
-    } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PanicHoldScreen(service: service),
+      ),
+    );
   }
 
   @override
@@ -103,13 +104,29 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
             -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Ambulans',
             Icons.local_hospital_outlined,
-            () => _makePhoneCall(_nomorAmbulans),
+            // --- PERUBAHAN: Panggil fungsi navigasi ---
+            () => _navigateToHoldScreen(
+              PanicService(
+                name: 'Panggilan Ambulans',
+                phoneNumber: _nomorAmbulans ?? '119',
+                info:
+                    'Fitur ini akan menghubungkan Anda ke layanan darurat Ambulans. Pastikan Anda gunakan dalam kondisi darurat saja.',
+              ),
+            ),
           ),
           _buildOption(
             -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Panggilan Darurat',
             Icons.phone_in_talk_outlined,
-            () => _makePhoneCall(_nomorDarurat),
+            // --- PERUBAHAN: Panggil fungsi navigasi ---
+            () => _navigateToHoldScreen(
+              PanicService(
+                name: 'Panggilan Darurat',
+                phoneNumber: _nomorDarurat ?? '112',
+                info:
+                    'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
+              ),
+            ),
           ),
           SizedBox(
             width: 50, // PERUBAHAN: Ukuran tombol diubah menjadi 50
