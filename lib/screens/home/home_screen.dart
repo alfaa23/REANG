@@ -21,6 +21,7 @@ import 'package:reang_app/screens/home/widgets/info_banner_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_fitur_widget.dart';
 import 'package:reang_app/screens/home/widgets/rekomendasi_berita_widget.dart';
 import 'package:reang_app/screens/home/widgets/panic_button_widget.dart';
+import 'package:reang_app/screens/home/widgets/rekomendasi_plesir_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Key _rekomendasiFiturKey = UniqueKey();
   Key _infoBannerKey = UniqueKey();
   Key _rekomendasiBeritaKey = UniqueKey();
+  Key _rekomendasiPlesirKey = UniqueKey();
 
   @override
   void initState() {
@@ -110,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _rekomendasiFiturKey = UniqueKey();
       _infoBannerKey = UniqueKey();
       _rekomendasiBeritaKey = UniqueKey();
+      _rekomendasiPlesirKey = UniqueKey();
     });
     await _sliderFuture;
   }
@@ -347,6 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     InfoBannerWidget(key: _infoBannerKey),
                     const SizedBox(height: 32),
                     RekomendasiBeritaWidget(key: _rekomendasiBeritaKey),
+                    const SizedBox(height: 5),
+                    RekomendasiPlesirWidget(key: _rekomendasiPlesirKey),
 
                     // =============================================================
                     const SizedBox(height: 24),

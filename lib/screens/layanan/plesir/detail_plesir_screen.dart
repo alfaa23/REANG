@@ -9,6 +9,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:reang_app/screens/auth/login_screen.dart'; // PENAMBAHAN: Import LoginScreen
 
 class DetailPlesirScreen extends StatefulWidget {
   final PlesirModel destinationData;
@@ -360,18 +361,20 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
             children: [
               Row(
                 children: List.generate(5, (index) {
-                  if (ratingAverage >= index + 1)
+                  if (ratingAverage >= index + 1) {
                     return const Icon(
                       Icons.star_rounded,
                       color: Colors.amber,
                       size: 22,
                     );
-                  if (ratingAverage > index)
+                  }
+                  if (ratingAverage > index) {
                     return const Icon(
                       Icons.star_half_rounded,
                       color: Colors.amber,
                       size: 22,
                     );
+                  }
                   return const Icon(
                     Icons.star_border_rounded,
                     color: Colors.amber,
@@ -451,10 +454,20 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
     );
   }
 
-  void _showAddReviewSheet(AuthProvider authProvider) {
+  // --- PERBAIKAN: Fungsi diubah menjadi async dan menangani navigasi ---
+  void _showAddReviewSheet(AuthProvider authProvider) async {
     if (!authProvider.isLoggedIn) {
-      Fluttertoast.showToast(msg: "Anda harus login untuk memberi ulasan.");
-      // TODO: Arahkan ke halaman Login
+      // Arahkan ke LoginScreen
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(popOnSuccess: true),
+        ),
+      );
+      // --- PERUBAHAN: Jika login berhasil, muat ulang data ulasan, JANGAN buka sheet ---
+      if (result == true && mounted) {
+        _loadInitialReviews();
+      }
       return;
     }
 

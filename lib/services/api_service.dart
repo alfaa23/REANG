@@ -854,6 +854,25 @@ class ApiService {
     }
   }
 
+  // --- 2. FUNGSI BARU: Untuk mengambil rekomendasi plesir ---
+  Future<List<PlesirModel>> fetchTopPlesir() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/plesir/top');
+      if (response.statusCode == 200) {
+        // API mengembalikan list langsung, jadi kita mapping dari sana
+        final List<PlesirModel> list = (response.data as List)
+            .map((item) => PlesirModel.fromJson(item))
+            .toList();
+        return list;
+      } else {
+        throw Exception('Gagal memuat rekomendasi plesir');
+      }
+    } catch (e) {
+      // Melempar exception agar bisa ditangkap oleh FutureBuilder
+      throw Exception('Terjadi error saat mengambil rekomendasi: $e');
+    }
+  }
+
   // =======================================================================
   // API DUMAS (BARU)
   // =======================================================================

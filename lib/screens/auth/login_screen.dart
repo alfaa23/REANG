@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset('assets/wongreang.webp', height: 150),
+                Image.asset('assets/wongreang.webp', height: 75),
                 const SizedBox(height: 2),
                 const Text(
                   'selamat datang di Reang',
