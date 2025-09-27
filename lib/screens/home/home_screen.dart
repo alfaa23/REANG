@@ -463,32 +463,62 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Widget placeholder untuk slider saat loading atau error
   Widget _buildSliderPlaceholder({bool isError = false}) {
-    return Container(
-      height: 230,
-      margin: const EdgeInsets.fromLTRB(16, 40, 16, 12), // Sesuaikan margin
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: isError
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.cloud_off,
-                    color: Theme.of(context).hintColor,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Gagal memuat banner',
-                    style: TextStyle(color: Theme.of(context).hintColor),
-                  ),
-                ],
-              )
-            : const CircularProgressIndicator(),
-      ),
+    // 1. Hitung tinggi slider sama persis seperti di _buildSliderSection
+    final double imageAspect = 2.0;
+    final double sliderHeight = MediaQuery.of(context).size.width / imageAspect;
+
+    // 2. Gunakan Column agar strukturnya identik dengan _buildSliderSection
+    //    Ini untuk memastikan ruang untuk "dots indicator" juga dialokasikan.
+    return Column(
+      children: [
+        SizedBox(
+          height: sliderHeight,
+          child: Padding(
+            // 3. Gunakan padding yang sesuai dengan viewportFraction
+            //    viewportFraction: 0.95 -> 1.0 - 0.95 = 0.05
+            //    Padding horizontalnya adalah 5% dari lebar layar / 2
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width * 0.025,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: isError
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.cloud_off,
+                            color: Theme.of(context).hintColor,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Gagal memuat banner',
+                            style: TextStyle(
+                              color: Theme.of(context).hintColor,
+                            ),
+                          ),
+                        ],
+                      )
+                    : const CircularProgressIndicator(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 4. Tambahkan placeholder untuk 'dots indicator' agar total tingginya sama
+        Container(
+          width: 8.0 * 5 + 4.0 * 8, // simulasi lebar dots
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.transparent, // tidak perlu terlihat
+          ),
+        ),
+      ],
     );
   }
 }
