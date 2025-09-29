@@ -18,6 +18,7 @@ import 'package:reang_app/models/plesir_model.dart';
 import 'package:reang_app/models/ulasan_response_model.dart';
 import 'package:reang_app/models/pagination_response_model.dart';
 import 'package:reang_app/models/dumas_model.dart';
+import 'package:reang_app/models/banner_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -27,7 +28,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://c2310d45e7bf.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://0587b8929d23.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -543,7 +544,7 @@ class ApiService {
   // =======================================================================
   Future<List<SliderModel>> fetchSliders() async {
     try {
-      final response = await _dio.get('$_baseUrlBackend/sliders');
+      final response = await _dio.get('$_baseUrlBackend/slider');
       // Cek apakah response sukses dan memiliki data
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<SliderModel> sliderList = (response.data['data'] as List)
@@ -555,6 +556,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil sliders: $e');
+    }
+  }
+
+  // =======================================================================
+  // API BANNER (UNTUK INFO BANNER WIDGET)
+  // =======================================================================
+  Future<List<BannerModel>> fetchBanner() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/banner');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<BannerModel> list = (response.data['data'] as List)
+            .map((item) => BannerModel.fromJson(item))
+            .toList();
+        return list;
+      } else {
+        throw Exception('Gagal memuat banner dari API');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil banner: $e');
     }
   }
 
@@ -877,11 +897,11 @@ class ApiService {
   // API DUMAS (BARU)
   // =======================================================================
 
-  // PERBAIKAN: Fungsi ini sekarang bisa menangani semua laporan dan laporan milik user
+  // Fungsi ini mengambil daftar laporan (sudah benar)
   Future<PaginationResponseModel<DumasModel>> fetchDumasPaginated({
     required int page,
-    int? userId, // Parameter opsional untuk filter
-    String? token, // Token dibutuhkan untuk mengambil laporan milik user
+    int? userId,
+    String? token,
   }) async {
     try {
       final Map<String, dynamic> queryParams = {'page': page};
@@ -890,7 +910,7 @@ class ApiService {
       }
 
       final response = await _dio.get(
-        '$_baseUrlBackend/dumas', // Selalu menggunakan endpoint utama
+        '$_baseUrlBackend/dumas',
         queryParameters: queryParams,
         options: Options(
           headers: (token != null) ? {'Authorization': 'Bearer $token'} : null,
@@ -913,19 +933,16 @@ class ApiService {
     }
   }
 
-  // Mengambil detail satu laporan
-  // --- PERBAIKAN KUNCI: Menambahkan parameter token opsional ---
+  // Fungsi ini mengambil detail laporan (sudah benar)
   Future<DumasModel> fetchDumasDetail(int id, {String? token}) async {
     try {
       final response = await _dio.get(
         '$_baseUrlBackend/dumas/$id',
-        // --- PENAMBAHAN: Mengirim token jika ada ---
         options: Options(
           headers: (token != null) ? {'Authorization': 'Bearer $token'} : null,
         ),
       );
       if (response.statusCode == 200) {
-        // Langsung membaca dari response.data
         return DumasModel.fromJson(response.data);
       } else {
         throw Exception('Gagal memuat detail laporan');
@@ -935,14 +952,29 @@ class ApiService {
     }
   }
 
-  // Mengirim laporan baru (dengan foto)
+  // --- PENAMBAHAN: Fungsi baru untuk mengambil daftar kategori Dumas ---
+  Future<List<String>> fetchDumasKategori() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/dumas/kategori');
+      if (response.statusCode == 200) {
+        // API mengembalikan daftar string secara langsung
+        final List<String> kategoriList = List<String>.from(response.data);
+        return kategoriList;
+      } else {
+        throw Exception('Gagal memuat kategori Dumas');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil kategori Dumas: $e');
+    }
+  }
+
+  // Fungsi ini mengirim laporan baru (sudah benar)
   Future<Map<String, dynamic>> postDumas({
     required Map<String, String> data,
     File? image,
     required String token,
   }) async {
     try {
-      // Menggunakan FormData untuk mengirim file dan teks
       final formData = FormData.fromMap(data);
       if (image != null) {
         formData.files.add(
@@ -987,7 +1019,7 @@ class ApiService {
     }
   }
 
-  // --- FUNGSI BARU: Untuk mengirim rating ---
+  // --- Fungsi untuk rating (sudah benar) ---
   Future<void> postDumasRating({
     required int dumasId,
     required double rating,
@@ -1018,7 +1050,6 @@ class ApiService {
     }
   }
 
-  // --- PENAMBAHAN: Fungsi untuk menghapus rating ---
   Future<void> deleteDumasRating({
     required int dumasId,
     required String token,

@@ -97,6 +97,7 @@ flutter:
     - assets/logo.png
     - assets/wongreang.webp
     - assets/coba.jpg
+    - assets/konsultasi.webp
     #icon aplikasi
     - assets/icons/info_yu.png
     - assets/icons/sehat_yu.png
