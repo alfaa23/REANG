@@ -21,6 +21,9 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
 
   String? _nomorDarurat;
   String? _nomorAmbulans;
+  // --- PENAMBAHAN: Variabel untuk nomor baru ---
+  String? _nomorPolisi;
+  String? _nomorPemadam;
 
   @override
   void initState() {
@@ -46,6 +49,9 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
       await Future.delayed(const Duration(seconds: 2));
       _nomorDarurat = "112";
       _nomorAmbulans = "119";
+      // --- PENAMBAHAN: Mengisi nomor untuk layanan baru ---
+      _nomorPolisi = "110";
+      _nomorPemadam = "113";
     } catch (e) {
       // Handle error jika gagal mengambil data
     } finally {
@@ -100,6 +106,34 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
       child: Stack(
         alignment: Alignment.bottomRight,
         children: [
+          // --- PENAMBAHAN: Tombol Pemadam Kebakaran ---
+          _buildOption(
+            -230.0, // Posisi paling atas
+            'Pemadam',
+            Icons.local_fire_department_outlined,
+            () => _navigateToHoldScreen(
+              PanicService(
+                name: 'Panggilan Pemadam Kebakaran',
+                phoneNumber: _nomorPemadam ?? '113',
+                info:
+                    'Fitur ini akan menghubungkan Anda ke layanan Pemadam Kebakaran. Pastikan Anda gunakan dalam kondisi darurat saja.',
+              ),
+            ),
+          ),
+          // --- PENAMBAHAN: Tombol Polisi ---
+          _buildOption(
+            -175.0, // Posisi kedua
+            'Polisi',
+            Icons.local_police_outlined,
+            () => _navigateToHoldScreen(
+              PanicService(
+                name: 'Panggilan Polisi',
+                phoneNumber: _nomorPolisi ?? '110',
+                info:
+                    'Fitur ini akan menghubungkan Anda ke layanan Polisi. Gunakan dengan bijak.',
+              ),
+            ),
+          ),
           _buildOption(
             -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Ambulans',

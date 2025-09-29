@@ -10,32 +10,32 @@ class DetailBannerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool isDarkMode = theme.brightness == Brightness.dark;
-
-    // Latar belakang disesuaikan dengan tema untuk kontras yang lebih baik
-    final Color backgroundColor = isDarkMode
-        ? Colors.black
-        : const Color(0xFF1A202C);
-    final Color textColor = Colors.white.withOpacity(0.9);
-    final Color hintColor = Colors.white.withOpacity(0.6);
+    // Dihapus: Variabel warna yang hardcoded agar bisa adaptif
+    // final bool isDarkMode = theme.brightness == Brightness.dark;
+    // final Color backgroundColor = isDarkMode ? Colors.black : const Color(0xFF1A202C);
+    // final Color textColor = Colors.white.withOpacity(0.9);
+    // final Color hintColor = Colors.white.withOpacity(0.6);
 
     final String content =
         bannerData.deskripsi ??
         "<p>Konten detail untuk banner ini belum tersedia. Silakan cek kembali nanti untuk informasi lebih lanjut mengenai <b>${bannerData.judul}</b>.</p>";
 
     return Scaffold(
-      // --- PERBAIKAN: Latar belakang diubah agar sesuai contoh ---
-      backgroundColor: backgroundColor,
+      // --- PERBAIKAN: Latar belakang sekarang adaptif sesuai tema ---
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // --- PERBAIKAN: AppBar disederhanakan ---
+          // --- PERBAIKAN: AppBar disesuaikan dengan tema ---
           SliverAppBar(
             pinned: true,
-            backgroundColor: backgroundColor,
+            backgroundColor:
+                theme.scaffoldBackgroundColor, // Menggunakan warna dari tema
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(
+                Icons.arrow_back,
+              ), // Warna ikon akan mengikuti tema AppBar
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -51,7 +51,8 @@ class DetailBannerScreen extends StatelessWidget {
                       'id_ID',
                     ).format(bannerData.createdAt),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: hintColor,
+                      color:
+                          theme.hintColor, // Menggunakan warna hint dari tema
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -59,7 +60,7 @@ class DetailBannerScreen extends StatelessWidget {
                     bannerData.judul,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white, // Teks judul dibuat putih
+                      // Dihapus: color: Colors.white agar adaptif
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -88,8 +89,8 @@ class DetailBannerScreen extends StatelessWidget {
                     content,
                     textStyle: theme.textTheme.bodyLarge?.copyWith(
                       height: 1.7,
-                      color: textColor, // Teks konten disesuaikan
                       fontSize: 16,
+                      // Dihapus: color: textColor agar adaptif
                     ),
                   ),
                   const SizedBox(height: 30),
