@@ -8,7 +8,10 @@ import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 
 class FormLaporanScreen extends StatefulWidget {
-  const FormLaporanScreen({Key? key}) : super(key: key);
+  // --- PENAMBAHAN: Parameter untuk menerima gambar dari alur kamera ---
+  final File? initialImage;
+
+  const FormLaporanScreen({Key? key, this.initialImage}) : super(key: key);
 
   @override
   State<FormLaporanScreen> createState() => _FormLaporanScreenState();
@@ -21,7 +24,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   final _lokasiController = TextEditingController();
   final _deskripsiController = TextEditingController();
 
-  // --- PERBAIKAN: Kategori sekarang diambil dari API ---
   List<String> _kategoriList = [];
   bool _isKategoriLoading = true;
   String? _selectedKategori;
@@ -39,6 +41,10 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   @override
   void initState() {
     super.initState();
+    // --- PENAMBAHAN: Set gambar awal jika ada ---
+    if (widget.initialImage != null) {
+      _pickedImage = widget.initialImage;
+    }
     // Memuat daftar kategori saat halaman dibuka
     _fetchKategori();
   }
@@ -188,7 +194,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         'nama_kategori': _selectedKategori!,
         'lokasi_laporan': _lokasiController.text,
         'deskripsi': _deskripsiController.text,
-        // --- PERBAIKAN: Mengirim teks pernyataan lengkap ---
         'pernyataan': _isStatementChecked
             ? 'Saya menyatakan bahwa laporan yang saya berikan adalah benar dan dapat dipertanggungjawabkan.'
             : '',
@@ -205,17 +210,13 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         backgroundColor: Colors.green,
       );
 
-      // Pastikan keyboard tertutup sebelum navigasi hasil submit
       _unfocusGlobal();
 
-      // --- PERBAIKAN: Logika navigasi diubah agar lebih aman ---
-      // Kembali ke halaman Dumas-Yu dan langsung buka tab "Laporan Saya"
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (context) => const DumasYuHomeScreen(bukaLaporanSaya: true),
         ),
-        (Route<dynamic> route) =>
-            route.isFirst, // Hanya sisakan route pertama (HomeScreen)
+        (Route<dynamic> route) => route.isFirst,
       );
     } catch (e) {
       Fluttertoast.showToast(
@@ -242,7 +243,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     super.dispose();
   }
 
-  // Pastikan keyboard tertutup saat halaman dinavigasi/pergi
   @override
   void deactivate() {
     _unfocusGlobal();
@@ -282,7 +282,6 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         title: const Text('Form Laporan Aduan'),
         centerTitle: false,
       ),
-      // Bungkus seluruh area form dengan GestureDetector untuk menangani ketuk di luar TextField
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTapDown: _handleTapDown,
@@ -315,13 +314,11 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
               const SizedBox(height: 24),
               Text('Kategori', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
-              // --- PERBAIKAN: Dropdown tidak lagi menampilkan loading spinner ---
               Container(
                 decoration: boxDecoration,
                 child: DropdownMenu<String>(
                   initialSelection: _selectedKategori,
                   onSelected: (String? value) {
-                    // tutup keyboard ketika memilih kategori
                     _unfocusGlobal();
                     setState(() {
                       _selectedKategori = value;

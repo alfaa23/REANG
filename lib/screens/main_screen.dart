@@ -1,8 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:reang_app/screens/home/home_screen.dart';
 import 'package:reang_app/screens/profile/profile_screen.dart';
 import 'package:reang_app/screens/notifikasi/notifikasi_screen.dart';
 import 'package:reang_app/screens/ecomerce/umkm_screen.dart';
+import 'package:reang_app/screens/camera/camera_screen.dart';
+import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
+import 'package:reang_app/screens/auth/login_screen.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -96,7 +102,7 @@ class _MainScreenState extends State<MainScreen> {
               _buildBottomNavItem(
                 icon: Icons.shopping_bag_outlined,
                 selectedIcon: Icons.shopping_bag,
-                label: 'UMKM',
+                label: 'UMKM', ////heheheh
                 index: 1,
               ),
               const Expanded(child: SizedBox()), // Placeholder FAB
@@ -117,7 +123,40 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        // --- PERBAIKAN: Menambahkan logika pengecekan login ---
+        onPressed: () async {
+          // 1. Ambil AuthProvider
+          final authProvider = Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          );
+
+          // 2. Cek apakah pengguna sudah login
+          if (authProvider.isLoggedIn) {
+            // Jika sudah login, lanjutkan ke alur kamera
+            final imageFile = await Navigator.push<File>(
+              context,
+              MaterialPageRoute(builder: (context) => const CameraScreen()),
+            );
+
+            // Jika ada file gambar yang dikembalikan, buka FormLaporanScreen
+            if (imageFile != null && mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      FormLaporanScreen(initialImage: imageFile),
+                ),
+              );
+            }
+          } else {
+            // Jika belum login, arahkan ke halaman login
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          }
+        },
         backgroundColor: const Color(0xFFF08519),
         child: const Icon(Icons.add_a_photo_outlined, color: Colors.white),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'cart_screen.dart';
 
 class DetailProdukScreen extends StatefulWidget {
@@ -11,11 +12,11 @@ class DetailProdukScreen extends StatefulWidget {
 }
 
 class _DetailProdukScreenState extends State<DetailProdukScreen> {
-  // --- PENAMBAHAN: State untuk mengelola jumlah dan ukuran ---
+  // State untuk mengelola jumlah dan ukuran
   int _quantity = 1;
   String _selectedSize = 'M'; // Ukuran default yang terpilih
 
-  // --- Data dummy untuk produk serupa (bisa diganti dengan data API nanti) ---
+  // Data dummy untuk produk serupa
   final List<Map<String, dynamic>> similarProducts = const [
     {
       'title': 'Batik Modern',
@@ -75,20 +76,19 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.share, color: theme.colorScheme.onSurface),
-            onPressed: () {},
-          ),
-          IconButton(
             icon: Icon(
-              Icons.favorite_border,
+              Icons.shopping_cart_outlined,
               color: theme.colorScheme.onSurface,
             ),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartScreen()),
+              );
+            },
           ),
         ],
       ),
-
-      // Tombol Aksi di bagian bawah layar
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
@@ -97,7 +97,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         ),
         child: _buildActionButtons(context, theme),
       ),
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,23 +159,24 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          data['discount'] ?? '0% OFF',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onErrorContainer,
-                            fontWeight: FontWeight.bold,
+                      if (data['discount_percent'] != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '-${data['discount_percent']}%',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -289,6 +289,10 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
 
   Widget _buildSizeChip(String label, {bool isSelected = false}) {
     final theme = Theme.of(context);
+    // --- PERBAIKAN: Menentukan warna teks dan ceklis secara eksplisit berdasarkan tema ---
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final Color selectedContentColor = isDarkMode ? Colors.black : Colors.white;
+
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: ChoiceChip(
@@ -301,9 +305,11 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         },
         selectedColor: theme.colorScheme.primary,
         backgroundColor: theme.colorScheme.surface,
+        checkmarkColor:
+            selectedContentColor, // Gunakan warna yang sudah ditentukan
         labelStyle: TextStyle(
           color: isSelected
-              ? theme.colorScheme.onPrimary
+              ? selectedContentColor // Gunakan warna yang sudah ditentukan
               : theme.colorScheme.onSurface,
           fontWeight: FontWeight.bold,
         ),
@@ -452,10 +458,13 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         Expanded(
           child: ElevatedButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Produk ditambahkan ke keranjang!'),
-                ),
+              Fluttertoast.showToast(
+                msg: "Produk ditambahkan ke keranjang!",
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: Colors.black.withOpacity(0.7),
+                textColor: Colors.white,
+                fontSize: 16.0,
               );
             },
             style: ElevatedButton.styleFrom(

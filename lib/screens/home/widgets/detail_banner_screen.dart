@@ -10,31 +10,48 @@ class DetailBannerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
 
-    // Mengambil konten HTML dari deskripsi banner
+    // Latar belakang disesuaikan dengan tema untuk kontras yang lebih baik
+    final Color backgroundColor = isDarkMode
+        ? Colors.black
+        : const Color(0xFF1A202C);
+    final Color textColor = Colors.white.withOpacity(0.9);
+    final Color hintColor = Colors.white.withOpacity(0.6);
+
     final String content =
         bannerData.deskripsi ??
         "<p>Konten detail untuk banner ini belum tersedia. Silakan cek kembali nanti untuk informasi lebih lanjut mengenai <b>${bannerData.judul}</b>.</p>";
 
     return Scaffold(
+      // --- PERBAIKAN: Latar belakang diubah agar sesuai contoh ---
+      backgroundColor: backgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildSliverAppBar(context, theme, bannerData),
+          // --- PERBAIKAN: AppBar disederhanakan ---
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: backgroundColor,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    // Format tanggal agar lebih mudah dibaca, contoh: "29 September 2025"
                     DateFormat(
                       'd MMMM y',
                       'id_ID',
                     ).format(bannerData.createdAt),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.hintColor,
+                      color: hintColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -42,73 +59,45 @@ class DetailBannerScreen extends StatelessWidget {
                     bannerData.judul,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: Colors.white, // Teks judul dibuat putih
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Menampilkan deskripsi dari HTML
+                  const SizedBox(height: 24),
+                  // --- PERBAIKAN: Gambar sekarang menjadi bagian dari konten ---
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: Image.network(
+                      bannerData.imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => Container(
+                        height: 200,
+                        color: theme.colorScheme.surface,
+                        child: Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 48,
+                            color: theme.hintColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   HtmlWidget(
                     content,
-                    textStyle: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
+                    textStyle: theme.textTheme.bodyLarge?.copyWith(
+                      height: 1.7,
+                      color: textColor, // Teks konten disesuaikan
+                      fontSize: 16,
+                    ),
                   ),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSliverAppBar(
-    BuildContext context,
-    ThemeData theme,
-    BannerModel data,
-  ) {
-    return SliverAppBar(
-      expandedHeight: 250.0,
-      pinned: true,
-      stretch: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      // Tombol kembali yang adaptif terhadap tema
-      leading: _buildBackButton(context, theme),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Image.network(
-          data.imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (c, e, s) => Container(
-            color: theme.colorScheme.surface,
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                size: 48,
-                color: theme.hintColor,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Widget untuk tombol kembali yang warnanya menyesuaikan dengan tema
-  Widget _buildBackButton(BuildContext context, ThemeData theme) {
-    final bool isDarkMode = theme.brightness == Brightness.dark;
-    // Jika tema gelap, ikonnya hitam pekat. Jika tema terang, ikonnya putih.
-    final Color iconColor = isDarkMode ? Colors.black : Colors.white;
-    // Latar belakang tombol dibuat semi-transparan
-    final Color bgColor = isDarkMode
-        ? Colors.white.withOpacity(0.8)
-        : Colors.black.withOpacity(0.5);
-
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: CircleAvatar(
-        backgroundColor: bgColor,
-        child: IconButton(
-          icon: Icon(Icons.arrow_back, color: iconColor),
-          onPressed: () => Navigator.of(context).pop(),
-          tooltip: 'Kembali',
-        ),
       ),
     );
   }

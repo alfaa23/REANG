@@ -49,6 +49,10 @@
 <string>Aplikasi ini membutuhkan akses lokasi untuk menampilkan posisi Anda di peta.</string>
 <key>NSLocationAlwaysUsageDescription</key>
 <string>Aplikasi ini membutuhkan akses lokasi untuk menampilkan posisi Anda di peta.</string>
+<key>NSCameraUsageDescription</key>
+      <string>Aplikasi ini memerlukan akses ke kamera untuk mengambil foto bukti laporan.</string>
+      <key>NSPhotoLibraryUsageDescription</key>
+      <string>Aplikasi ini memerlukan akses ke galeri untuk memilih foto bukti laporan.</string>
 
 </dict>
 </plist>

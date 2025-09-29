@@ -18,43 +18,42 @@ class _UmkmScreenState extends State<UmkmScreen> {
     {'name': 'Elektronik', 'icon': Icons.devices_other_outlined},
   ];
 
-  // Data Dummy untuk Produk
+  // Data Dummy untuk Produk (contoh nama baju sudah dimasukkan)
   final List<Map<String, dynamic>> products = const [
     {
       'image': 'assets/placeholder.png',
-      'title': 'iPhone 15 Pro Max',
-      'subtitle': 'Garansi Resmi 256GB - Warna Natural Titanium',
+      'title': 'Kaos Polos Unisex Katun Combed 30s',
+      'subtitle': 'Kaos polos nyaman, bahan combed, cocok sehari-hari',
       'rating': 4.9,
       'sold': 1234,
-      'price_final': 'Rp 18.999.000',
+      'price_final': 'Rp 149.000',
       'location': 'Jakarta Pusat',
     },
     {
       'image': 'assets/placeholder.png',
-      'title': 'Galaxy S24 Ultra',
-      'subtitle':
-          'Samsung Galaxy S24 Ultra 5G AI Smartphone Garansi Resmi SEIN',
+      'title': 'Hoodie Oversize Fleece Tebal',
+      'subtitle': 'Hoodie nyaman dengan fleece tebal, cocok cuaca dingin',
       'rating': 4.8,
       'sold': 856,
-      'price_final': 'Rp 16.999.000',
+      'price_final': 'Rp 249.000',
       'location': 'Surabaya',
     },
     {
       'image': 'assets/placeholder.png',
-      'title': 'MacBook Air M3',
-      'subtitle': 'Chip Apple M3 13 inch 8/256GB',
+      'title': 'Kemeja Batik Slimfit Modern',
+      'subtitle': 'Kemeja batik slimfit, bahan adem, cocok acara formal',
       'rating': 4.9,
       'sold': 432,
-      'price_final': 'Rp 15.999.000',
+      'price_final': 'Rp 199.000',
       'location': 'Bandung',
     },
     {
       'image': 'assets/placeholder.png',
       'title': 'Kemeja Pria Lengan Panjang',
-      'subtitle': 'Kemeja Kantor Polos Bahan Katun Premium',
+      'subtitle': 'Kemeja kantor polos, bahan katun premium',
       'rating': 4.6,
       'sold': 2341,
-      'price_final': 'Rp 149.000',
+      'price_final': 'Rp 179.000',
       'location': 'Yogyakarta',
     },
   ];
@@ -64,6 +63,21 @@ class _UmkmScreenState extends State<UmkmScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Hitung childAspectRatio dinamis supaya tinggi kartu lebih besar/tetap stabil di semua layar
+    final screenWidth = MediaQuery.of(context).size.width;
+    const horizontalPadding = 16.0 * 2; // padding kiri + kanan dari parent
+    const crossAxisSpacing = 12.0; // jarak antar kolom
+    final itemWidth = (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
+    // multiplier >1 => kartu lebih tinggi. 1.8 artinya tinggi = width * 1.8
+    const heightMultiplier = 1.8;
+    final childAspectRatio =
+        itemWidth / (itemWidth * heightMultiplier); // ~0.555
+
+    // bottom padding includes safe area + keyboard insets
+    final bottomInset =
+        MediaQuery.of(context).padding.bottom +
+        MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -92,7 +106,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
+      // SafeArea untuk menghindari area notch/gesture bar
+      body: SafeArea(
+        bottom: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -117,7 +133,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
                             : theme.colorScheme.primary,
                       ),
                       selected: _selectedCategoryIndex == index,
-                      // --- PERBAIKAN: Menghilangkan ikon centang ---
+                      // Menghilangkan ikon centang
                       showCheckmark: false,
                       onSelected: (bool selected) {
                         setState(() {
@@ -170,36 +186,40 @@ class _UmkmScreenState extends State<UmkmScreen> {
             ),
 
             // --- Grid Produk (Product Card) ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: products.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12.0,
-                  mainAxisSpacing: 12.0,
-                  // --- PERBAIKAN: Aspect ratio diubah agar kartu lebih panjang ---
-                  childAspectRatio: 0.62,
+            // Gunakan Expanded agar GridView dapat menggulir dan tidak memicu overflow
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: GridView.builder(
+                  // beri padding bottom untuk menghindari gesture bar / tombol layar + keyboard
+                  padding: EdgeInsets.only(top: 0, bottom: bottomInset + 16),
+                  itemCount: products.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12.0,
+                    mainAxisSpacing: 12.0,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                DetailProdukScreen(product: products[index]),
+                          ),
+                        );
+                      },
+                      child: ProductCard(product: products[index]),
+                    );
+                  },
                 ),
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              DetailProdukScreen(product: products[index]),
-                        ),
-                      );
-                    },
-                    child: ProductCard(product: products[index]),
-                  );
-                },
               ),
             ),
-            const SizedBox(height: 20),
+
+            // Jeda bawah supaya tidak terlalu mepet
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -208,7 +228,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
 }
 
 // =============================================================================
-// WIDGET KARTU PRODUK (SUDAH DIPERBARUI)
+// WIDGET KARTU PRODUK (DIPANJANGKAN TINGGI NYA)
 // =============================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
@@ -232,15 +252,12 @@ class ProductCard extends StatelessWidget {
           Stack(
             children: [
               AspectRatio(
-                aspectRatio: 1, // Membuat gambar menjadi persegi
+                aspectRatio: 1, // gambar persegi
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: theme
-                        .colorScheme
-                        .surfaceContainer, // Warna latar belakang yang lebih jelas
+                    color: theme.colorScheme.surfaceContainer,
                     boxShadow: [
-                      // Menambahkan shadow halus di dalam kartu
                       BoxShadow(
                         color: theme.shadowColor.withOpacity(0.05),
                         spreadRadius: 1,
@@ -256,11 +273,6 @@ class ProductCard extends StatelessWidget {
                       size: 40,
                     ),
                   ),
-                  // Jika sudah ada URL gambar, ganti dengan Image.network
-                  // child: Image.network(
-                  //   product['image']!,
-                  //   fit: BoxFit.cover,
-                  // ),
                 ),
               ),
               Positioned(
@@ -288,6 +300,7 @@ class ProductCard extends StatelessWidget {
           ),
 
           // --- DETAIL PRODUK ---
+          // Gunakan Expanded agar layout lebih stabil dan tidak overflow
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
@@ -296,7 +309,7 @@ class ProductCard extends StatelessWidget {
                 mainAxisAlignment:
                     MainAxisAlignment.spaceBetween, // Distribusi ruang
                 children: [
-                  // Judul Produk
+                  // Judul Produk (subtitle dipakai sebagai deskripsi singkat)
                   Text(
                     product['subtitle']!,
                     style: theme.textTheme.bodyMedium?.copyWith(

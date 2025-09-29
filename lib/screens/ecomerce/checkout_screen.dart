@@ -32,6 +32,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     const double bottomBarHeight = 72.0;
 
     return Scaffold(
+      // --- PERBAIKAN 1: Mencegah tombol bawah terdorong oleh keyboard ---
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         elevation: 1,
         backgroundColor: theme.cardColor,
@@ -49,34 +51,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: bottomBarHeight),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AddressCard(theme: theme),
-                  const SizedBox(height: 18),
-                  StoreCard(theme: theme, products: cartItems),
-                  const SizedBox(height: 18),
-                  NoteCard(theme: theme),
-                  const SizedBox(height: 18),
-                  CostBreakdownCard(theme: theme),
-                ],
+      // --- PERBAIKAN 2: Menambahkan GestureDetector untuk menutup keyboard ---
+      body: GestureDetector(
+        onTap: () {
+          // Menutup keyboard saat area kosong di-tap
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: bottomBarHeight),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AddressCard(theme: theme),
+                    const SizedBox(height: 18),
+                    StoreCard(theme: theme, products: cartItems),
+                    const SizedBox(height: 18),
+                    NoteCard(theme: theme),
+                    const SizedBox(height: 18),
+                    CostBreakdownCard(theme: theme),
+                  ],
+                ),
               ),
             ),
-          ),
-          // --- Tombol Aksi di Bawah ---
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildActionButtons(context, theme),
-          ),
-        ],
+            // Tombol Aksi di Bawah
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildActionButtons(context, theme),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -258,14 +267,14 @@ class ProductRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product['title'] ?? 'Nama Produk', // PERBAIKAN
+                  product['title'] ?? 'Nama Produk',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  product['variant'] ?? '', // PERBAIKAN
+                  product['variant'] ?? '',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.hintColor,
                   ),
@@ -274,7 +283,7 @@ class ProductRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      product['price'] ?? 'Rp 0', // PERBAIKAN
+                      product['price'] ?? 'Rp 0',
                       style: TextStyle(
                         color: theme.colorScheme.secondary,
                         fontWeight: FontWeight.w700,
@@ -282,7 +291,7 @@ class ProductRow extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      product['qty'] ?? 'x0', // PERBAIKAN
+                      product['qty'] ?? 'x0',
                       style: TextStyle(color: theme.hintColor),
                     ),
                   ],
@@ -292,7 +301,7 @@ class ProductRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            product['total'] ?? 'Rp 0', // PERBAIKAN
+            product['total'] ?? 'Rp 0',
             style: theme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
