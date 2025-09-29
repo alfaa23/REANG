@@ -13,13 +13,27 @@ class UserModel {
     required this.noKtp,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  // --- FUNGSI BARU: Mengubah objek User menjadi Map ---
+  // Ini diperlukan oleh AuthProvider untuk menyimpan data ke SharedPreferences
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'no_ktp': noKtp,
+    };
+  }
+
+  // --- PERBAIKAN: Mengganti nama 'fromJson' menjadi 'fromMap' agar sesuai dengan AuthProvider ---
+  // Fungsi ini digunakan untuk membuat objek User dari data yang disimpan
+  factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
-      noKtp: json['no_ktp'] ?? '',
+      id: map['id'] ?? 0,
+      name: map['name'] ?? '',
+      email: map['email'] ?? '',
+      phone: map['phone'] ?? '',
+      noKtp: map['no_ktp'] ?? '',
     );
   }
 }

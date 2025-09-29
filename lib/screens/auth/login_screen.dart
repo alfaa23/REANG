@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const storage = FlutterSecureStorage();
         await storage.write(key: 'auth_token', value: token);
 
-        final user = UserModel.fromJson(userData);
+        final user = UserModel.fromMap(userData);
         if (mounted) {
           Provider.of<AuthProvider>(
             context,

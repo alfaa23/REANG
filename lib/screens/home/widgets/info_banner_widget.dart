@@ -59,10 +59,7 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
           return _buildSliderPlaceholder(); // Tampilkan placeholder saat loading
         }
         if (snapshot.hasError) {
-          return _buildSliderPlaceholder(
-            isError: true,
-            errorMessage: snapshot.error.toString(),
-          );
+          return _buildSliderPlaceholder(isError: true);
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink(); // Sembunyikan jika data kosong
@@ -184,7 +181,7 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
     );
   }
 
-  Widget _buildSliderPlaceholder({bool isError = false, String? errorMessage}) {
+  Widget _buildSliderPlaceholder({bool isError = false}) {
     return Container(
       height: 150,
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -194,13 +191,17 @@ class _InfoBannerWidgetState extends State<InfoBannerWidget> {
       ),
       child: Center(
         child: isError
-            ? Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'Gagal memuat banner:\n$errorMessage',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Theme.of(context).hintColor),
-                ),
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Gagal memuat banner',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Theme.of(context).hintColor),
+                  ),
+                ],
               )
             : const CircularProgressIndicator(),
       ),

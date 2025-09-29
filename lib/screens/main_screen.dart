@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:reang_app/screens/home/home_screen.dart';
 import 'package:reang_app/screens/profile/profile_screen.dart';
 import 'package:reang_app/screens/notifikasi/notifikasi_screen.dart';
-import 'package:reang_app/screens/aktivitas/aktivitas_screen.dart';
+import 'package:reang_app/screens/ecomerce/umkm_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,7 +16,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _pages = <Widget>[
     const HomeScreen(),
-    const AktivitasScreen(),
+    const UmkmScreen(),
     const NotifikasiScreen(),
     const ProfileScreen(),
   ];
@@ -94,9 +94,9 @@ class _MainScreenState extends State<MainScreen> {
                 index: 0,
               ),
               _buildBottomNavItem(
-                icon: Icons.article_outlined,
-                selectedIcon: Icons.article,
-                label: 'Aktivitas',
+                icon: Icons.shopping_bag_outlined,
+                selectedIcon: Icons.shopping_bag,
+                label: 'UMKM',
                 index: 1,
               ),
               const Expanded(child: SizedBox()), // Placeholder FAB

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/date_symbol_data_local.dart'; // <-- 1. TAMBAHKAN IMPORT INI
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/app/theme/app_theme.dart';
 import 'package:reang_app/providers/theme_provider.dart';
@@ -7,20 +7,23 @@ import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/splash_screen.dart';
 
-// 2. UBAH FUNGSI main MENJADI ASYNC
-void main() async {
-  // 3. TAMBAHKAN DUA BARIS INI
+// --- PERBAIKAN: Fungsi main diubah untuk memuat sesi sebelum aplikasi berjalan ---
+Future<void> main() async {
+  // Pastikan Flutter sudah siap sebelum menjalankan kode async
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
-  // AKHIR BAGIAN TAMBAHAN
 
-  // --- PERUBAHAN: Menggunakan MultiProvider ---
+  // --- PENAMBAHAN: Inisialisasi AuthProvider dan muat sesi dari penyimpanan aman ---
+  final authProvider = AuthProvider();
+  await authProvider.loadUserFromStorage();
+  // --- AKHIR PENAMBAHAN ---
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        // Menambahkan AuthProvider agar bisa diakses di seluruh aplikasi
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        // --- PERBAIKAN: Menggunakan .value karena authProvider sudah dibuat ---
+        ChangeNotifierProvider.value(value: authProvider),
       ],
       child: const MyApp(),
     ),
@@ -40,7 +43,6 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          // Halaman home sekarang memanggil SplashScreen dari file yang di-import mundur dulu
           home: const SplashScreen(),
         );
       },
