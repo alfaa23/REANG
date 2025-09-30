@@ -28,8 +28,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend =
-      'https://zara-gruffiest-silas.ngrok-free.dev/api';
+  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)

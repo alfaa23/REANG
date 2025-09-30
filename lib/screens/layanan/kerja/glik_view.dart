@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -17,6 +18,9 @@ class _GlikViewState extends State<GlikView> {
   String _errorMessage = '';
 
   final String _url = 'https://glik.jabarprov.go.id/index.php';
+
+  Timer? _loadTimeout;
+  static const Duration _timeoutDuration = Duration(seconds: 20);
 
   @override
   void initState() {
@@ -42,16 +46,28 @@ class _GlikViewState extends State<GlikView> {
                 _loadingProgress = 0;
               });
             }
+            _startTimeout();
           },
-          onWebResourceError: (WebResourceError error) {
-            // Error ini akan menangkap jika ada masalah jaringan atau sumber daya
-            // dan menampilkan halaman error.
+          onPageFinished: (url) {
+            _cancelTimeout();
             if (mounted) {
               setState(() {
-                _hasError = true;
-                _errorMessage =
-                    'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                _loadingProgress = 100;
               });
+            }
+          },
+          onWebResourceError: (WebResourceError error) {
+            _cancelTimeout();
+            // Error ini akan menangkap jika ada masalah jaringan atau sumber daya
+            // dan menampilkan halaman error.
+            if (error.isForMainFrame == true) {
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                  _errorMessage =
+                      'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                });
+              }
             }
           },
         ),
@@ -60,6 +76,31 @@ class _GlikViewState extends State<GlikView> {
 
     // Memberikan controller ke parent widget agar bisa handle tombol 'back'
     widget.onWebViewCreated(_controller);
+  }
+
+  void _startTimeout() {
+    _cancelTimeout();
+    _loadTimeout = Timer(_timeoutDuration, () {
+      if (mounted && _loadingProgress < 100 && !_hasError) {
+        setState(() {
+          _hasError = true;
+          _errorMessage =
+              'Gagal memuat halaman. Periksa koneksi internet Anda.';
+        });
+      }
+    });
+  }
+
+  void _cancelTimeout() {
+    if (_loadTimeout?.isActive ?? false) {
+      _loadTimeout?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelTimeout();
+    super.dispose();
   }
 
   @override

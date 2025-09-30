@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:reang_app/screens/home/panic_hold_screen.dart'; // <-- PENAMBAHAN: Import layar baru
 // import 'package:reang_app/services/api_service.dart'; // Aktifkan jika sudah siap
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class PanicButtonWidget extends StatefulWidget {
   const PanicButtonWidget({super.key});
@@ -137,7 +138,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
           _buildOption(
             -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Ambulans',
-            Icons.local_hospital_outlined,
+            FontAwesomeIcons.ambulance,
             // --- PERUBAHAN: Panggil fungsi navigasi ---
             () => _navigateToHoldScreen(
               PanicService(
@@ -151,7 +152,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
           _buildOption(
             -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'PMI',
-            Icons.phone_in_talk_outlined,
+            Icons.local_hospital_outlined,
             // --- PERUBAHAN: Panggil fungsi navigasi ---
             () => _navigateToHoldScreen(
               PanicService(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -18,6 +19,9 @@ class _UpdateHargaPanganScreenState extends State<UpdateHargaPanganScreen> {
 
   final String _url =
       'https://dashboard.jabarprov.go.id/id/dashboard-static/pangan';
+
+  Timer? _loadTimeout;
+  static const Duration _timeoutDuration = Duration(seconds: 20);
 
   @override
   void initState() {
@@ -43,26 +47,61 @@ class _UpdateHargaPanganScreenState extends State<UpdateHargaPanganScreen> {
                 _loadingProgress = 0;
               });
             }
+            _startTimeout();
           },
-          // PERUBAHAN: Menambahkan onWebResourceError untuk menangkap error
-          onWebResourceError: (WebResourceError error) {
+          onPageFinished: (url) {
+            _cancelTimeout();
             if (mounted) {
               setState(() {
-                _hasError = true;
-                _errorMessage =
-                    'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                _loadingProgress = 100;
               });
             }
           },
-          onNavigationRequest: (request) {
-            if (request.url.startsWith('https://dashboard.jabarprov.go.id/')) {
-              return NavigationDecision.navigate;
+          // PERUBAHAN: Menambahkan onWebResourceError untuk menangkap error
+          onWebResourceError: (WebResourceError error) {
+            _cancelTimeout();
+            if (error.isForMainFrame == true) {
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                  _errorMessage =
+                      'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                });
+              }
             }
-            return NavigationDecision.prevent;
+          },
+          onNavigationRequest: (request) {
+            // Izinkan navigasi ke mana saja
+            return NavigationDecision.navigate;
           },
         ),
       )
       ..loadRequest(Uri.parse(_url));
+  }
+
+  void _startTimeout() {
+    _cancelTimeout();
+    _loadTimeout = Timer(_timeoutDuration, () {
+      if (mounted && _loadingProgress < 100 && !_hasError) {
+        setState(() {
+          _hasError = true;
+          _errorMessage =
+              'Gagal memuat halaman. Periksa koneksi internet Anda.';
+        });
+      }
+    });
+  }
+
+  void _cancelTimeout() {
+    if (_loadTimeout?.isActive ?? false) {
+      _loadTimeout?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelTimeout();
+    super.dispose();
   }
 
   @override
@@ -80,9 +119,22 @@ class _UpdateHargaPanganScreenState extends State<UpdateHargaPanganScreen> {
             : null,
       ),
       // PERUBAHAN: Tampilkan error view jika _hasError true, jika tidak, tampilkan WebView
-      body: _hasError
-          ? _buildErrorView(context, _errorMessage)
-          : WebViewWidget(controller: _controller),
+      body: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) async {
+          if (didPop) return;
+          if (await _controller.canGoBack()) {
+            await _controller.goBack();
+          } else {
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+          }
+        },
+        child: _hasError
+            ? _buildErrorView(context, _errorMessage)
+            : WebViewWidget(controller: _controller),
+      ),
     );
   }
 

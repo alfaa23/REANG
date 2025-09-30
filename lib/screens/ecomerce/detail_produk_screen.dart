@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'cart_screen.dart';
+import 'checkout_screen.dart';
 
 class DetailProdukScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -504,7 +505,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const CartScreen()),
+                MaterialPageRoute(builder: (context) => const CheckoutScreen()),
               );
             },
             style: ElevatedButton.styleFrom(

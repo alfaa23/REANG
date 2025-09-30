@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -19,6 +20,9 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
 
   final String _url = 'https://cekpajak.indramayukab.go.id/portlet.php';
 
+  Timer? _loadTimeout;
+  static const Duration _timeoutDuration = Duration(seconds: 20);
+
   @override
   void initState() {
     super.initState();
@@ -37,21 +41,26 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
                 _hasError = false; // Reset error saat mencoba memuat ulang
               });
             }
+            _startTimeout();
           },
           onPageFinished: (url) {
+            _cancelTimeout();
             if (mounted) {
               setState(() => _isLoading = false);
             }
           },
           // PERUBAHAN: Menambahkan onWebResourceError untuk menangkap error
           onWebResourceError: (WebResourceError error) {
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-                _hasError = true;
-                _errorMessage =
-                    'Gagal memuat halaman. Periksa koneksi internet Anda.';
-              });
+            _cancelTimeout();
+            if (error.isForMainFrame == true) {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _hasError = true;
+                  _errorMessage =
+                      'Gagal memuat halaman. Periksa koneksi internet Anda.';
+                });
+              }
             }
           },
           onNavigationRequest: (request) {
@@ -67,18 +76,56 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
       ..loadRequest(Uri.parse(_url));
   }
 
+  void _startTimeout() {
+    _cancelTimeout();
+    _loadTimeout = Timer(_timeoutDuration, () {
+      if (mounted && _isLoading && !_hasError) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage =
+              'Gagal memuat halaman. Periksa koneksi internet Anda.';
+        });
+      }
+    });
+  }
+
+  void _cancelTimeout() {
+    if (_loadTimeout?.isActive ?? false) {
+      _loadTimeout?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelTimeout();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     // PERUBAHAN: Jika ada error, tampilkan view error. Jika tidak, tampilkan WebView.
-    if (_hasError) {
-      return _buildErrorView(context, _errorMessage);
-    }
-
-    return Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading) const Center(child: CircularProgressIndicator()),
-      ],
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (await _controller.canGoBack()) {
+          await _controller.goBack();
+        } else {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: _hasError
+          ? _buildErrorView(context, _errorMessage)
+          : Stack(
+              children: [
+                WebViewWidget(controller: _controller),
+                if (_isLoading)
+                  const Center(child: CircularProgressIndicator()),
+              ],
+            ),
     );
   }
 
