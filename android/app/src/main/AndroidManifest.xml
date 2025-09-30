@@ -6,7 +6,7 @@
 <uses-permission android:name="android.permission.CAMERA" />
 
     <application
-        android:label="reang_app"
+        android:label="Wongreang"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">

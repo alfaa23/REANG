@@ -9,7 +9,8 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final bool popOnSuccess;
+  const RegisterScreen({super.key, this.popOnSuccess = false});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -84,7 +85,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _ktpController.dispose();
     _phoneController.dispose();
-    _emailController.dispose();
     _passwordConfirmationController.dispose();
     super.dispose();
   }
@@ -125,7 +125,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final userData = response['user'];
 
       if (token != null && userData != null) {
-        // --- PERBAIKAN: Menyimpan token dan data pengguna ---
         const storage = FlutterSecureStorage();
         await storage.write(key: 'auth_token', value: token);
 
@@ -136,19 +135,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
             listen: false,
           ).setUser(user, token);
         }
-        // ---------------------------------------------
 
         Fluttertoast.showToast(
           msg: "Pendaftaran berhasil!",
           backgroundColor: Colors.green,
         );
 
-        // --- PERUBAHAN: Navigasi ke MainScreen setelah registrasi ---
         if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-            (Route<dynamic> route) => false,
-          );
+          if (widget.popOnSuccess) {
+            Navigator.of(context).pop(true);
+          } else {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+              (Route<dynamic> route) => false,
+            );
+          }
         }
       } else {
         throw Exception("Token atau data pengguna tidak ditemukan.");
@@ -168,13 +169,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onBackground),
           onPressed: () {
             if (_currentPage == 0) {
               Navigator.of(context).pop();
@@ -200,11 +202,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 },
                 children: [
                   _buildStep(
+                    context: context,
                     formKey: _nameFormKey,
                     title: 'Siapa nama lengkap kamu?',
                     child: TextFormField(
                       controller: _nameController,
                       decoration: _buildInputDecoration(
+                        context: context,
                         hintText: 'Nama lengkap',
                       ),
                       validator: (value) {
@@ -217,6 +221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isStepValid: _isNameValid,
                   ),
                   _buildStep(
+                    context: context,
                     formKey: _ktpFormKey,
                     title: 'Masukkan nomor KTP kamu',
                     child: TextFormField(
@@ -226,7 +231,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(16),
                       ],
-                      decoration: _buildInputDecoration(hintText: 'Nomor KTP'),
+                      decoration: _buildInputDecoration(
+                        context: context,
+                        hintText: 'Nomor KTP',
+                      ),
                       validator: (value) {
                         if (value == null || value.length != 16) {
                           return 'Nomor KTP harus 16 digit';
@@ -238,6 +246,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isStepValid: _isKtpValid,
                   ),
                   _buildStep(
+                    context: context,
                     formKey: _phoneFormKey,
                     title: 'Berapa nomor telepon kamu?',
                     child: TextFormField(
@@ -245,6 +254,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: _buildInputDecoration(
+                        context: context,
                         hintText: 'Nomor Telepon',
                       ),
                       validator: (value) {
@@ -257,12 +267,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isStepValid: _isPhoneValid,
                   ),
                   _buildStep(
+                    context: context,
                     formKey: _emailFormKey,
                     title: 'Alamat email kamu?',
                     child: TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: _buildInputDecoration(hintText: 'Email'),
+                      decoration: _buildInputDecoration(
+                        context: context,
+                        hintText: 'Email',
+                      ),
                       validator: (value) {
                         if (value == null ||
                             !value.contains('@') ||
@@ -275,6 +289,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isStepValid: _isEmailValid,
                   ),
                   _buildStep(
+                    context: context,
                     formKey: _passwordFormKey,
                     title: 'Buat password kamu',
                     child: Column(
@@ -283,13 +298,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _passwordController,
                           obscureText: !_isPasswordVisible,
                           decoration: _buildInputDecoration(
+                            context: context,
                             hintText: 'Password',
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _isPasswordVisible
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
-                                color: Colors.grey[600],
+                                color: theme.hintColor,
                               ),
                               onPressed: () => setState(
                                 () => _isPasswordVisible = !_isPasswordVisible,
@@ -308,13 +324,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _passwordConfirmationController,
                           obscureText: !_isPasswordConfirmationVisible,
                           decoration: _buildInputDecoration(
+                            context: context,
                             hintText: 'Konfirmasi password',
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _isPasswordConfirmationVisible
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
-                                color: Colors.grey[600],
+                                color: theme.hintColor,
                               ),
                               onPressed: () => setState(
                                 () => _isPasswordConfirmationVisible =
@@ -345,12 +362,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildStep({
+    required BuildContext context,
     required GlobalKey<FormState> formKey,
     required String title,
     required Widget child,
     required bool isStepValid,
     String? infoText,
   }) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Form(
@@ -359,22 +378,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 48),
-            Text(title, style: _titleTextStyle()),
+            Text(title, style: _titleTextStyle(theme)),
             const SizedBox(height: 24),
             child,
             if (infoText != null) ...[
               const SizedBox(height: 16),
-              Text(infoText, style: _infoTextStyle()),
+              Text(infoText, style: _infoTextStyle(theme)),
             ],
             const Spacer(),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _nextPage,
-                style: _buttonStyle(
-                  isActive: isStepValid,
-                  activeColor: Colors.blue,
-                ),
+                style: _buttonStyle(context: context, isActive: isStepValid),
                 child: Text('Lanjutkan', style: _buttonTextStyle()),
               ),
             ),
@@ -386,17 +402,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildTermsStep() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 32),
-          Text('Syarat & ketentuan', style: _titleTextStyle()),
+          Text('Syarat & ketentuan', style: _titleTextStyle(theme)),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'selamat datang di REANG',
-            style: TextStyle(fontSize: 16, color: Colors.black54),
+            style: TextStyle(
+              fontSize: 16,
+              color: theme.colorScheme.onBackground.withOpacity(0.7),
+            ),
           ),
           const SizedBox(height: 16),
           const Divider(),
@@ -407,16 +427,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Text(
                   'Dengan mendaftar dan menggunakan aplikasi Reang, Anda setuju untuk mematuhi semua syarat dan ketentuan yang berlaku.\n\n'
                   '1. Penggunaan Akun:\n'
-                  '   - Anda bertanggung jawab penuh atas keamanan dan kerahasiaan akun dan password Anda.\n'
-                  '   - Setiap aktivitas yang terjadi melalui akun Anda adalah tanggung jawab Anda.\n\n'
+                  '   - Anda bertanggung jawab penuh atas keamanan dan kerahasiaan akun dan password Anda.\n'
+                  '   - Setiap aktivitas yang terjadi melalui akun Anda adalah tanggung jawab Anda.\n\n'
                   '2. Konten Pengguna:\n'
-                  '   - Anda tidak diperkenankan untuk mengunggah konten yang melanggar hukum, bersifat SARA, pornografi, atau ujaran kebencian.\n'
-                  '   - Reang berhak untuk menghapus konten atau menonaktifkan akun yang melanggar ketentuan ini tanpa pemberitahuan sebelumnya.\n\n'
+                  '   - Anda tidak diperkenankan untuk mengunggah konten yang melanggar hukum, bersifat SARA, pornografi, atau ujaran kebencian.\n'
+                  '   - Reang berhak untuk menghapus konten atau menonaktifkan akun yang melanggar ketentuan ini tanpa pemberitahuan sebelumnya.\n\n'
                   '3. Privasi:\n'
-                  '   - Kami menghargai privasi Anda. Data pribadi Anda akan dikelola sesuai dengan Kebijakan Privasi kami.\n\n'
+                  '   - Kami menghargai privasi Anda. Data pribadi Anda akan dikelola sesuai dengan Kebijakan Privasi kami.\n\n'
                   'Dengan melanjutkan, Anda mengonfirmasi bahwa Anda telah membaca, memahami, dan menyetujui seluruh Syarat & Ketentuan aplikasi Reang.',
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: theme.hintColor,
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -434,7 +454,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onChanged: (bool? value) {
                     setState(() => _isTermsAgreed = value ?? false);
                   },
-                  activeColor: Colors.blue,
+                  activeColor: Colors.blue.shade800, // Diubah
                 ),
                 const Expanded(
                   child: Text(
@@ -451,10 +471,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onPressed: (_isTermsAgreed && !_isSubmitting)
                   ? _submitRegistration
                   : null,
-              style: _buttonStyle(
-                isActive: _isTermsAgreed,
-                activeColor: Colors.blue,
-              ),
+              style: _buttonStyle(context: context, isActive: _isTermsAgreed),
               child: _isSubmitting
                   ? const SizedBox(
                       height: 24,
@@ -474,13 +491,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   InputDecoration _buildInputDecoration({
+    required BuildContext context,
     required String hintText,
     Widget? suffixIcon,
   }) {
+    final theme = Theme.of(context);
     return InputDecoration(
       hintText: hintText,
       filled: true,
-      fillColor: Colors.grey[200],
+      fillColor: theme.colorScheme.surfaceContainerHighest,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -490,25 +509,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  TextStyle _titleTextStyle() {
-    return const TextStyle(
+  TextStyle _titleTextStyle(ThemeData theme) {
+    return TextStyle(
       fontSize: 26,
       fontWeight: FontWeight.bold,
       fontFamily: 'Montserrat',
+      color: theme.colorScheme.onBackground,
     );
   }
 
-  TextStyle _infoTextStyle() {
-    return TextStyle(color: Colors.grey[600], fontSize: 14);
+  TextStyle _infoTextStyle(ThemeData theme) {
+    return TextStyle(color: theme.hintColor, fontSize: 14);
   }
 
   ButtonStyle _buttonStyle({
+    required BuildContext context,
     bool isActive = true,
-    Color activeColor = const Color(0xFFC4C4C4),
   }) {
+    final theme = Theme.of(context);
     return ElevatedButton.styleFrom(
-      backgroundColor: isActive ? activeColor : Colors.grey[300],
-      foregroundColor: Colors.white,
+      backgroundColor: isActive
+          ? Colors.blue.shade800
+          : theme.disabledColor, // Diubah
+      foregroundColor: Colors.white, // Diubah agar selalu putih
       padding: const EdgeInsets.symmetric(vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 0,
@@ -516,7 +539,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   TextStyle _buttonTextStyle() {
-    return const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+    return const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+    );
   }
 }
 
@@ -528,6 +555,7 @@ class _ProgressIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(totalSteps, (index) {
@@ -536,7 +564,9 @@ class _ProgressIndicator extends StatelessWidget {
           height: 4,
           margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
-            color: index < currentStep ? Colors.blue : Colors.grey[300],
+            color: index < currentStep
+                ? Colors.blue.shade800
+                : theme.dividerColor, // Diubah
             borderRadius: BorderRadius.circular(2),
           ),
         );

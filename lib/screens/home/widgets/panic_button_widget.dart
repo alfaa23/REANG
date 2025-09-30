@@ -19,7 +19,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
   bool _isOpen = false;
   bool _isLoading = true;
 
-  String? _nomorDarurat;
+  String? _PMI;
   String? _nomorAmbulans;
   // --- PENAMBAHAN: Variabel untuk nomor baru ---
   String? _nomorPolisi;
@@ -47,7 +47,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
       // _nomorDarurat = data['darurat'];
       // _nomorAmbulans = data['ambulans'];
       await Future.delayed(const Duration(seconds: 2));
-      _nomorDarurat = "112";
+      _PMI = "085133468780";
       _nomorAmbulans = "119";
       // --- PENAMBAHAN: Mengisi nomor untuk layanan baru ---
       _nomorPolisi = "110";
@@ -150,13 +150,13 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
           ),
           _buildOption(
             -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
-            'Panggilan Darurat',
+            'PMI',
             Icons.phone_in_talk_outlined,
             // --- PERUBAHAN: Panggil fungsi navigasi ---
             () => _navigateToHoldScreen(
               PanicService(
                 name: 'Panggilan Darurat',
-                phoneNumber: _nomorDarurat ?? '112',
+                phoneNumber: _PMI ?? '085133468780',
                 info:
                     'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
               ),

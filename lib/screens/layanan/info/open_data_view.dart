@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -15,7 +16,11 @@ class _SatuDataViewState extends State<SatuDataView> {
   bool _isLoading = true;
   bool _hasError = false;
 
-  final String _url = 'https://1data.indramayukab.go.id/';
+  final String _url =
+      'https://opendata.indramayukab.go.id/dataset/jumlah-penduduk-di-kabupaten-indramayu';
+
+  Timer? _loadTimeout;
+  static const Duration _timeoutDuration = Duration(seconds: 20);
 
   @override
   void initState() {
@@ -36,8 +41,10 @@ class _SatuDataViewState extends State<SatuDataView> {
                     false; // Reset status error setiap kali mencoba memuat
               });
             }
+            _startTimeout();
           },
           onPageFinished: (url) {
+            _cancelTimeout();
             // Cek jika masih loading, berarti terjadi timeout atau error lain
             if (mounted && !_hasError) {
               setState(() {
@@ -46,6 +53,7 @@ class _SatuDataViewState extends State<SatuDataView> {
             }
           },
           onWebResourceError: (error) {
+            _cancelTimeout();
             // Hanya tampilkan error jika halaman utama yang gagal dimuat,
             // bukan aset seperti gambar atau iklan.
             if (error.isForMainFrame ?? true) {
@@ -59,6 +67,7 @@ class _SatuDataViewState extends State<SatuDataView> {
           },
           // --- TAMBAHAN: Menangkap error HTTP dari server ---
           onHttpError: (HttpResponseError error) {
+            _cancelTimeout();
             if (mounted) {
               setState(() {
                 _isLoading = false;
@@ -74,6 +83,24 @@ class _SatuDataViewState extends State<SatuDataView> {
     widget.onControllerCreated(_controller);
   }
 
+  void _startTimeout() {
+    _cancelTimeout();
+    _loadTimeout = Timer(_timeoutDuration, () {
+      if (mounted && _isLoading) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+    });
+  }
+
+  void _cancelTimeout() {
+    if (_loadTimeout?.isActive ?? false) {
+      _loadTimeout?.cancel();
+    }
+  }
+
   void _retryLoading() {
     setState(() {
       _isLoading = true;
@@ -81,6 +108,12 @@ class _SatuDataViewState extends State<SatuDataView> {
     });
     // Memuat ulang request dari awal untuk penanganan error yang lebih baik
     _controller.loadRequest(Uri.parse(_url));
+  }
+
+  @override
+  void dispose() {
+    _cancelTimeout();
+    super.dispose();
   }
 
   @override

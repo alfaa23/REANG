@@ -102,14 +102,31 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             // --- 1. Gambar Produk (Placeholder) ---
-            Container(
+            SizedBox(
               height: 300,
-              color: theme.colorScheme.surfaceContainerHighest,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.image,
-                size: 100,
-                color: theme.hintColor.withOpacity(0.5),
+              width: double.infinity,
+              child: Hero(
+                tag:
+                    widget.product['title'] ??
+                    widget.product['image'] ??
+                    'produk-${widget.product.hashCode}',
+                child: Image.asset(
+                  widget.product['image'] ?? 'assets/placeholder.png',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.broken_image,
+                        size: 72,
+                        color: theme.hintColor.withOpacity(0.5),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
 

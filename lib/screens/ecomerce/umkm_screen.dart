@@ -21,7 +21,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   // Data Dummy untuk Produk (contoh nama baju sudah dimasukkan)
   final List<Map<String, dynamic>> products = const [
     {
-      'image': 'assets/placeholder.png',
+      'image': 'assets/baju.webp',
       'title': 'Kaos Polos Unisex Katun Combed 30s',
       'subtitle': 'Kaos polos nyaman, bahan combed, cocok sehari-hari',
       'rating': 4.9,
@@ -30,7 +30,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'location': 'Jakarta Pusat',
     },
     {
-      'image': 'assets/placeholder.png',
+      'image': 'assets/baju.webp',
       'title': 'Hoodie Oversize Fleece Tebal',
       'subtitle': 'Hoodie nyaman dengan fleece tebal, cocok cuaca dingin',
       'rating': 4.8,
@@ -39,7 +39,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'location': 'Surabaya',
     },
     {
-      'image': 'assets/placeholder.png',
+      'image': 'assets/baju.webp',
       'title': 'Kemeja Batik Slimfit Modern',
       'subtitle': 'Kemeja batik slimfit, bahan adem, cocok acara formal',
       'rating': 4.9,
@@ -48,7 +48,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'location': 'Bandung',
     },
     {
-      'image': 'assets/placeholder.png',
+      'image': 'assets/baju.webp',
       'title': 'Kemeja Pria Lengan Panjang',
       'subtitle': 'Kemeja kantor polos, bahan katun premium',
       'rating': 4.6,
@@ -249,32 +249,40 @@ class ProductCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           // --- GAMBAR PRODUK DAN TOMBOL TAMBAH ---
+          // Ganti bagian Stack di ProductCard dengan kode ini:
           Stack(
             children: [
               AspectRatio(
-                aspectRatio: 1, // gambar persegi
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainer,
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.shadowColor.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.image,
-                      color: theme.hintColor.withOpacity(0.7),
-                      size: 40,
-                    ),
+                aspectRatio: 1,
+                child: Hero(
+                  tag:
+                      product['title'] ??
+                      product['image'] ??
+                      'produk-${product.hashCode}',
+                  child: Image.asset(
+                    product['image'] ?? 'assets/placeholder.png',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        child: Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Theme.of(context).hintColor.withOpacity(0.7),
+                            size: 36,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
+
+              // tombol tambah tetap pakai Positioned seperti sebelumnya
               Positioned(
                 bottom: 8,
                 right: 8,

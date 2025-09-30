@@ -6,7 +6,7 @@ import 'package:reang_app/screens/layanan/info/detail_berita_screen.dart';
 import 'package:reang_app/screens/layanan/info/cctv_screen.dart';
 import 'package:reang_app/screens/layanan/info/jdih_screen.dart';
 // PERUBAHAN: Import file view baru
-import 'package:reang_app/screens/layanan/info/satu_data_view.dart';
+import 'package:reang_app/screens/layanan/info/open_data_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class InfoYuScreen extends StatefulWidget {
@@ -32,7 +32,7 @@ class _InfoYuScreenState extends State<InfoYuScreen> {
     {'label': 'Berita', 'icon': Icons.newspaper},
     {'label': 'CCTV', 'icon': Icons.videocam},
     {'label': 'JDIH', 'icon': Icons.balance},
-    {'label': 'Satu Data', 'icon': Icons.dataset_outlined},
+    {'label': 'Open Data', 'icon': Icons.dataset_outlined},
   ];
 
   @override

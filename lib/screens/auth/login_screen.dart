@@ -9,14 +9,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 class LoginScreen extends StatefulWidget {
-  // --- TAMBAHAN: Parameter baru untuk mengontrol navigasi ---
   final bool popOnSuccess;
 
-  const LoginScreen({
-    super.key,
-    this.popOnSuccess =
-        false, // Defaultnya false, agar perilaku lama tidak berubah
-  });
+  const LoginScreen({super.key, this.popOnSuccess = false});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -77,12 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (mounted) {
-          // --- PERBAIKAN: Logika navigasi cerdas ---
           if (widget.popOnSuccess) {
-            // Jika dipanggil dari Dumas, kembali ke Dumas dengan sinyal sukses
             Navigator.pop(context, true);
           } else {
-            // Perilaku default: pergi ke halaman utama
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -108,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Sisa kode tampilan login_screen.dart tidak ada yang berubah)
+    final theme = Theme.of(context);
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -196,11 +188,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () {
                       // TODO: lupa password
                     },
-                    child: const Text(
+                    child: Text(
                       'lupa password?',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.black54,
+                        // --- PERBAIKAN: Warna teks adaptif ---
+                        color: theme.hintColor,
                       ),
                     ),
                   ),
@@ -209,7 +202,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _performLogin,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF212121),
+                    // --- PERBAIKAN: Warna tombol diubah ---
+                    backgroundColor: Colors.blue.shade800,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
@@ -237,7 +231,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
+                            builder: (context) => RegisterScreen(
+                              popOnSuccess: widget.popOnSuccess,
+                            ),
                           ),
                         );
                       },
