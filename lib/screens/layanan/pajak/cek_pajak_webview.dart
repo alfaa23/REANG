@@ -109,12 +109,8 @@ class _CekPajakWebViewState extends State<CekPajakWebView> {
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (await _controller.canGoBack()) {
-          await _controller.goBack();
-        } else {
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
+        if (mounted) {
+          Navigator.of(context).pop();
         }
       },
       child: _hasError
