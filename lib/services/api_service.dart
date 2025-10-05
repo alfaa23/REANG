@@ -28,7 +28,8 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
+  final String _baseUrlBackend =
+      'https://zara-gruffiest-silas.ngrok-free.dev/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -718,6 +719,38 @@ class ApiService {
     } catch (e) {
       // Menangani error tak terduga lainnya
       throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+    }
+  }
+
+  // =======================================================================
+  // --- BAGIAN OTENTIKASI (DIPERBARUI) --- buat chek token masih berlaku tidak ini
+  // =======================================================================
+
+  /// Memvalidasi token ke endpoint /check-token.
+  /// Mengembalikan `true` jika token valid (status 200),
+  /// dan `false` jika tidak valid atau terjadi error.
+  Future<bool> isTokenValid(String token) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/check-token', // <-- MENGGUNAKAN ENDPOINT ANDA
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      // Jika server merespons dengan 200 OK, token dianggap valid.
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      // Jika ada error (seperti 401 Unauthorized), token dianggap tidak valid.
+      if (e.response?.statusCode == 401) {
+        print('Validasi gagal: Token tidak valid atau kedaluwarsa.');
+      } else {
+        print('Validasi gagal: Tidak dapat terhubung ke server. Error: $e');
+      }
+      return false;
     }
   }
 

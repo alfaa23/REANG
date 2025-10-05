@@ -98,6 +98,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_currentPage == 4) isValid = _passwordFormKey.currentState!.validate();
 
     if (isValid) {
+      // --- TAMBAHKAN BARIS INI UNTUK MENUTUP KEYBOARD ---
+      FocusScope.of(context).unfocus();
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.ease,
@@ -126,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (token != null && userData != null) {
         const storage = FlutterSecureStorage();
-        await storage.write(key: 'auth_token', value: token);
+        await storage.write(key: 'user_token', value: token);
 
         final user = UserModel.fromMap(userData);
         if (mounted) {
@@ -142,9 +144,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
 
         if (mounted) {
+          // --- KEMBALIKAN BLOK INI SEPERTI SEMULA ---
           if (widget.popOnSuccess) {
+            // Kirim sinyal 'true' bahwa registrasi sukses saat kembali
             Navigator.of(context).pop(true);
           } else {
+            // Alur normal: bersihkan semua dan ke MainScreen
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (context) => const MainScreen()),
               (Route<dynamic> route) => false,

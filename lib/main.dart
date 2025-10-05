@@ -3,7 +3,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/app/theme/app_theme.dart';
 import 'package:reang_app/providers/theme_provider.dart';
-// --- TAMBAHAN BARU: Import AuthProvider ---
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/splash_screen.dart';
 
@@ -14,8 +13,7 @@ Future<void> main() async {
   await initializeDateFormatting('id_ID', null);
 
   // --- PENAMBAHAN: Inisialisasi AuthProvider dan muat sesi dari penyimpanan aman ---
-  final authProvider = AuthProvider();
-  await authProvider.loadUserFromStorage();
+
   // --- AKHIR PENAMBAHAN ---
 
   runApp(
@@ -23,7 +21,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         // --- PERBAIKAN: Menggunakan .value karena authProvider sudah dibuat ---
-        ChangeNotifierProvider.value(value: authProvider),
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
       ],
       child: const MyApp(),
     ),

@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (token != null && userData != null) {
         const storage = FlutterSecureStorage();
-        await storage.write(key: 'auth_token', value: token);
+        await storage.write(key: 'user_token', value: token);
 
         final user = UserModel.fromMap(userData);
         if (mounted) {
@@ -227,8 +227,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text('Belum punya akun? '),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => RegisterScreen(
@@ -236,7 +236,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         );
+
+                        if (result == true && mounted) {
+                          Navigator.of(context).pop(true);
+                        }
                       },
+                      // --- TAMBAHKAN KEMBALI BAGIAN INI ---
                       child: const Text(
                         'Daftar di sini',
                         style: TextStyle(
@@ -244,6 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.blue,
                         ),
                       ),
+                      // ------------------------------------
                     ),
                   ],
                 ),
