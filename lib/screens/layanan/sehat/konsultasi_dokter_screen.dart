@@ -175,11 +175,9 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     );
   }
 
+  // --- PERUBAHAN UTAMA: Struktur body dirombak agar loading tidak satu halaman penuh ---
   Widget _buildBody(ThemeData theme) {
-    if (_isFirstLoadRunning) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+    // Tampilan error jaringan tetap satu halaman penuh
     if (_errorMessage != null) {
       return _buildErrorWidget(theme);
     }
@@ -191,6 +189,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
+            // Widget Search Bar (selalu tampil)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -216,6 +215,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
                 ),
               ),
             ),
+            // Widget Judul (selalu tampil)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -249,8 +249,12 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
               ),
             ),
 
-            // --- PERUBAHAN TAMPILAN SAAT HASIL KOSONG ---
-            if (_puskesmasList.isEmpty)
+            // Bagian konten list yang dinamis (Loading / Hasil Kosong / Daftar)
+            if (_isFirstLoadRunning)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_puskesmasList.isEmpty)
               SliverFillRemaining(child: _buildEmptySearchResultWidget(theme))
             else
               SliverPadding(
@@ -265,6 +269,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
                 ),
               ),
 
+            // Indikator loading untuk infinite scroll
             if (_isLoadMoreRunning)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -278,6 +283,8 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     );
   }
 
+  // Sisa kode di bawah ini tidak ada yang berubah
+  // ...
   Widget _buildErrorWidget(ThemeData theme) {
     return Center(
       child: Padding(
@@ -306,7 +313,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     );
   }
 
-  // --- WIDGET BARU UNTUK HASIL PENCARIAN KOSONG ---
   Widget _buildEmptySearchResultWidget(ThemeData theme) {
     return Center(
       child: Padding(
@@ -324,7 +330,9 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Maaf, kami tidak dapat menemukan puskesmas dengan kata kunci "${_searchController.text}". Silakan coba kata kunci lain.',
+              _searchController.text.isEmpty
+                  ? 'Saat ini belum ada data puskesmas yang tersedia.'
+                  : 'Maaf, kami tidak dapat menemukan puskesmas dengan kata kunci "${_searchController.text}". Silakan coba kata kunci lain.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.hintColor,
@@ -338,7 +346,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
 }
 
 class _PuskesmasCard extends StatelessWidget {
-  // ... (Kode _PuskesmasCard tidak berubah)
   final PuskesmasModel puskesmas;
   const _PuskesmasCard({required this.puskesmas});
 
