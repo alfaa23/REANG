@@ -20,7 +20,7 @@ class _GlikViewState extends State<GlikView> {
   final String _url = 'https://glik.jabarprov.go.id/index.php';
 
   Timer? _loadTimeout;
-  static const Duration _timeoutDuration = Duration(seconds: 20);
+  static const Duration _timeoutDuration = Duration(seconds: 30);
 
   @override
   void initState() {

@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:reang_app/models/dokter_model.dart';
 import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
 
 class DetailDokterScreen extends StatelessWidget {
-  // Menerima data dokter dari halaman sebelumnya
-  final Map<String, dynamic> data;
-  const DetailDokterScreen({super.key, required this.data});
+  final DokterModel dokter;
+  const DetailDokterScreen({super.key, required this.dokter});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Data dummy (atau dari API)
-    final alumni = 'Universitas Metodist Indonesia, 2009';
-    final praktik = 'PUSKESMAS LIMBONG, Kab. Samosir';
-    final noStr = '1211100320105995';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -26,14 +21,15 @@ class DetailDokterScreen extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // Foto dokter
-                  Image.asset(
-                    data['foto'] ?? 'assets/images/dokter_henry.png',
+                  // --- PERUBAHAN DI SINI: Menampilkan foto dari URL ---
+                  Image.network(
+                    dokter.fotoUrl ?? '',
                     width: double.infinity,
                     height: 240,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 240,
+                      width: double.infinity,
                       color: theme.colorScheme.surface,
                       child: Center(
                         child: Icon(
@@ -86,62 +82,69 @@ class DetailDokterScreen extends StatelessWidget {
                         _buildOnlineStatus(theme),
                         const SizedBox(height: 12),
                         Text(
-                          data['nama'] ?? 'Dr. Nama Dokter',
+                          dokter.nama,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          data['spesialis'] ?? 'Spesialis...',
+                          dokter.fitur,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.hintColor,
                           ),
                         ),
                         const SizedBox(height: 12),
+                        // --- PERUBAHAN DI SINI: Menambahkan info Masa Kerja ---
                         _buildInfoChip(
                           theme,
                           Icons.work_outline,
-                          '${data['pengalaman'] ?? 16} tahun',
+                          dokter.masaKerja,
                         ),
                         const SizedBox(height: 24),
                         _buildDetailRow(
                           theme,
                           Icons.school_outlined,
                           'Alumnus',
-                          alumni,
+                          dokter.pendidikan,
                         ),
                         _buildDetailRow(
                           theme,
                           Icons.local_hospital_outlined,
                           'Praktik di',
-                          praktik,
+                          dokter.puskesmas.nama,
                         ),
                         _buildDetailRow(
                           theme,
-                          Icons.badge_outlined,
-                          'Nomor STR',
-                          noStr,
+                          Icons.phone_outlined,
+                          'Nomor Telepon',
+                          dokter.nomer,
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
             ],
           ),
         ),
       ),
-      // Tombol Chat di bottomNavigationBar, diangkat sedikit dengan padding bottom
+      // Tombol Chat
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
         child: ElevatedButton(
           onPressed: () {
+            final doctorMap = {
+              'nama': dokter.nama,
+              'spesialis': dokter.fitur,
+              'foto_url': dokter.fotoUrl,
+            };
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => ChatScreen(doctorData: data)),
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(doctorData: doctorMap),
+              ),
             );
           },
           style: ElevatedButton.styleFrom(
@@ -160,6 +163,8 @@ class DetailDokterScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ... (sisa kode helper tidak berubah, tapi _buildInfoChip ditambahkan kembali)
 
   Widget _buildOnlineStatus(ThemeData theme) {
     return Container(
@@ -187,6 +192,7 @@ class DetailDokterScreen extends StatelessWidget {
     );
   }
 
+  // --- WIDGET INI DITAMBAHKAN KEMBALI ---
   Widget _buildInfoChip(ThemeData theme, IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

@@ -19,6 +19,8 @@ import 'package:reang_app/models/ulasan_response_model.dart';
 import 'package:reang_app/models/pagination_response_model.dart';
 import 'package:reang_app/models/dumas_model.dart';
 import 'package:reang_app/models/banner_model.dart';
+import 'package:reang_app/models/puskesmas_model.dart';
+import 'package:reang_app/models/dokter_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -1102,6 +1104,78 @@ class ApiService {
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Gagal menghapus ulasan.');
+    }
+  }
+
+  // =======================================================================
+  // --- KONSULTASI DOKTER (DIPERBARUI DENGAN API) ---
+  // =======================================================================
+
+  /// Mengambil daftar puskesmas dengan pagination.
+  Future<Map<String, dynamic>> fetchPuskesmasPaginated({
+    required int page,
+  }) async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/puskesmas?page=$page');
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        final List<PuskesmasModel> listPuskesmas =
+            (responseData['data'] as List)
+                .map((item) => PuskesmasModel.fromJson(item))
+                .toList();
+
+        return {'data': listPuskesmas, 'last_page': responseData['last_page']};
+      } else {
+        throw Exception('Gagal memuat daftar puskesmas.');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data puskesmas: $e');
+    }
+  }
+
+  /// Mengambil daftar dokter berdasarkan ID puskesmas.
+  /// CATATAN: Endpoint diasumsikan /api/dokter?puskesmas_id={id}
+  Future<List<DokterModel>> fetchDokterByPuskesmas(int puskesmasId) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/dokter',
+        queryParameters: {'puskesmas_id': puskesmasId},
+      );
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((item) => DokterModel.fromJson(item))
+            .toList();
+      } else {
+        throw Exception('Gagal memuat daftar dokter.');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data dokter: $e');
+    }
+  }
+
+  /// Mencari puskesmas dengan pagination.
+  Future<Map<String, dynamic>> searchPuskesmasPaginated({
+    required int page,
+    required String query,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/puskesmas/search',
+        queryParameters: {'page': page, 'q': query},
+      );
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        final List<PuskesmasModel> listPuskesmas =
+            (responseData['data'] as List)
+                .map((item) => PuskesmasModel.fromJson(item))
+                .toList();
+
+        return {'data': listPuskesmas, 'last_page': responseData['last_page']};
+      } else {
+        throw Exception('Gagal mencari puskesmas.');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mencari puskesmas: $e');
     }
   }
 }

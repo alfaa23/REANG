@@ -1,56 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/screens/layanan/sehat/detail_dokter_screen.dart';
+import 'package:reang_app/services/api_service.dart';
 
 class DetailPuskesmasScreen extends StatefulWidget {
-  final Map<String, dynamic> puskesmasData;
-  const DetailPuskesmasScreen({super.key, required this.puskesmasData});
+  final PuskesmasModel puskesmas;
+  const DetailPuskesmasScreen({super.key, required this.puskesmas});
 
   @override
   State<DetailPuskesmasScreen> createState() => _DetailPuskesmasScreenState();
 }
 
 class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
-  // Data dummy untuk semua dokter yang ada di puskesmas ini
-  final List<Map<String, dynamic>> _allDoctors = const [
-    {
-      'nama': 'dr. Sarah Wijaya',
-      'spesialis': 'Dokter Umum',
-      'pasienHariIni': 12,
-    },
-    {'nama': 'dr. Abdul', 'spesialis': 'Dokter Umum', 'pasienHariIni': 8},
-    {
-      'nama': 'dr. Budi Santoso',
-      'spesialis': 'Dokter Gigi',
-      'pasienHariIni': 5,
-    },
-    {'nama': 'Amelia, S.Gz', 'spesialis': 'Ahli Gizi', 'pasienHariIni': 10},
-    {'nama': 'Siti Aminah, Amd.Keb', 'spesialis': 'Bidan', 'pasienHariIni': 15},
-  ];
+  final ApiService _apiService = ApiService();
 
-  // Daftar kategori filter
-  final List<String> _categories = [
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<DokterModel> _allDoctors = [];
+
+  List<String> _categories = ['Semua'];
+  final List<String> _fallbackCategories = [
     'Semua',
-    'Dokter Umum',
-    'Dokter Gigi',
+    'Umum',
+    'Gigi',
     'Bidan',
-    'Ahli Gizi',
-    'Kesehatan Lingkungan', // Contoh spesialis lain
+    'Gizi',
+    'Lainnya',
   ];
   int _selectedCategoryIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDokterAndGenerateCategories();
+  }
+
+  Future<void> _fetchDokterAndGenerateCategories() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final dokterData = await _apiService.fetchDokterByPuskesmas(
+        widget.puskesmas.id,
+      );
+      final Set<String> uniqueFitur = dokterData
+          .map((dokter) => dokter.fitur)
+          .toSet();
+      final List<String> apiCategories = ['Semua', ...uniqueFitur];
+
+      setState(() {
+        _allDoctors = dokterData;
+        _categories = apiCategories;
+      });
+    } catch (e) {
+      String friendlyMessage = 'Terjadi kesalahan yang tidak diketahui.';
+      if (e is DioException &&
+          (e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.sendTimeout ||
+              e.type == DioExceptionType.receiveTimeout)) {
+        friendlyMessage = 'Gagal terhubung. Periksa koneksi internet Anda.';
+      } else {
+        friendlyMessage = 'Gagal memuat data dokter.';
+      }
+      setState(() {
+        _errorMessage = friendlyMessage;
+        _categories = _fallbackCategories;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Logika untuk memfilter dokter berdasarkan kategori yang dipilih
-    final List<Map<String, dynamic>> filteredDoctors;
+    final List<DokterModel> filteredDoctors;
     if (_selectedCategoryIndex == 0) {
-      filteredDoctors = _allDoctors; // Tampilkan semua jika 'Semua' dipilih
+      filteredDoctors = _allDoctors;
     } else {
-      final selectedCategory = _categories[_selectedCategoryIndex];
-      filteredDoctors = _allDoctors
-          .where((doctor) => doctor['spesialis'] == selectedCategory)
-          .toList();
+      if (_selectedCategoryIndex < _categories.length) {
+        final selectedCategory = _categories[_selectedCategoryIndex]
+            .toLowerCase();
+        filteredDoctors = _allDoctors
+            .where((doctor) => doctor.fitur.toLowerCase() == selectedCategory)
+            .toList();
+      } else {
+        filteredDoctors = [];
+      }
     }
 
     return Scaffold(
@@ -60,7 +104,7 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.puskesmasData['nama'],
+              widget.puskesmas.nama,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
@@ -83,56 +127,88 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
           ),
         ],
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? _buildErrorWidget(theme)
+          : ListView(
+              physics: const BouncingScrollPhysics(),
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Pilih Dokter',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Pilih Dokter',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${_allDoctors.length} total dokter',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.hintColor,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      '${_allDoctors.length} total dokter',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
-                      ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      _buildCategoryChips(theme),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 8),
+                if (filteredDoctors.isEmpty && !_isLoading)
+                  _buildEmptyDoctorView(theme)
+                else
+                  ...filteredDoctors.map(
+                    (doctor) => _DokterCard(dokter: doctor),
+                  ),
                 const SizedBox(height: 16),
-                _buildCategoryChips(theme),
+                _buildInfoPuskesmas(theme),
               ],
             ),
-          ),
-          // PERUBAHAN: Padding ditambahkan di sini agar ada jarak antara filter dan kartu pertama
-          const SizedBox(height: 8),
-          if (filteredDoctors.isEmpty)
-            _buildEmptyDoctorView(theme)
-          else
-            ...filteredDoctors.map((doctor) => _DokterCard(data: doctor)),
+    );
+  }
 
-          const SizedBox(height: 16),
-          _buildInfoPuskesmas(theme),
-        ],
+  Widget _buildErrorWidget(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 80, color: theme.hintColor),
+            const SizedBox(height: 24),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchDokterAndGenerateCategories,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Widget baru untuk filter chips yang bisa di-scroll
   Widget _buildCategoryChips(ThemeData theme) {
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        // HAPUS PADDING DARI SINI AGAR LURUS
         itemCount: _categories.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -168,7 +244,8 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
     );
   }
 
-  // Widget baru untuk tampilan alternatif jika dokter tidak ditemukan
+  // Sisa kode di bawah ini tidak ada yang berubah
+  // ...
   Widget _buildEmptyDoctorView(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 16.0),
@@ -179,11 +256,12 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
             const SizedBox(height: 16),
             Text('Dokter tidak ditemukan', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text(
-              'Saat ini tidak ada dokter dengan spesialisasi "${_categories[_selectedCategoryIndex]}" yang tersedia.',
-              style: TextStyle(color: theme.hintColor),
-              textAlign: TextAlign.center,
-            ),
+            if (_selectedCategoryIndex < _categories.length)
+              Text(
+                'Saat ini tidak ada dokter dengan spesialisasi "${_categories[_selectedCategoryIndex]}" yang tersedia.',
+                style: TextStyle(color: theme.hintColor),
+                textAlign: TextAlign.center,
+              ),
           ],
         ),
       ),
@@ -212,15 +290,11 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
                 theme,
                 Icons.access_time_outlined,
                 'Jam Operasional',
-                [
-                  'Senin - Jumat: 08:00 - 16:00',
-                  'Sabtu: 08:00 - 12:00',
-                  'Minggu: Tutup',
-                ],
+                [widget.puskesmas.jam],
               ),
               const SizedBox(height: 12),
               _buildInfoRow(theme, Icons.location_on_outlined, 'Alamat', [
-                widget.puskesmasData['alamat'],
+                widget.puskesmas.alamat,
               ]),
               const SizedBox(height: 12),
               _buildInfoRow(theme, Icons.phone_outlined, 'Kontak', [
@@ -272,10 +346,9 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
   }
 }
 
-// Widget untuk kartu Dokter
 class _DokterCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const _DokterCard({required this.data});
+  final DokterModel dokter;
+  const _DokterCard({required this.dokter});
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +364,7 @@ class _DokterCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DetailDokterScreen(data: data),
+              builder: (context) => DetailDokterScreen(dokter: dokter),
             ),
           );
         },
@@ -302,14 +375,26 @@ class _DokterCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      dokter.fotoUrl ?? '',
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 64,
+                          height: 64,
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.person,
+                            size: 40,
+                            color: theme.hintColor,
+                          ),
+                        );
+                      },
                     ),
-                    child: Icon(Icons.person, size: 40, color: theme.hintColor),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -317,13 +402,12 @@ class _DokterCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          data['nama'],
+                          dokter.nama,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // PERBAIKAN: Mengganti Chip dengan Container agar lebih kecil
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -334,7 +418,7 @@ class _DokterCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            data['spesialis'],
+                            dokter.fitur,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: isDark
                                   ? Colors.green.shade200
@@ -344,19 +428,9 @@ class _DokterCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.people_alt_outlined,
-                              size: 14,
-                              color: theme.hintColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Pasien hari ini: ${data['pasienHariIni']}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
+                        Text(
+                          'Pendidikan: ${dokter.pendidikan}',
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
