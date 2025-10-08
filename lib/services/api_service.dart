@@ -21,6 +21,7 @@ import 'package:reang_app/models/dumas_model.dart';
 import 'package:reang_app/models/banner_model.dart';
 import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/admin_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -721,6 +722,38 @@ class ApiService {
     } catch (e) {
       // Menangani error tak terduga lainnya
       throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+    }
+  }
+  //login admin
+
+  Future<Map<String, dynamic>> loginAdmin({
+    required String name, // <-- Diubah dari email menjadi name
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/login',
+        data: {
+          'name': name,
+          'password': password,
+        }, // <-- Diubah dari email menjadi name
+        options: Options(headers: {'Accept': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final token = response.data['token'];
+        final adminData = response.data['admin'];
+        if (token != null && adminData != null) {
+          return {'token': token, 'user': AdminModel.fromMap(adminData)};
+        }
+        throw Exception('Format respons tidak valid.');
+      } else {
+        throw Exception('Gagal login admin.');
+      }
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data['message'] ?? 'Nama atau password salah.';
+      throw Exception(errorMessage);
     }
   }
 

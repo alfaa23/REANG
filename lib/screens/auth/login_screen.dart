@@ -5,8 +5,10 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:reang_app/screens/auth/register_screen.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+
+// --- TAMBAHAN: Import halaman login dokter ---
+import 'package:reang_app/screens/auth/dokter_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;
@@ -55,12 +57,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final userData = response['user'];
 
       if (token != null && userData != null) {
-        const storage = FlutterSecureStorage();
-        await storage.write(key: 'user_token', value: token);
-
         final user = UserModel.fromMap(userData);
         if (mounted) {
-          Provider.of<AuthProvider>(
+          // Ganti 'user_token' agar konsisten
+          await Provider.of<AuthProvider>(
             context,
             listen: false,
           ).setUser(user, token);
@@ -192,7 +192,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       'lupa password?',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        // --- PERBAIKAN: Warna teks adaptif ---
                         color: theme.hintColor,
                       ),
                     ),
@@ -202,7 +201,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _performLogin,
                   style: ElevatedButton.styleFrom(
-                    // --- PERBAIKAN: Warna tombol diubah ---
                     backgroundColor: Colors.blue.shade800,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(50),
@@ -241,7 +239,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.of(context).pop(true);
                         }
                       },
-                      // --- TAMBAHKAN KEMBALI BAGIAN INI ---
                       child: const Text(
                         'Daftar di sini',
                         style: TextStyle(
@@ -249,10 +246,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.blue,
                         ),
                       ),
-                      // ------------------------------------
                     ),
                   ],
                 ),
+
+                // --- TAMBAHAN: Tombol untuk navigasi ke Login Dokter ---
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DokterLoginScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Masuk sebagai Dokter/Admin'),
+                ),
+                // ---------------------------------------------------
               ],
             ),
           ),

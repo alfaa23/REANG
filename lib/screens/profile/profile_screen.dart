@@ -3,14 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
-import 'package:reang_app/services/api_service.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+
+// --- TAMBAHAN: Import halaman LoginScreen untuk navigasi ---
+import 'package:reang_app/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // Fungsi untuk menampilkan dialog konfirmasi logout
   void _showLogoutConfirmationDialog(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final theme = Theme.of(context);
@@ -44,27 +44,12 @@ class ProfileScreen extends StatelessWidget {
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                // Tutup dialog terlebih dahulu
                 Navigator.of(ctx).pop();
-
-                // --- PERBAIKAN: API call di-nonaktifkan sementara ---
-                // try {
-                //   // KOMENTAR: Baris ini akan digunakan untuk memanggil API logout di server.
-                //   // Pastikan endpoint dan fungsi logoutUser() sudah siap di ApiService.
-                //   await ApiService().logoutUser(token: authProvider.token!);
-                // } catch (e) {
-                //   debugPrint("Server logout error (diabaikan): $e");
-                // }
-                // ----------------------------------------------------
-
-                // Hapus token dari penyimpanan aman
-                await const FlutterSecureStorage().delete(key: 'auth_token');
-                // Hapus data pengguna dari provider
-                authProvider.logout();
-
+                await authProvider.logout();
                 Fluttertoast.showToast(msg: "Anda telah keluar.");
 
-                // Navigasi ke halaman utama dan hapus semua halaman sebelumnya
+                // Cek mounted sebelum navigasi
+                if (!context.mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const MainScreen()),
                   (Route<dynamic> route) => false,
@@ -84,20 +69,61 @@ class ProfileScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
 
-    // --- PERBAIKAN: Menggunakan properti 'name' dan menghapus 'avatar' ---
-    final String name = authProvider.isLoggedIn
-        ? authProvider.user!.name
-        : 'Pengunjung';
-    final String role = authProvider.isLoggedIn ? 'Warga' : 'Guest';
-    // UserModel tidak memiliki avatar, jadi kita gunakan URL statis
+    final String name = authProvider.user?.name ?? 'Pengunjung';
+    final String role = authProvider.isLoggedIn && authProvider.user != null
+        ? 'Warga'
+        : 'Guest';
     const String avatarUrl =
         'https://i.pinimg.com/564x/eb/43/44/eb4344d5f4d31dadd4efa0cf12b70bf3.jpg';
-    // ----------------------------------------------------
+
+    // --- PERUBAHAN UTAMA: Membuat tombol dinamis berdasarkan status login ---
+    final Widget actionButton;
+
+    if (authProvider.isLoggedIn) {
+      // Tombol Keluar Akun (Merah) jika sudah login
+      actionButton = ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red.shade700,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: const Icon(Icons.exit_to_app),
+        label: const Text('Keluar Akun'),
+        onPressed: () => _showLogoutConfirmationDialog(context),
+      );
+    } else {
+      // Tombol Masuk (Biru) jika belum login
+      actionButton = ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade800, // Warna biru
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: const Icon(Icons.login), // Ikon login
+        label: const Text('Masuk'), // Teks diubah
+        onPressed: () {
+          // Arahkan ke halaman login
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              // popOnSuccess true agar setelah login kembali ke halaman profil
+              builder: (context) => const LoginScreen(popOnSuccess: true),
+            ),
+          );
+        },
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
-        // Profile Header
+        // Profile Header (tidak berubah)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -109,8 +135,7 @@ class ProfileScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 40,
                 backgroundImage: NetworkImage(avatarUrl),
-                onBackgroundImageError:
-                    (_, __) {}, // Mencegah error jika gambar gagal dimuat
+                onBackgroundImageError: (_, __) {},
               ),
               const SizedBox(height: 12),
               Text(
@@ -134,7 +159,6 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.edit_outlined,
                     label: 'Ubah Profil',
                     onTap: () {
-                      // TODO: Navigasi ke halaman ubah profil
                       Fluttertoast.showToast(
                         msg: "Fitur ini akan segera tersedia.",
                       );
@@ -146,7 +170,8 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        // Pengaturan Section
+
+        // Pengaturan Section (tidak berubah)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -190,7 +215,8 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        // Lainnya Section
+
+        // Lainnya Section (tidak berubah)
         Container(
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           decoration: BoxDecoration(
@@ -221,35 +247,17 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 32),
-        // Logout Button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            icon: const Icon(Icons.exit_to_app),
-            label: const Text('Keluar Akun'),
-            onPressed: () {
-              if (authProvider.isLoggedIn) {
-                _showLogoutConfirmationDialog(context);
-              } else {
-                Fluttertoast.showToast(msg: "Anda belum login.");
-              }
-            },
-          ),
-        ),
+
+        // --- PERUBAHAN: Menggunakan tombol dinamis yang sudah dibuat ---
+        SizedBox(width: double.infinity, child: actionButton),
         const SizedBox(height: 25),
       ],
     );
   }
 }
 
+// Widget helper tidak berubah
+// ...
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;

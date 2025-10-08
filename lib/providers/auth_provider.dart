@@ -1,76 +1,81 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:reang_app/models/admin_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
-  UserModel? _user;
-  String? _token;
-
   final _storage = const FlutterSecureStorage();
   final _apiService = ApiService();
 
-  UserModel? get user => _user;
-  String? get token => _token;
-  bool get isLoggedIn => _token != null && _user != null;
+  Object? _currentUser;
+  String? _token;
+  String? _role;
 
-  /// Mencoba login otomatis saat aplikasi dibuka (DIPERBARUI).
+  bool get isLoggedIn => _token != null;
+  String? get role => _role;
+  UserModel? get user =>
+      (_currentUser is UserModel) ? _currentUser as UserModel : null;
+  AdminModel? get admin =>
+      (_currentUser is AdminModel) ? _currentUser as AdminModel : null;
+  String? get token => _token;
+
+  Future<void> setUser(UserModel user, String token) async {
+    _currentUser = user;
+    _token = token;
+    _role = 'user';
+    await _storage.write(key: 'user_token', value: token);
+    await _storage.write(key: 'user_role', value: 'user');
+    await _storage.write(key: 'user_data', value: json.encode(user.toMap()));
+    notifyListeners();
+  }
+
+  Future<void> setAdmin(AdminModel admin, String token) async {
+    _currentUser = admin;
+    _token = token;
+    _role = admin.role;
+    await _storage.write(key: 'user_token', value: token);
+    await _storage.write(key: 'user_role', value: admin.role);
+    await _storage.write(key: 'user_data', value: json.encode(admin.toMap()));
+    notifyListeners();
+  }
+
   Future<void> tryAutoLogin() async {
-    // 1. Baca token DAN data user dari penyimpanan
     final storedToken = await _storage.read(key: 'user_token');
+    final storedRole = await _storage.read(key: 'user_role');
     final userDataString = await _storage.read(key: 'user_data');
 
-    if (storedToken == null || userDataString == null) {
-      // Jika salah satunya tidak ada, tidak bisa melanjutkan.
+    if (storedToken == null || storedRole == null || userDataString == null) {
+      // Jika data sesi tidak lengkap, pastikan semuanya bersih.
+      await logout();
       return;
     }
 
-    // 2. Validasi token ke server menggunakan fungsi baru
     final bool tokenIsValid = await _apiService.isTokenValid(storedToken);
 
     if (tokenIsValid) {
-      // 3. Jika token VALID, gunakan data user dari storage untuk login
-      print("Token masih valid. Memuat sesi user dari storage...");
-      final userDataMap = json.decode(userDataString) as Map<String, dynamic>;
-      _user = UserModel.fromMap(userDataMap);
+      final userDataMap = json.decode(userDataString);
+      if (storedRole == 'dokter') {
+        _currentUser = AdminModel.fromMap(userDataMap);
+      } else {
+        // Asumsikan selain itu adalah 'user'
+        _currentUser = UserModel.fromMap(userDataMap);
+      }
+      _role = storedRole;
       _token = storedToken;
-      print("Auto-login berhasil untuk user: ${_user?.name}");
     } else {
-      // 4. Jika token TIDAK VALID, panggil logout untuk bersih-bersih
-      print("Token kadaluwarsa. Melakukan logout...");
+      // Jika token tidak valid, bersihkan sesi.
       await logout();
     }
-
-    // 5. Beri tahu UI bahwa ada perubahan status
     notifyListeners();
   }
 
-  /// Menyimpan sesi user ke penyimpanan yang aman.
-  Future<void> _saveUserSession() async {
-    if (_user != null && _token != null) {
-      await _storage.write(key: 'user_token', value: _token!);
-      await _storage.write(
-        key: 'user_data',
-        value: json.encode(_user!.toMap()),
-      );
-    }
-  }
-
-  /// Mengatur dan menyimpan data user setelah login/registrasi.
-  Future<void> setUser(UserModel user, String token) async {
-    _user = user;
-    _token = token;
-    await _saveUserSession();
-    notifyListeners();
-  }
-
-  /// Membersihkan sesi user dan data dari penyimpanan.
   Future<void> logout() async {
-    _user = null;
+    _currentUser = null;
     _token = null;
-    await _storage.delete(key: 'user_token');
-    await _storage.delete(key: 'user_data');
+    _role = null;
+    await _storage.deleteAll();
     notifyListeners();
   }
 }
