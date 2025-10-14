@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:reang_app/models/event_keagamaan_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/ibadah/detail_event_screen.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // --- TAMBAHAN: Kelas helper untuk menyimpan data cache per kategori ---
 class _CachedEventData {
@@ -83,7 +83,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
           _cache[category]!.isInitiated = true; // Tandai selesai walau error
         });
       }
-      Fluttertoast.showToast(msg: "Gagal memuat data event.");
+      showToast("Gagal memuat data event.", context: context);
     }
   }
 

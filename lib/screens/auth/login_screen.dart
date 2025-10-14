@@ -5,7 +5,7 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:reang_app/screens/auth/register_screen.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // --- TAMBAHAN: Import halaman login dokter ---
 import 'package:reang_app/screens/auth/dokter_login_screen.dart';
@@ -37,8 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoading) return;
 
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      Fluttertoast.showToast(
-        msg: "Email dan password tidak boleh kosong.",
+      showToast(
+        "Email dan password tidak boleh kosong.",
+        context: context,
         backgroundColor: Colors.red,
       );
       return;
@@ -63,11 +64,12 @@ class _LoginScreenState extends State<LoginScreen> {
           await Provider.of<AuthProvider>(
             context,
             listen: false,
-          ).setUser(user, token);
+          ).login(user, token);
         }
 
-        Fluttertoast.showToast(
-          msg: "Login Berhasil!",
+        showToast(
+          "Login Berhasil!",
+          context: context,
           backgroundColor: Colors.green,
         );
 
@@ -86,10 +88,11 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception("Token atau data pengguna tidak ditemukan.");
       }
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: e.toString(),
+      showToast(
+        e.toString(),
+        context: context,
         backgroundColor: Colors.red,
-        toastLength: Toast.LENGTH_LONG,
+        duration: const Duration(seconds: 4),
       );
     } finally {
       if (mounted) {

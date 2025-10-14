@@ -7,7 +7,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:reang_app/models/lokasi_peta_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 // tambahan: gunakan alias untuk menghindari tabrakan nama dengan geocoding.Location
 import 'package:location/location.dart' as loc;
 
@@ -147,12 +147,14 @@ class _PetaScreenState extends State<PetaScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        Fluttertoast.showToast(
-          msg: 'Gagal mendapatkan lokasi: ${e.toString()}',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
+        showToast(
+          'Gagal mendapatkan lokasi: ${e.toString()}',
+          context: context, // wajib karena toast tampil di UI
           backgroundColor: Colors.red,
-          textColor: Colors.white,
+          textStyle: const TextStyle(color: Colors.white),
+          alignment:
+              Alignment.bottomCenter, // pengganti gravity: ToastGravity.BOTTOM
+          duration: const Duration(seconds: 4), // pengganti Toast.LENGTH_LONG
         );
       }
     }
@@ -198,10 +200,12 @@ class _PetaScreenState extends State<PetaScreen> {
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      Fluttertoast.showToast(
-        msg: 'Tidak dapat membuka aplikasi peta',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
+      showToast(
+        'Tidak dapat membuka aplikasi peta',
+        context: context, // wajib di versi baru
+        alignment:
+            Alignment.bottomCenter, // pengganti gravity: ToastGravity.BOTTOM
+        duration: const Duration(seconds: 2), // pengganti LENGTH_SHORT
       );
     }
   }

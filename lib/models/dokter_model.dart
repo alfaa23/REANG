@@ -5,9 +5,10 @@ class DokterModel {
   final String nama;
   final String pendidikan;
   final String fitur;
-  final String masaKerja; // <-- Diubah dari umur
+  final String masaKerja;
   final String nomer;
-  final String? fotoUrl; // <-- Ditambahkan (nullable untuk keamanan)
+  final String? fotoUrl;
+  final int adminId; // <-- TAMBAHAN
   final PuskesmasModel puskesmas;
 
   DokterModel({
@@ -15,21 +16,30 @@ class DokterModel {
     required this.nama,
     required this.pendidikan,
     required this.fitur,
-    required this.masaKerja, // <-- Diubah
+    required this.masaKerja,
     required this.nomer,
-    this.fotoUrl, // <-- Ditambahkan
+    this.fotoUrl,
+    required this.adminId, // <-- TAMBAHAN
     required this.puskesmas,
   });
 
   factory DokterModel.fromJson(Map<String, dynamic> json) {
+    // Helper untuk parsing integer secara aman (dari int, string, ataupun null)
+    int _safeParseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      return int.tryParse(value.toString()) ?? 0;
+    }
+
     return DokterModel(
-      id: json['id'] ?? 0,
+      id: _safeParseInt(json['id']),
       nama: json['nama'] ?? 'Tanpa Nama',
       pendidikan: json['pendidikan'] ?? 'Tidak Diketahui',
       fitur: json['fitur'] ?? 'Umum',
-      masaKerja: json['masa_kerja'] ?? 'N/A', // <-- Diubah
+      masaKerja: json['masa_kerja'] ?? 'N/A',
       nomer: json['nomer'] ?? 'Tidak Diketahui',
-      fotoUrl: json['foto_url'], // <-- Ditambahkan
+      fotoUrl: json['foto_url'],
+      adminId: _safeParseInt(json['admin_id']), // <-- TAMBAHAN
       puskesmas: PuskesmasModel.fromJson(json['puskesmas'] ?? {}),
     );
   }

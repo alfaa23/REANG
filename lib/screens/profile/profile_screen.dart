@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // --- TAMBAHAN: Import halaman LoginScreen untuk navigasi ---
 import 'package:reang_app/screens/auth/login_screen.dart';
@@ -46,7 +46,7 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 await authProvider.logout();
-                Fluttertoast.showToast(msg: "Anda telah keluar.");
+                showToast("Anda telah keluar.", context: context);
 
                 // Cek mounted sebelum navigasi
                 if (!context.mounted) return;
@@ -159,8 +159,9 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.edit_outlined,
                     label: 'Ubah Profil',
                     onTap: () {
-                      Fluttertoast.showToast(
-                        msg: "Fitur ini akan segera tersedia.",
+                      showToast(
+                        "Fitur ini akan segera tersedia.",
+                        context: context,
                       );
                     },
                   ),

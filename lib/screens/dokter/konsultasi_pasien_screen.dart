@@ -1,60 +1,92 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:reang_app/models/user_model.dart' as app_user_model;
 import 'package:reang_app/providers/auth_provider.dart';
-import 'package:fluttertoast/fluttertoast.dart'; // <-- TAMBAHAN: Import yang diperlukan
-import 'package:reang_app/screens/main_screen.dart'; // <-- TAMBAHAN: Import yang diperlukan
+import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
+import 'package:reang_app/screens/main_screen.dart';
+import 'package:shimmer/shimmer.dart';
 
-class KonsultasiPasienScreen extends StatelessWidget {
+class KonsultasiPasienScreen extends StatefulWidget {
   const KonsultasiPasienScreen({super.key});
 
-  // Data dummy untuk tampilan
-  final List<Map<String, dynamic>> _chats = const [
-    {
-      'nama': 'Ahmad Rizki',
-      'pesanTerakhir':
-          'Dok, saya masih merasa pusing dan mual sejak kemarin...',
-      'waktu': '10:30',
-      'jumlahBelumDibaca': 2,
-    },
-    {
-      'nama': 'Siti Nurhaliza',
-      'pesanTerakhir': 'Terima kasih dok atas penjelasannya',
-      'waktu': '08:45',
-      'jumlahBelumDibaca': 0,
-    },
-    {
-      'nama': 'Budi Santoso',
-      'pesanTerakhir': 'Dok, obatnya sudah habis. Apakah perlu kontrol lagi?',
-      'waktu': 'Kemarin',
-      'jumlahBelumDibaca': 1,
-    },
-    {
-      'nama': 'Maya Sari',
-      'pesanTerakhir': 'Baik dok, saya akan coba dulu sarannya',
-      'waktu': 'Kemarin',
-      'jumlahBelumDibaca': 0,
-    },
-    {
-      'nama': 'Andi Wijaya',
-      'pesanTerakhir': 'Dok, saya merasa sesak napas sejak tadi malam',
-      'waktu': '2 hari lalu',
-      'jumlahBelumDibaca': 3,
-    },
-  ];
+  @override
+  State<KonsultasiPasienScreen> createState() => _KonsultasiPasienScreenState();
+}
 
-  String getInitials(String name) {
-    List<String> names = name.split(' ');
-    String initials = '';
-    int numWords = names.length > 1 ? 2 : 1;
-    for (var i = 0; i < numWords; i++) {
-      if (names[i].isNotEmpty) {
-        initials += names[i][0];
-      }
-    }
-    return initials.toUpperCase();
+class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
+  late Stream<QuerySnapshot> _chatsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeStream();
   }
 
-  // --- TAMBAHAN: Fungsi untuk menampilkan dialog konfirmasi ---
+  // Fungsi ini HANYA menginisialisasi stream, tanpa setState.
+  void _initializeStream() {
+    final myId = FirebaseAuth.instance.currentUser?.uid;
+    if (myId != null) {
+      _chatsStream = FirebaseFirestore.instance
+          .collection('chats')
+          .where('participants', arrayContains: myId)
+          .orderBy('lastMessageTimestamp', descending: true)
+          .snapshots();
+    } else {
+      _chatsStream = const Stream.empty();
+    }
+  }
+
+  // Clear unread for a chat doc, tries update then falls back to set(merge)
+  Future<void> _clearUnreadForChat(String chatDocId, String myId) async {
+    if (chatDocId.isEmpty || myId.isEmpty) return;
+    final chatDocRef = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatDocId);
+    try {
+      // Gunakan dot notation untuk set key di map unreadCount
+      await chatDocRef.update({'unreadCount.$myId': 0});
+    } catch (e) {
+      // Kalau gagal (mis. dokumen belum ada atau field tidak ada), pakai set merge
+      try {
+        await chatDocRef.set({
+          'unreadCount': {myId: 0},
+        }, SetOptions(merge: true));
+      } catch (e2) {
+        debugPrint('Gagal membersihkan unread untuk $chatDocId: $e2');
+      }
+    }
+  }
+
+  // --- 2. BUAT WIDGET BARU UNTUK SHIMMER EFFECT ---
+  Widget _buildShimmerEffect() {
+    return Shimmer.fromColors(
+      baseColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.grey[800]!
+          : Colors.grey[300]!,
+      highlightColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.grey[700]!
+          : Colors.grey[100]!,
+      child: ListView.separated(
+        itemCount: 8, // Tampilkan beberapa item shimmer
+        separatorBuilder: (context, index) =>
+            const Divider(indent: 80, height: 1),
+        itemBuilder: (context, index) {
+          return const ListTile(
+            contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            leading: CircleAvatar(radius: 28, backgroundColor: Colors.white),
+            title: ShimmerBox(width: 150, height: 16),
+            subtitle: ShimmerBox(width: 200, height: 14),
+            trailing: ShimmerBox(width: 50, height: 12),
+          );
+        },
+      ),
+    );
+  }
+
   void _showLogoutConfirmationDialog(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final theme = Theme.of(context);
@@ -86,14 +118,12 @@ class KonsultasiPasienScreen extends StatelessWidget {
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                Navigator.of(ctx).pop(); // Tutup dialog
-
-                await authProvider.logout(); // Panggil fungsi logout
-
-                Fluttertoast.showToast(msg: "Anda telah keluar.");
+                Navigator.of(ctx).pop();
+                await authProvider.logout();
 
                 if (!context.mounted) return;
-                // Arahkan kembali ke alur utama, yang akan dimulai dari SplashScreen
+                showToast("Anda telah keluar.", context: context);
+
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const MainScreen()),
                   (Route<dynamic> route) => false,
@@ -107,8 +137,40 @@ class KonsultasiPasienScreen extends StatelessWidget {
     );
   }
 
+  String getInitials(String name) {
+    if (name.isEmpty) return '?';
+    List<String> names = name.split(' ');
+    String initials = '';
+    int numWords = names.length > 1 ? 2 : 1;
+    for (var i = 0; i < numWords; i++) {
+      if (names[i].isNotEmpty) {
+        initials += names[i][0];
+      }
+    }
+    return initials.toUpperCase();
+  }
+
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    final messageDate = timestamp.toDate();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+
+    if (messageDate.isAfter(today))
+      return DateFormat('HH:mm').format(messageDate);
+    if (messageDate.isAfter(yesterday)) return 'Kemarin';
+    return DateFormat('dd/MM/yy').format(messageDate);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final myId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (myId == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -120,93 +182,197 @@ class KonsultasiPasienScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
-            // --- PERUBAHAN: Memanggil dialog konfirmasi ---
-            onPressed: () {
-              _showLogoutConfirmationDialog(context);
-            },
+            onPressed: () => _showLogoutConfirmationDialog(context),
           ),
         ],
       ),
-      body: ListView.separated(
-        itemCount: _chats.length,
-        separatorBuilder: (context, index) =>
-            const Divider(indent: 80, height: 1),
-        itemBuilder: (context, index) {
-          final chat = _chats[index];
-          final hasUnread = chat['jumlahBelumDibaca'] > 0;
-
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: 16,
-            ),
-            leading: CircleAvatar(
-              radius: 28,
-              child: Text(
-                getInitials(chat['nama']),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _chatsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildShimmerEffect();
+          }
+          if (snapshot.hasError) {
+            if (snapshot.error.toString().contains('requires an index')) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Text(
+                    'Database sedang menyiapkan daftar chat Anda. Ini bisa memakan waktu beberapa menit. Silakan kembali lagi nanti.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
-              ),
-            ),
-            title: Text(
-              chat['nama'],
-              style: TextStyle(
-                fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            subtitle: Text(
-              chat['pesanTerakhir'],
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
-                color: hasUnread
-                    ? Theme.of(context).colorScheme.onSurface
-                    : null,
-              ),
-            ),
-            trailing: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  chat['waktu'],
+              );
+            }
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('Belum ada percakapan.'));
+          }
+
+          final chatDocs = snapshot.data!.docs;
+
+          return ListView.separated(
+            itemCount: chatDocs.length,
+            separatorBuilder: (context, index) =>
+                const Divider(indent: 80, height: 1),
+            itemBuilder: (context, index) {
+              final chatDoc = chatDocs[index];
+              final chatData = chatDoc.data() as Map<String, dynamic>;
+              final chatId = chatDoc.id;
+
+              String patientName = 'Pasien';
+              String patientId = '';
+              final pNames = List<String>.from(
+                chatData['participantNames'] ?? [],
+              );
+              final pIds = List<String>.from(chatData['participants'] ?? []);
+
+              for (int i = 0; i < pIds.length; i++) {
+                if (pIds[i] != myId) {
+                  patientId = pIds[i];
+                  if (i < pNames.length) patientName = pNames[i];
+                  break;
+                }
+              }
+
+              // Ambil unread dengan aman
+              int unreadCount = 0;
+              try {
+                final unreadMap = Map<String, dynamic>.from(
+                  chatData['unreadCount'] ?? {},
+                );
+                final value = unreadMap[myId];
+                if (value is int) {
+                  unreadCount = value;
+                } else if (value is double) {
+                  unreadCount = value.toInt();
+                } else if (value is String) {
+                  unreadCount = int.tryParse(value) ?? 0;
+                } else {
+                  unreadCount = 0;
+                }
+              } catch (_) {
+                unreadCount = 0;
+              }
+
+              final hasUnread = unreadCount > 0;
+
+              final patientUser = app_user_model.UserModel(
+                id: int.tryParse(patientId) ?? 0,
+                name: patientName,
+                email: '',
+                phone: '',
+                noKtp: '',
+                role: 'user',
+              );
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 16,
+                ),
+                leading: CircleAvatar(
+                  radius: 28,
+                  child: Text(
+                    getInitials(patientName),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  patientName,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: hasUnread
-                        ? Colors.green
-                        : Theme.of(context).hintColor,
                     fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                const SizedBox(height: 6),
-                if (hasUnread)
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      chat['jumlahBelumDibaca'].toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
+                subtitle: Text(
+                  chatData['lastMessage'] ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _formatTimestamp(
+                        chatData['lastMessageTimestamp'] as Timestamp?,
+                      ),
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        color: hasUnread
+                            ? Colors.green
+                            : Theme.of(context).hintColor,
                       ),
                     ),
-                  )
-                else
-                  const SizedBox(width: 24, height: 24),
-              ],
-            ),
-            onTap: () {
-              // TODO: Navigasi ke halaman chat detail untuk pasien ini
+                    const SizedBox(height: 6),
+                    if (hasUnread)
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 24, height: 24),
+                  ],
+                ),
+                onTap: () async {
+                  // CLEAR unread sebelum masuk chat (menghindari race condition)
+                  await _clearUnreadForChat(chatId, myId);
+
+                  // Masuk ke ChatScreen
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(recipient: patientUser),
+                    ),
+                  );
+
+                  // Safety: pastikan unread cleared setelah kembali dari chat
+                  await _clearUnreadForChat(chatId, myId);
+
+                  // Refresh stream/list (tetap pake inisialisasi ulang)
+                  if (mounted) {
+                    setState(() {
+                      _initializeStream();
+                    });
+                  }
+                },
+              );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class ShimmerBox extends StatelessWidget {
+  final double width;
+  final double height;
+  const ShimmerBox({super.key, required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }

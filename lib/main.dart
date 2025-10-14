@@ -2,25 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/app/theme/app_theme.dart';
-import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/splash_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-// --- PERBAIKAN: Fungsi main diubah untuk memuat sesi sebelum aplikasi berjalan ---
 Future<void> main() async {
-  // Pastikan Flutter sudah siap sebelum menjalankan kode async
+  // Pastikan Flutter sudah siap
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Inisialisasi format tanggal
   await initializeDateFormatting('id_ID', null);
-
-  // --- PENAMBAHAN: Inisialisasi AuthProvider dan muat sesi dari penyimpanan aman ---
-
-  // --- AKHIR PENAMBAHAN ---
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        // --- PERBAIKAN: Menggunakan .value karena authProvider sudah dibuat ---
         ChangeNotifierProvider(create: (context) => AuthProvider()),
       ],
       child: const MyApp(),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/dumas_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
@@ -310,14 +310,16 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                   dumasId: widget.dumasId,
                   token: authProvider.token!,
                 );
-                Fluttertoast.showToast(
-                  msg: "Ulasan berhasil dihapus",
+                showToast(
+                  "Ulasan berhasil dihapus",
+                  context: context,
                   backgroundColor: Colors.green,
                 );
                 _loadDumasDetail();
               } catch (e) {
-                Fluttertoast.showToast(
-                  msg: e.toString(),
+                showToast(
+                  e.toString(),
+                  context: context,
                   backgroundColor: Colors.red,
                 );
               }
@@ -436,15 +438,17 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                                   comment: commentController.text,
                                   token: auth.token!,
                                 );
-                                Fluttertoast.showToast(
-                                  msg: "Ulasan Anda berhasil disimpan!",
+                                showToast(
+                                  "Ulasan Anda berhasil disimpan!",
+                                  context: context,
                                   backgroundColor: Colors.green,
                                 );
                                 Navigator.of(ctx).pop(); // Close the modal
                                 _loadDumasDetail(); // Refresh the detail page
                               } catch (e) {
-                                Fluttertoast.showToast(
-                                  msg: "Gagal mengirim ulasan: ${e.toString()}",
+                                showToast(
+                                  "Gagal mengirim ulasan: ${e.toString()}",
+                                  context: context,
                                 );
                               } finally {
                                 if (mounted) {

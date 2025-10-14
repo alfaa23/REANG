@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/models/slider_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/ibadah/ibadah_yu_screen.dart';
@@ -137,14 +137,17 @@ class _HomeScreenState extends State<HomeScreen> {
             _isExitPressed = true;
           });
 
-          Fluttertoast.showToast(
-            msg: "Tekan sekali lagi untuk keluar",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            // PERUBAHAN: Warna diubah menjadi abu-abu solid
-            backgroundColor: Colors.grey.shade700,
-            textColor: Colors.white,
-            fontSize: 16.0,
+          showToast(
+            "Tekan sekali lagi untuk keluar",
+            context: context, // wajib di versi terbaru
+            alignment: Alignment.bottomCenter, // pengganti gravity
+            backgroundColor: Colors.grey.shade700, // sama seperti sebelumnya
+            textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
+            duration: const Duration(
+              seconds: 2,
+            ), // pengganti Toast.LENGTH_SHORT
+            animation: StyledToastAnimation.slideFromBottom,
+            reverseAnimation: StyledToastAnimation.fade,
           );
 
           // PERBAIKAN: Tambahkan timer untuk mereset status setelah 7 detik

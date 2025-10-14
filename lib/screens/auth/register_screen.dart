@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
@@ -132,14 +132,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         final user = UserModel.fromMap(userData);
         if (mounted) {
-          Provider.of<AuthProvider>(
-            context,
-            listen: false,
-          ).setUser(user, token);
+          Provider.of<AuthProvider>(context, listen: false).login(user, token);
         }
 
-        Fluttertoast.showToast(
-          msg: "Pendaftaran berhasil!",
+        showToast(
+          "Pendaftaran berhasil!",
+          context: context,
           backgroundColor: Colors.green,
         );
 
@@ -160,10 +158,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         throw Exception("Token atau data pengguna tidak ditemukan.");
       }
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: e.toString(),
+      showToast(
+        e.toString(),
+        context: context,
         backgroundColor: Colors.red,
-        toastLength: Toast.LENGTH_LONG,
+        duration: const Duration(seconds: 4),
       );
     } finally {
       if (mounted) {

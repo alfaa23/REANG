@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
@@ -64,7 +64,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         setState(() {
           _isKategoriLoading = false; // Hentikan loading meskipun error
         });
-        Fluttertoast.showToast(msg: "Gagal memuat daftar kategori.");
+        showToast("Gagal memuat daftar kategori.", context: context);
       }
     }
   }
@@ -133,16 +133,18 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         _selectedKategori == null ||
         _lokasiController.text.isEmpty ||
         _deskripsiController.text.isEmpty) {
-      Fluttertoast.showToast(
-        msg: "Harap lengkapi semua kolom yang wajib diisi.",
+      showToast(
+        "Harap lengkapi semua kolom yang wajib diisi.",
+        context: context,
         backgroundColor: Colors.red,
       );
       return;
     }
 
     if (!_isStatementChecked) {
-      Fluttertoast.showToast(
-        msg: "Anda harus menyetujui pernyataan pertanggungjawaban.",
+      showToast(
+        "Anda harus menyetujui pernyataan pertanggungjawaban.",
+        context: context,
         backgroundColor: Colors.red,
       );
       return;
@@ -181,8 +183,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isLoggedIn || authProvider.token == null) {
-      Fluttertoast.showToast(
-        msg: "Sesi Anda telah berakhir, silakan login kembali.",
+      showToast(
+        "Sesi Anda telah berakhir, silakan login kembali.",
+        context: context,
       );
       setState(() => _isSubmitting = false);
       return;
@@ -205,8 +208,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         token: authProvider.token!,
       );
 
-      Fluttertoast.showToast(
-        msg: "Laporan berhasil dikirim!",
+      showToast(
+        "Laporan berhasil dikirim!",
+        context: context,
         backgroundColor: Colors.green,
       );
 
@@ -219,8 +223,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         (Route<dynamic> route) => route.isFirst,
       );
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Gagal mengirim laporan: ${e.toString()}",
+      showToast(
+        "Gagal mengirim laporan: ${e.toString()}",
+        context: context,
         backgroundColor: Colors.red,
       );
     } finally {

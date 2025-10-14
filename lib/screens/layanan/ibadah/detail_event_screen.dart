@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/event_keagamaan_model.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
@@ -11,7 +11,11 @@ class DetailEventScreen extends StatelessWidget {
   const DetailEventScreen({super.key, required this.event});
 
   // --- Fungsi untuk membuka aplikasi peta ---
-  Future<void> _launchMapsUrl(String lat, String lng) async {
+  Future<void> _launchMapsUrl(
+    BuildContext context,
+    String lat,
+    String lng,
+  ) async {
     final Uri url = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
@@ -20,7 +24,7 @@ class DetailEventScreen extends StatelessWidget {
         throw 'Tidak dapat membuka aplikasi peta';
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      showToast(e.toString(), context: context);
     }
   }
 
@@ -169,8 +173,11 @@ class DetailEventScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () =>
-                            _launchMapsUrl(event.latitude, event.longitude),
+                        onPressed: () => _launchMapsUrl(
+                          context,
+                          event.latitude,
+                          event.longitude,
+                        ),
                         icon: const Icon(Icons.map_outlined),
                         label: const Text('Lihat Lokasi di Peta'),
                         // --- PERUBAHAN: Menyesuaikan gaya tombol ---

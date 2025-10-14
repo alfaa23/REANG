@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 class FormUsulanScreen extends StatefulWidget {
   const FormUsulanScreen({Key? key}) : super(key: key);
@@ -38,14 +38,17 @@ class _FormUsulanScreenState extends State<FormUsulanScreen> {
         _selectedKategori == null ||
         _deskripsiController.text.isEmpty) {
       // --- PERUBAHAN: Menggunakan Toast untuk notifikasi error ---
-      Fluttertoast.showToast(
-        msg: "Harap lengkapi semua kolom yang wajib diisi.",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
+      showToast(
+        "Harap lengkapi semua kolom yang wajib diisi.",
+        context: context, // wajib di versi baru
+        alignment: Alignment.bottomCenter, // posisi bawah
         backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 16.0,
+        textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
+        duration: const Duration(seconds: 2), // pengganti LENGTH_SHORT
+        animation: StyledToastAnimation.slideFromBottom,
+        reverseAnimation: StyledToastAnimation.fade,
       );
+
       return;
     }
 
@@ -82,13 +85,15 @@ class _FormUsulanScreenState extends State<FormUsulanScreen> {
     // TODO: Tambahkan logika untuk mengirim data ke API di sini
 
     // Tampilkan notifikasi toast, bukan snackbar
-    Fluttertoast.showToast(
-      msg: "Usulan berhasil dikirim!",
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
+    showToast(
+      "Usulan berhasil dikirim!",
+      context: context, // wajib di versi baru
+      alignment: Alignment.bottomCenter, // pengganti gravity
       backgroundColor: Colors.green,
-      textColor: Colors.white,
-      fontSize: 16.0,
+      textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
+      duration: const Duration(seconds: 2), // pengganti Toast.LENGTH_SHORT
+      animation: StyledToastAnimation.slideFromBottom,
+      reverseAnimation: StyledToastAnimation.fade,
     );
 
     // Kembali ke halaman sebelumnya

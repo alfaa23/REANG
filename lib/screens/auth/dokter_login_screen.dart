@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // --- TAMBAHAN: Import halaman tujuan dokter ---
 import 'package:reang_app/screens/dokter/konsultasi_pasien_screen.dart';
@@ -32,8 +32,9 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
     if (_isLoading) return;
 
     if (_nameController.text.isEmpty || _passwordController.text.isEmpty) {
-      Fluttertoast.showToast(
-        msg: "Nama dan password tidak boleh kosong.",
+      showToast(
+        "Nama dan password tidak boleh kosong.",
+        context: context,
         backgroundColor: Colors.red,
       );
       return;
@@ -54,7 +55,7 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
       await Provider.of<AuthProvider>(
         context,
         listen: false,
-      ).setAdmin(response['user'], response['token']);
+      ).login(response['user'], response['token']);
 
       // Pastikan widget masih ada sebelum navigasi
       if (!mounted) return;
@@ -65,10 +66,11 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
         (route) => false, // Hapus semua halaman di belakangnya
       );
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: e.toString(),
+      showToast(
+        e.toString(),
+        context: context,
         backgroundColor: Colors.red,
-        toastLength: Toast.LENGTH_LONG,
+        duration: const Duration(seconds: 4),
       );
     } finally {
       // Pastikan loading indicator selalu mati jika terjadi error

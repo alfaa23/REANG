@@ -3,7 +3,7 @@ import 'package:reang_app/models/info_kerja_model.dart';
 // --- PERBAIKAN: Menggunakan package lengkap untuk mendukung WidgetFactory ---
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 class DetailLowonganScreen extends StatelessWidget {
   // Menerima objek InfoKerjaModel, bukan Map
@@ -31,7 +31,7 @@ class DetailLowonganScreen extends StatelessWidget {
         throw 'Tidak dapat membuka WhatsApp.';
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      showToast(e.toString(), context: context);
     }
   }
 

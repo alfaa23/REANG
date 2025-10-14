@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "703588825307",
+    "project_id": "reang-app",
+    "storage_bucket": "reang-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:703588825307:android:f52b18a20336eb148df4fe",
+        "android_client_info": {
+          "package_name": "com.example.reang_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD98Q4tECHd8C0jdzyyJ4S94yD3WUEhDPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

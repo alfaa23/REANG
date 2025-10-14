@@ -5,7 +5,7 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/pasar/update_harga_pangan_screen.dart';
 import 'package:reang_app/screens/peta/peta_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // Kelas helper untuk menyimpan data cache per kategori
 class _CachedCategoryData {
@@ -98,7 +98,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
           _cache[category]!.isInitiated = true;
         });
       }
-      Fluttertoast.showToast(msg: "Gagal memuat data pasar.");
+      showToast("Gagal memuat data pasar.", context: context);
     }
   }
 
@@ -166,7 +166,7 @@ class _PasarYuScreenState extends State<PasarYuScreen> {
         throw 'Tidak dapat membuka aplikasi peta';
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      showToast(e.toString(), context: context);
     }
   }
 

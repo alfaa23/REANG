@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 
@@ -476,13 +476,27 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         Expanded(
           child: ElevatedButton(
             onPressed: () {
-              Fluttertoast.showToast(
-                msg: "Produk ditambahkan ke keranjang!",
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
+              showToast(
+                "Produk ditambahkan ke keranjang!",
+                context: context,
+
+                // 'gravity' diubah menjadi 'position'
+                position: StyledToastPosition.bottom,
+
+                // 'toastLength' diubah menjadi 'duration'
+                duration: const Duration(seconds: 2), // Durasi untuk SHORT
+                // backgroundColor tetap sama
                 backgroundColor: Colors.black.withOpacity(0.7),
-                textColor: Colors.white,
-                fontSize: 16.0,
+
+                // 'textColor' dan 'fontSize' digabung ke dalam 'textStyle'
+                textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
+
+                // Opsional: Tambahan untuk tampilan yang lebih bagus
+                borderRadius: BorderRadius.circular(8.0),
+                textPadding: const EdgeInsets.symmetric(
+                  horizontal: 18.0,
+                  vertical: 10.0,
+                ),
               );
             },
             style: ElevatedButton.styleFrom(

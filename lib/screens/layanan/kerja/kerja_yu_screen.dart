@@ -7,7 +7,7 @@ import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
 // --- PERUBAHAN: Mengimpor file view GLIK yang baru ---
 import 'package:reang_app/screens/layanan/kerja/glik_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:html_unescape/html_unescape.dart';
 
 // --- TAMBAHAN: Kelas helper untuk menyimpan data cache per kategori ---
@@ -266,7 +266,7 @@ class _BerandaKerjaViewState extends State<_BerandaKerjaView> {
           _cache[category]!.isInitiated = true;
         });
       }
-      Fluttertoast.showToast(msg: "Gagal memuat data.");
+      showToast("Gagal memuat data.", context: context);
     }
   }
 

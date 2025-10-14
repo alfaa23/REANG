@@ -6,7 +6,7 @@ import 'package:reang_app/screens/layanan/pajak/detail_pajak_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:html_unescape/html_unescape.dart'; // Import untuk membersihkan HTML
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 class PajakYuScreen extends StatefulWidget {
   const PajakYuScreen({super.key});
@@ -153,7 +153,7 @@ class _InfoPajakViewState extends State<_InfoPajakView> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      Fluttertoast.showToast(msg: "Gagal memuat info pajak.");
+      showToast("Gagal memuat info pajak.", context: context);
     }
   }
 

@@ -135,15 +135,11 @@ class DetailDokterScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
         child: ElevatedButton(
           onPressed: () {
-            final doctorMap = {
-              'nama': dokter.nama,
-              'spesialis': dokter.fitur,
-              'foto_url': dokter.fotoUrl,
-            };
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatScreen(doctorData: doctorMap),
+                // Langsung kirim seluruh objek 'dokter' ke parameter 'recipient'
+                builder: (_) => ChatScreen(recipient: dokter),
               ),
             );
           },

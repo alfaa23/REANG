@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/home/panic_hold_screen.dart'; // <-- PENAMBAHAN: Import layar baru
 // import 'package:reang_app/services/api_service.dart'; // Aktifkan jika sudah siap
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -88,7 +88,8 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
   // --- PENAMBAHAN: Fungsi baru untuk menavigasi ke layar konfirmasi ---
   void _navigateToHoldScreen(PanicService service) {
     if (service.phoneNumber.isEmpty) {
-      Fluttertoast.showToast(msg: 'Nomor tidak tersedia');
+      showToast('Nomor tidak tersedia', context: context);
+
       return;
     }
     Navigator.push(

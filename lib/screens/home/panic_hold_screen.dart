@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Kelas helper untuk membawa data layanan darurat
@@ -63,7 +63,7 @@ class _PanicHoldScreenState extends State<PanicHoldScreen> {
         throw 'Tidak dapat melakukan panggilan ke ${widget.service.phoneNumber}';
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      showToast(e.toString(), context: context);
     } finally {
       if (mounted) {
         setState(() {

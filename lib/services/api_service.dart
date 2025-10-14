@@ -757,6 +757,20 @@ class ApiService {
     }
   }
 
+  // --- TAMBAHKAN FUNGSI INI --- Firebase token
+  Future<String> getFirebaseToken(String laravelToken) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/firebase/token',
+        options: Options(headers: {'Authorization': 'Bearer $laravelToken'}),
+      );
+      return response.data['firebase_custom_token'];
+    } catch (e) {
+      print("Gagal mendapatkan token Firebase: $e");
+      throw Exception("Gagal mendapatkan token Firebase");
+    }
+  }
+
   // =======================================================================
   // --- BAGIAN OTENTIKASI (DIPERBARUI) --- buat chek token masih berlaku tidak ini
   // =======================================================================

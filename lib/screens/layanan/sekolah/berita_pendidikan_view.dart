@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:reang_app/models/berita_pendidikan_model.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/layanan/sekolah/detail_berita_pendidikan_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:html_unescape/html_unescape.dart';
@@ -50,7 +50,7 @@ class _BeritaPendidikanViewState extends State<BeritaPendidikanView> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      Fluttertoast.showToast(msg: "Gagal memuat berita pendidikan.");
+      showToast("Gagal memuat berita pendidikan.", context: context);
     }
   }
 

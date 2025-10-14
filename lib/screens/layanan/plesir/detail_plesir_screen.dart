@@ -7,7 +7,7 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:reang_app/screens/auth/login_screen.dart'; // PENAMBAHAN: Import LoginScreen
 
@@ -65,7 +65,7 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      Fluttertoast.showToast(msg: "Gagal memuat ulasan.");
+      showToast("Gagal memuat ulasan.", context: context);
     }
   }
 
@@ -117,7 +117,7 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
         throw 'Tidak dapat membuka aplikasi peta';
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      showToast(e.toString(), context: context);
     }
   }
 
@@ -146,14 +146,16 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                   ratingId: ratingId,
                   token: authProvider.token!,
                 );
-                Fluttertoast.showToast(
-                  msg: "Ulasan berhasil dihapus",
+                showToast(
+                  "Ulasan berhasil dihapus",
+                  context: context,
                   backgroundColor: Colors.green,
                 );
                 _loadInitialReviews();
               } catch (e) {
-                Fluttertoast.showToast(
-                  msg: e.toString(),
+                showToast(
+                  e.toString(),
+                  context: context,
                   backgroundColor: Colors.red,
                 );
               }
@@ -586,15 +588,17 @@ class _DetailPlesirScreenState extends State<DetailPlesirScreen> {
                                   );
                                 }
 
-                                Fluttertoast.showToast(
-                                  msg: "Ulasan berhasil dikirim!",
+                                showToast(
+                                  "Ulasan berhasil dikirim!",
+                                  context: context,
                                   backgroundColor: Colors.green,
                                 );
                                 Navigator.of(context).pop();
                                 _loadInitialReviews();
                               } catch (e) {
-                                Fluttertoast.showToast(
-                                  msg: e.toString(),
+                                showToast(
+                                  e.toString(),
+                                  context: context,
                                   backgroundColor: Colors.red,
                                 );
                               }

@@ -1,85 +1,74 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/user_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:shimmer/shimmer.dart';
 
-// Model sederhana untuk pesan
-class ChatMessage {
+// Model untuk pesan dari Firestore
+class FirestoreMessage {
+  final String senderId;
   final String text;
-  final bool isSender; // true jika dari pengguna, false jika dari dokter
-  final String time;
+  final Timestamp? timestamp;
 
-  ChatMessage({required this.text, required this.isSender, required this.time});
+  FirestoreMessage({
+    required this.senderId,
+    required this.text,
+    this.timestamp,
+  });
+
+  factory FirestoreMessage.fromDoc(DocumentSnapshot doc) {
+    Map data = doc.data() as Map<String, dynamic>;
+    return FirestoreMessage(
+      senderId: data['senderId'] ?? '',
+      text: data['text'] ?? '',
+      timestamp: data['timestamp'] as Timestamp?,
+    );
+  }
 }
 
 class ChatScreen extends StatefulWidget {
-  final Map<String, dynamic> doctorData;
-  const ChatScreen({super.key, required this.doctorData});
+  final dynamic recipient;
+  const ChatScreen({super.key, required this.recipient});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  // State UI
   final TextEditingController _controller = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
-
-  // key untuk pesan terakhir agar ensureVisible
   final GlobalKey _lastMessageKey = GlobalKey();
-
-  // key untuk composer agar bisa ukur tinggi composer
   final GlobalKey _composerKey = GlobalKey();
-
-  // padding bottom yang dipakai ListView (komposerHeight + defaultPadding)
   double _listViewBottomPadding = 16.0;
-
-  // apakah ListView saat ini bisa discroll (konten overflow)?
   bool _canScroll = false;
 
-  // Data dummy untuk percakapan (urut dari atas ke bawah)
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text:
-          'Selamat pagi! Saya Dr. Sarah. Ada keluhan apa yang bisa saya bantu hari ini?',
-      isSender: false,
-      time: '09:15',
-    ),
-    ChatMessage(
-      text:
-          'Pagi dok, saya merasa pusing dan mual sejak kemarin. Apakah ini gejala yang serius?',
-      isSender: true,
-      time: '09:16',
-    ),
-    ChatMessage(
-      text:
-          'Terima kasih sudah menjelaskan keluhannya. Untuk membantu diagnosis yang lebih akurat, boleh saya tahu sudah berapa lama mengalami gejala ini? Dan apakah ada gejala lain yang menyertai?',
-      isSender: false,
-      time: '09:17',
-    ),
-    ChatMessage(
-      text:
-          'Sudah sekitar 2 hari dok. Selain pusing dan mual, saya juga merasa lemas dan tidak nafsu makan.',
-      isSender: true,
-      time: '09:18',
-    ),
-  ];
+  // State Logika
+  List<FirestoreMessage> _messages = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  String _chatId = '';
+  String _myId = '';
+  String _recipientId = '';
+  StreamSubscription? _chatSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupChatAndListen();
+    });
     WidgetsBinding.instance.addObserver(this);
-
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         _updateComposerHeightAndEnsureVisible(immediate: true);
       }
     });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateComposerHeightAndEnsureVisible(immediate: true);
-      _updateCanScroll();
-    });
-
     _scrollController.addListener(() {
       _updateCanScroll();
     });
@@ -87,6 +76,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _chatSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _scrollController.dispose();
@@ -94,7 +84,138 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // keyboard muncul/tutup => update composer height & pastikan pesan terakhir terlihat INSTANT
+  void _setupChatAndListen() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (!authProvider.isLoggedIn ||
+        (authProvider.user == null && authProvider.admin == null)) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "Sesi tidak valid. Silakan login kembali.";
+      });
+      return;
+    }
+
+    _myId =
+        (authProvider.role == 'dokter'
+                ? authProvider.admin!.id
+                : authProvider.user!.id)
+            .toString();
+    _recipientId = (widget.recipient is DokterModel)
+        ? (widget.recipient as DokterModel).adminId.toString()
+        : widget.recipient.id.toString();
+
+    List<String> ids = [_myId, _recipientId]..sort();
+    _chatId = ids.join('_');
+
+    _listenToMessages();
+    _clearUnreadForChat(_chatId, _myId); // Panggil fungsi baru di sini
+  }
+
+  // --- FUNGSI BARU DITAMBAHKAN DI SINI ---
+  Future<void> _clearUnreadForChat(String chatDocId, String myId) async {
+    if (chatDocId.isEmpty || myId.isEmpty) return;
+    final chatDocRef = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatDocId);
+    try {
+      // Cara paling efisien untuk mengupdate satu field di dalam map
+      await chatDocRef.update({'unreadCount.$myId': 0});
+    } catch (e) {
+      // Jika gagal (misalnya field/dokumen belum ada), gunakan set(merge) sebagai fallback
+      try {
+        await chatDocRef.set({
+          'unreadCount': {myId: 0},
+        }, SetOptions(merge: true));
+      } catch (e2) {
+        debugPrint('Gagal membersihkan unread count untuk $chatDocId: $e2');
+      }
+    }
+  }
+
+  void _listenToMessages() {
+    setState(() => _isLoading = true);
+    _chatSubscription = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(_chatId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (mounted) {
+              setState(() {
+                _messages = snapshot.docs
+                    .map((doc) => FirestoreMessage.fromDoc(doc))
+                    .toList();
+                _isLoading = false;
+                _errorMessage = null;
+              });
+              _ensureLastMessageVisibleImmediate(immediate: true);
+              _updateCanScroll();
+            }
+          },
+          onError: (error) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+              debugPrint("Firestore Listen Error: $error");
+            }
+          },
+        );
+  }
+
+  Future<void> _sendMessage() async {
+    if (_controller.text.trim().isEmpty) return;
+    final messageText = _controller.text.trim();
+    _controller.clear();
+
+    final messageData = {
+      'senderId': _myId,
+      'text': messageText,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final myName = authProvider.role == 'dokter'
+        ? authProvider.admin!.name
+        : authProvider.user!.name;
+    final recipientName = (widget.recipient is UserModel)
+        ? (widget.recipient as UserModel).name
+        : (widget.recipient as DokterModel).nama;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      final chatDocRef = firestore.collection('chats').doc(_chatId);
+      final messageDocRef = chatDocRef.collection('messages').doc();
+
+      batch.set(chatDocRef, {
+        'participants': [_myId, _recipientId],
+        'participantNames': [myName, recipientName],
+        'lastMessage': messageText,
+        'lastMessageTimestamp': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': _myId,
+        'unreadCount': {_recipientId: FieldValue.increment(1)},
+      }, SetOptions(merge: true));
+      batch.set(messageDocRef, messageData);
+      await batch.commit();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengirim pesan: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    if (_focusNode.canRequestFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
   @override
   void didChangeMetrics() {
     _updateComposerHeightAndEnsureVisible(immediate: true);
@@ -102,81 +223,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.didChangeMetrics();
   }
 
-  void _sendMessage() {
-    if (_controller.text.isNotEmpty) {
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            text: _controller.text,
-            isSender: true,
-            time: _currentTime(),
-          ),
-        );
-        _controller.clear();
-      });
-
-      if (_focusNode.canRequestFocus) {
-        _focusNode.requestFocus();
-      }
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateComposerHeightAndEnsureVisible(immediate: true);
-        _updateCanScroll();
-      });
-
-      // TODO: Kirim pesan ke backend Laravel
-    }
-  }
-
-  String _currentTime() {
-    final now = DateTime.now();
-    final h = now.hour.toString().padLeft(2, '0');
-    final m = now.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source);
-    if (image != null) {
-      print('Image picked: ${image.path}');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateComposerHeightAndEnsureVisible(immediate: true);
-        _updateCanScroll();
-      });
-    }
-  }
-
-  void _showImagePickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Galeri'),
-                onTap: () {
-                  _pickImage(ImageSource.gallery);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('Kamera'),
-                onTap: () {
-                  _pickImage(ImageSource.camera);
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ukur composer, set padding bottom = composerHeight + defaultPadding (JANGAN masukkan keyboard inset)
   void _updateComposerHeightAndEnsureVisible({bool immediate = false}) {
     double composerHeight = 0;
     try {
@@ -185,25 +231,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (renderBox != null && renderBox.hasSize) {
         composerHeight = renderBox.size.height;
       }
-    } catch (_) {
-      composerHeight = 0;
-    }
-
+    } catch (_) {}
     final desiredPadding = 16.0 + composerHeight;
-
     if ((desiredPadding - _listViewBottomPadding).abs() > 1.0) {
       setState(() {
         _listViewBottomPadding = desiredPadding;
       });
     }
-
     _ensureLastMessageVisibleImmediate(immediate: immediate);
   }
 
-  // pastikan pesan terakhir terlihat. immediate = true -> durasi zero
   void _ensureLastMessageVisibleImmediate({bool immediate = false}) {
     if (!mounted) return;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       try {
@@ -212,37 +251,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _lastMessageKey.currentContext!,
             duration: immediate
                 ? Duration.zero
-                : const Duration(milliseconds: 1),
+                : const Duration(milliseconds: 300),
             alignment: 1.0,
             curve: Curves.easeOut,
           );
-        } else if (_scrollController.hasClients) {
+        } else if (_scrollController.hasClients &&
+            _scrollController.position.hasContentDimensions) {
           final max = _scrollController.position.maxScrollExtent;
           _scrollController.jumpTo(max);
         }
-      } catch (e) {
-        // ignore jika belum siap
-      }
+      } catch (e) {}
     });
   }
 
-  // Update _canScroll: jika maxScrollExtent > 0 => overflow => boleh scroll.
-  // Selain itu: jika keyboard terbuka dan konten muat (max <=0), kita force non-scrollable.
   void _updateCanScroll() {
-    if (!mounted) return;
-    if (!_scrollController.hasClients) {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        !_scrollController.position.hasContentDimensions) {
       if (_canScroll != false) setState(() => _canScroll = false);
       return;
     }
-    bool newCanScroll = false;
+    bool newCanScroll;
     try {
-      final maxExtent = _scrollController.position.maxScrollExtent;
-      final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-      // Jika ada overflow, izinkan scroll. Jika tidak ada overflow but keyboard terbuka, disable scroll.
-      newCanScroll = maxExtent > 0.0;
-      if (!newCanScroll && keyboardOpen) {
-        newCanScroll = false;
-      }
+      newCanScroll = _scrollController.position.maxScrollExtent > 0.0;
     } catch (_) {
       newCanScroll = false;
     }
@@ -254,71 +285,53 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    String recipientName;
+    String? recipientFotoUrl;
 
-    // pilih physics berdasarkan apakah konten overflow
+    if (widget.recipient is DokterModel) {
+      recipientName = (widget.recipient as DokterModel).nama;
+      recipientFotoUrl = (widget.recipient as DokterModel).fotoUrl;
+    } else if (widget.recipient is UserModel) {
+      recipientName = (widget.recipient as UserModel).name;
+      recipientFotoUrl = null;
+    } else {
+      recipientName = 'Tidak Dikenal';
+      recipientFotoUrl = null;
+    }
+
     final ScrollPhysics physics = _canScroll
-        ? const ClampingScrollPhysics()
+        ? const BouncingScrollPhysics()
         : const NeverScrollableScrollPhysics();
 
-    // AbsorbPointer digunakan untuk memblok gesture saat kita tidak ingin scroll,
-    // ini mencegah user drag ke area kosong saat keyboard terbuka dan konten muat.
-    final listView = NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is OverscrollNotification) {
-          final metrics = notification.metrics;
-          if (metrics.pixels > metrics.maxScrollExtent + 0.5) {
-            if (_scrollController.hasClients) {
-              try {
-                _scrollController.jumpTo(metrics.maxScrollExtent);
-              } catch (_) {}
-            }
-            return true;
-          }
-        }
-        return false;
-      },
-      child: AbsorbPointer(
-        absorbing: !_canScroll && MediaQuery.of(context).viewInsets.bottom > 0,
-        child: ListView.builder(
-          controller: _scrollController,
-          physics: physics,
-          padding: EdgeInsets.fromLTRB(
-            16.0,
-            16.0,
-            16.0,
-            _listViewBottomPadding,
-          ),
-          itemCount: _messages.length,
-          itemBuilder: (context, index) {
-            final message = _messages[index];
-            if (index == _messages.length - 1) {
-              return Container(
-                key: _lastMessageKey,
-                child: _ChatMessageBubble(message: message),
-              );
-            } else {
-              return _ChatMessageBubble(message: message);
-            }
-          },
-        ),
-      ),
-    );
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         title: Row(
           children: [
             const BackButton(),
-            const CircleAvatar(child: Text('DS')),
+            CircleAvatar(
+              backgroundImage:
+                  (recipientFotoUrl != null && recipientFotoUrl.isNotEmpty)
+                  ? NetworkImage(
+                      recipientFotoUrl,
+                      headers: const {'ngrok-skip-browser-warning': 'true'},
+                    )
+                  : null,
+              child: (recipientFotoUrl == null || recipientFotoUrl.isEmpty)
+                  ? Text(
+                      recipientName.isNotEmpty
+                          ? recipientName.substring(0, 1).toUpperCase()
+                          : '?',
+                    )
+                  : null,
+            ),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.doctorData['nama'],
+                  recipientName,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
@@ -344,7 +357,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
-          Expanded(child: listView),
+          Expanded(
+            child: _isLoading
+                ? _buildShimmerEffect(theme)
+                : _errorMessage != null
+                ? Center(child: Text(_errorMessage!))
+                : _messages.isEmpty
+                ? const Center(child: Text('Mulai percakapan Anda.'))
+                : AbsorbPointer(
+                    absorbing:
+                        !_canScroll &&
+                        MediaQuery.of(context).viewInsets.bottom > 0,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      physics: physics,
+                      padding: EdgeInsets.fromLTRB(
+                        16.0,
+                        16.0,
+                        16.0,
+                        _listViewBottomPadding,
+                      ),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final message = _messages[index];
+                        final isMyMessage = message.senderId == _myId;
+                        final bubble = _ChatMessageBubble(
+                          message: message,
+                          isMyMessage: isMyMessage,
+                        );
+
+                        if (index == _messages.length - 1) {
+                          return Container(key: _lastMessageKey, child: bubble);
+                        } else {
+                          return bubble;
+                        }
+                      },
+                    ),
+                  ),
+          ),
           Container(
             key: _composerKey,
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
@@ -361,13 +411,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: SafeArea(
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.camera_alt_outlined,
-                      color: theme.hintColor,
-                    ),
-                    onPressed: _showImagePickerOptions,
-                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -384,6 +427,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           horizontal: 16,
                         ),
                       ),
+                      onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -399,24 +443,55 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
     );
   }
+
+  Widget _buildShimmerEffect(ThemeData theme) {
+    return Shimmer.fromColors(
+      baseColor: theme.brightness == Brightness.dark
+          ? Colors.grey[800]!
+          : Colors.grey[300]!,
+      highlightColor: theme.brightness == Brightness.dark
+          ? Colors.grey[700]!
+          : Colors.grey[100]!,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [
+          _ShimmerBubble(isMyMessage: false),
+          _ShimmerBubble(isMyMessage: true),
+          _ShimmerBubble(isMyMessage: false),
+          _ShimmerBubble(isMyMessage: true, isShort: true),
+          _ShimmerBubble(isMyMessage: false),
+        ],
+      ),
+    );
+  }
 }
 
-// Widget untuk gelembung chat
 class _ChatMessageBubble extends StatelessWidget {
-  final ChatMessage message;
-  const _ChatMessageBubble({required this.message});
+  final FirestoreMessage message;
+  final bool isMyMessage;
+  const _ChatMessageBubble({required this.message, required this.isMyMessage});
+
+  String _formatTime(BuildContext context, Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final dt = timestamp.toDate().toLocal();
+      return DateFormat('HH:mm').format(dt);
+    } catch (e) {
+      return '--:--';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isSender = message.isSender;
-    final alignment = isSender
+    final alignment = isMyMessage
         ? CrossAxisAlignment.end
         : CrossAxisAlignment.start;
-    final color = isSender
+    final color = isMyMessage
         ? theme.colorScheme.primary
         : theme.colorScheme.surfaceContainerHighest;
-    final textColor = isSender
+    final textColor = isMyMessage
         ? theme.colorScheme.onPrimary
         : theme.colorScheme.onSurface;
 
@@ -443,8 +518,43 @@ class _ChatMessageBubble extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          message.time,
+          _formatTime(context, message.timestamp),
           style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _ShimmerBubble extends StatelessWidget {
+  final bool isMyMessage;
+  final bool isShort;
+  const _ShimmerBubble({this.isMyMessage = false, this.isShort = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: isMyMessage
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: isShort ? 150 : MediaQuery.of(context).size.width * 0.6,
+          height: isShort ? 30 : 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: 50,
+          height: 10,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
         const SizedBox(height: 16),
       ],
