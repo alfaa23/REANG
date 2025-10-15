@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- 1. Import Firebase Auth
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:reang_app/models/admin_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+// Import Firebase Auth sudah tidak diperlukan di sini
 
 class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
@@ -22,12 +23,11 @@ class AuthProvider with ChangeNotifier {
       (_currentUser is AdminModel) ? _currentUser as AdminModel : null;
   String? get token => _token;
 
-  /// Fungsi login gabungan untuk User dan Admin
+  // Fungsi login sekarang hanya mengurus Laravel
   Future<void> login(Object userObject, String laravelToken) async {
     _currentUser = userObject;
     _token = laravelToken;
 
-    // Tentukan role dan simpan data ke storage
     if (userObject is UserModel) {
       _role = userObject.role;
       await _storage.write(
@@ -45,23 +45,11 @@ class AuthProvider with ChangeNotifier {
     await _storage.write(key: 'user_token', value: laravelToken);
     await _storage.write(key: 'user_role', value: _role);
 
-    // --- BAGIAN BARU: LOGIN KE FIREBASE ---
-    try {
-      final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
-      await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
-      debugPrint("Login ke Firebase berhasil!");
-    } catch (e) {
-      debugPrint("Gagal login ke Firebase: $e");
-      // Jika gagal login ke firebase, kita batalkan login dari laravel juga agar konsisten
-      await logout();
-      throw Exception("Gagal otentikasi dengan Firebase.");
-    }
-    // -------------------------------------
-
+    // Bagian login ke Firebase dihapus dari sini
     notifyListeners();
   }
 
-  /// Memeriksa sesi saat aplikasi dibuka
+  // tryAutoLogin sekarang hanya mengurus Laravel
   Future<void> tryAutoLogin() async {
     final storedToken = await _storage.read(key: 'user_token');
     final storedRole = await _storage.read(key: 'user_role');
@@ -83,36 +71,32 @@ class AuthProvider with ChangeNotifier {
       }
       _role = storedRole;
       _token = storedToken;
-
-      // --- BAGIAN BARU: LOGIN KE FIREBASE SAAT AUTO-LOGIN ---
-      try {
-        final firebaseToken = await _apiService.getFirebaseToken(storedToken);
-        await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
-        debugPrint("Auto-login ke Firebase berhasil!");
-      } catch (e) {
-        debugPrint("Gagal auto-login ke Firebase: $e");
-        await logout(); // Jika gagal, logout dari semua sistem
-      }
-      // ----------------------------------------------------
+      // Bagian auto-login ke Firebase dihapus dari sini
     } else {
       await logout();
     }
     notifyListeners();
   }
 
-  /// Membersihkan sesi dari Laravel dan Firebase
   Future<void> logout() async {
-    // Logout dari Firebase Auth
-    if (FirebaseAuth.instance.currentUser != null) {
-      await FirebaseAuth.instance.signOut();
-      debugPrint("Berhasil logout dari Firebase.");
+    try {
+      // 1. Coba logout dari Firebase terlebih dahulu
+      if (FirebaseAuth.instance.currentUser != null) {
+        await FirebaseAuth.instance.signOut();
+        debugPrint("Berhasil logout dari Firebase.");
+      }
+    } catch (e) {
+      // Jika logout Firebase error, cukup catat errornya tapi jangan hentikan proses
+      debugPrint("Error saat logout dari Firebase: $e");
+    } finally {
+      // 2. BLOK INI AKAN SELALU DIJALANKAN, baik logout Firebase berhasil maupun gagal
+      // Hapus state dan data lokal Laravel
+      _currentUser = null;
+      _token = null;
+      _role = null;
+      await _storage.deleteAll();
+      notifyListeners();
+      debugPrint("Sesi lokal (Laravel) berhasil dihapus.");
     }
-
-    // Hapus state dan data lokal
-    _currentUser = null;
-    _token = null;
-    _role = null;
-    await _storage.deleteAll();
-    notifyListeners();
   }
 }

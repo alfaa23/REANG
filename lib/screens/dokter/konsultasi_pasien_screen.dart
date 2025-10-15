@@ -9,6 +9,7 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:reang_app/services/api_service.dart';
 
 class KonsultasiPasienScreen extends StatefulWidget {
   const KonsultasiPasienScreen({super.key});
@@ -220,7 +221,6 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
             itemBuilder: (context, index) {
               final chatDoc = chatDocs[index];
               final chatData = chatDoc.data() as Map<String, dynamic>;
-              final chatId = chatDoc.id;
 
               String patientName = 'Pasien';
               String patientId = '';
@@ -330,25 +330,48 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                   ],
                 ),
                 onTap: () async {
-                  // CLEAR unread sebelum masuk chat (menghindari race condition)
-                  await _clearUnreadForChat(chatId, myId);
+                  // Cek apakah sudah login ke Firebase
+                  if (FirebaseAuth.instance.currentUser == null) {
+                    try {
+                      final token = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      ).token;
+                      if (token == null) return;
 
-                  // Masuk ke ChatScreen
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ChatScreen(recipient: patientUser),
-                    ),
-                  );
+                      final firebaseToken = await ApiService().getFirebaseToken(
+                        token,
+                      );
+                      await FirebaseAuth.instance.signInWithCustomToken(
+                        firebaseToken,
+                      );
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Gagal terhubung kembali ke server chat.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                  }
 
-                  // Safety: pastikan unread cleared setelah kembali dari chat
-                  await _clearUnreadForChat(chatId, myId);
-
-                  // Refresh stream/list (tetap pake inisialisasi ulang)
                   if (mounted) {
-                    setState(() {
-                      _initializeStream();
-                    });
+                    // Setelah dipastikan login, baru clear notif dan navigasi
+                    if (hasUnread) {
+                      await _clearUnreadForChat(chatDoc.id, myId);
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ChatScreen(recipient: patientUser),
+                      ),
+                    );
                   }
                 },
               );

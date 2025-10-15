@@ -22,6 +22,7 @@ import 'package:reang_app/models/banner_model.dart';
 import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/dokter_model.dart';
 import 'package:reang_app/models/admin_model.dart';
+import 'package:flutter/foundation.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -1223,6 +1224,33 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mencari puskesmas: $e');
+    }
+  }
+
+  // --- TAMBAHKAN FUNGSI BARU INI ---untuk storage chat image
+
+  Future<String> uploadChatImage(File imageFile, String token) async {
+    try {
+      String fileName = imageFile.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "image": await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+      });
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/chat/upload-image',
+        data: formData,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      // --- PERBAIKAN DI SINI ---
+      // Langsung kembalikan URL yang sudah jadi dari Laravel, tanpa diubah.
+      return response.data['url'];
+    } on DioException catch (e) {
+      debugPrint("Gagal upload gambar: ${e.response?.data}");
+      throw Exception("Gagal upload gambar");
     }
   }
 }

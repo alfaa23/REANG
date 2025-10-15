@@ -1,14 +1,25 @@
+import 'package:firebase_auth/firebase_auth.dart'
+    hide AuthProvider; // <-- PERBAIKAN DI SINI
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
+import 'package:reang_app/services/api_service.dart';
 
-class DetailDokterScreen extends StatelessWidget {
+class DetailDokterScreen extends StatefulWidget {
   final DokterModel dokter;
   const DetailDokterScreen({super.key, required this.dokter});
 
   @override
+  State<DetailDokterScreen> createState() => _DetailDokterScreenState();
+}
+
+class _DetailDokterScreenState extends State<DetailDokterScreen> {
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -17,13 +28,12 @@ class DetailDokterScreen extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           child: Column(
             children: [
-              // HEADER: FOTO + BACK
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // --- PERUBAHAN DI SINI: Menampilkan foto dari URL ---
                   Image.network(
-                    dokter.fotoUrl ?? '',
+                    widget.dokter.fotoUrl ?? '',
+                    headers: const {'ngrok-skip-browser-warning': 'true'},
                     width: double.infinity,
                     height: 240,
                     fit: BoxFit.cover,
@@ -40,8 +50,6 @@ class DetailDokterScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // Tombol back
                   Positioned(
                     top: 16,
                     left: 16,
@@ -62,10 +70,7 @@ class DetailDokterScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // Kartu info dokter
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
@@ -82,43 +87,42 @@ class DetailDokterScreen extends StatelessWidget {
                         _buildOnlineStatus(theme),
                         const SizedBox(height: 12),
                         Text(
-                          dokter.nama,
+                          widget.dokter.nama,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          dokter.fitur,
+                          widget.dokter.fitur,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.hintColor,
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // --- PERUBAHAN DI SINI: Menambahkan info Masa Kerja ---
                         _buildInfoChip(
                           theme,
                           Icons.work_outline,
-                          dokter.masaKerja,
+                          widget.dokter.masaKerja,
                         ),
                         const SizedBox(height: 24),
                         _buildDetailRow(
                           theme,
                           Icons.school_outlined,
                           'Alumnus',
-                          dokter.pendidikan,
+                          widget.dokter.pendidikan,
                         ),
                         _buildDetailRow(
                           theme,
                           Icons.local_hospital_outlined,
                           'Praktik di',
-                          dokter.puskesmas.nama,
+                          widget.dokter.puskesmas.nama,
                         ),
                         _buildDetailRow(
                           theme,
                           Icons.phone_outlined,
                           'Nomor Telepon',
-                          dokter.nomer,
+                          widget.dokter.nomer,
                         ),
                       ],
                     ),
@@ -130,19 +134,56 @@ class DetailDokterScreen extends StatelessWidget {
           ),
         ),
       ),
-      // Tombol Chat
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
         child: ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                // Langsung kirim seluruh objek 'dokter' ke parameter 'recipient'
-                builder: (_) => ChatScreen(recipient: dokter),
-              ),
-            );
-          },
+          onPressed: authProvider.role == 'dokter'
+              ? null
+              : () async {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) =>
+                        const Center(child: CircularProgressIndicator()),
+                  );
+
+                  if (FirebaseAuth.instance.currentUser == null) {
+                    try {
+                      final laravelToken = authProvider.token;
+                      if (laravelToken == null) {
+                        throw Exception("Token Laravel tidak ditemukan.");
+                      }
+
+                      final firebaseToken = await ApiService().getFirebaseToken(
+                        laravelToken,
+                      );
+                      await FirebaseAuth.instance.signInWithCustomToken(
+                        firebaseToken,
+                      );
+                    } catch (e) {
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Gagal terhubung ke server chat.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                  }
+
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(recipient: widget.dokter),
+                      ),
+                    );
+                  }
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: theme.colorScheme.onPrimary,
@@ -159,8 +200,6 @@ class DetailDokterScreen extends StatelessWidget {
       ),
     );
   }
-
-  // ... (sisa kode helper tidak berubah, tapi _buildInfoChip ditambahkan kembali)
 
   Widget _buildOnlineStatus(ThemeData theme) {
     return Container(
@@ -188,7 +227,6 @@ class DetailDokterScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGET INI DITAMBAHKAN KEMBALI ---
   Widget _buildInfoChip(ThemeData theme, IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

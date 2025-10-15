@@ -1,31 +1,42 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/dokter_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/services/api_service.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:reang_app/screens/layanan/sehat/image_preview_screen.dart';
+import 'package:reang_app/screens/layanan/sehat/full_screen_image_viewer.dart';
 
-// Model untuk pesan dari Firestore
+// Model untuk pesan dari Firestore (sudah mendukung teks dan gambar)
 class FirestoreMessage {
   final String senderId;
-  final String text;
+  final String? text; // Jadi nullable
   final Timestamp? timestamp;
+  final String type; // 'text' atau 'image'
+  final String? imageUrl; // Jadi nullable
 
   FirestoreMessage({
     required this.senderId,
-    required this.text,
+    this.text,
     this.timestamp,
+    required this.type,
+    this.imageUrl,
   });
 
   factory FirestoreMessage.fromDoc(DocumentSnapshot doc) {
     Map data = doc.data() as Map<String, dynamic>;
     return FirestoreMessage(
       senderId: data['senderId'] ?? '',
-      text: data['text'] ?? '',
+      text: data['text'],
       timestamp: data['timestamp'] as Timestamp?,
+      type: data['type'] ?? 'text',
+      imageUrl: data['imageUrl'],
     );
   }
 }
@@ -49,6 +60,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _canScroll = false;
 
   // State Logika
+  final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
   List<FirestoreMessage> _messages = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -109,32 +122,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _chatId = ids.join('_');
 
     _listenToMessages();
-    _clearUnreadForChat(_chatId, _myId); // Panggil fungsi baru di sini
-  }
-
-  // --- FUNGSI BARU DITAMBAHKAN DI SINI ---
-  Future<void> _clearUnreadForChat(String chatDocId, String myId) async {
-    if (chatDocId.isEmpty || myId.isEmpty) return;
-    final chatDocRef = FirebaseFirestore.instance
-        .collection('chats')
-        .doc(chatDocId);
-    try {
-      // Cara paling efisien untuk mengupdate satu field di dalam map
-      await chatDocRef.update({'unreadCount.$myId': 0});
-    } catch (e) {
-      // Jika gagal (misalnya field/dokumen belum ada), gunakan set(merge) sebagai fallback
-      try {
-        await chatDocRef.set({
-          'unreadCount': {myId: 0},
-        }, SetOptions(merge: true));
-      } catch (e2) {
-        debugPrint('Gagal membersihkan unread count untuk $chatDocId: $e2');
-      }
-    }
+    _markMessagesAsRead();
   }
 
   void _listenToMessages() {
-    setState(() => _isLoading = true);
     _chatSubscription = FirebaseFirestore.instance
         .collection('chats')
         .doc(_chatId)
@@ -166,17 +157,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
   }
 
-  Future<void> _sendMessage() async {
-    if (_controller.text.trim().isEmpty) return;
-    final messageText = _controller.text.trim();
-    _controller.clear();
+  void _markMessagesAsRead() {
+    FirebaseFirestore.instance.collection('chats').doc(_chatId).set({
+      'unreadCount': {_myId: 0},
+    }, SetOptions(merge: true));
+  }
 
-    final messageData = {
-      'senderId': _myId,
-      'text': messageText,
-      'timestamp': FieldValue.serverTimestamp(),
-    };
-
+  Future<void> _sendFirestoreMessage(
+    Map<String, dynamic> messageData,
+    String lastMessageText,
+  ) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final myName = authProvider.role == 'dokter'
         ? authProvider.admin!.name
@@ -194,7 +184,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       batch.set(chatDocRef, {
         'participants': [_myId, _recipientId],
         'participantNames': [myName, recipientName],
-        'lastMessage': messageText,
+        'lastMessage': lastMessageText,
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
         'lastMessageSenderId': _myId,
         'unreadCount': {_recipientId: FieldValue.increment(1)},
@@ -211,8 +201,105 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
       }
     }
+  }
+
+  Future<void> _sendTextMessage() async {
+    if (_controller.text.trim().isEmpty) return;
+    final messageText = _controller.text.trim();
+    _controller.clear();
+
+    final messageData = {
+      'senderId': _myId,
+      'text': messageText,
+      'type': 'text',
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+    await _sendFirestoreMessage(messageData, messageText);
+
     if (_focusNode.canRequestFocus) {
       _focusNode.requestFocus();
+    }
+  }
+
+  // --- LOGIKA MENGIRIM GAMBAR DIPERBARUI ---
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1080,
+    );
+    if (image == null) return;
+
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ImagePreviewScreen(imageFile: File(image.path)),
+      ),
+    );
+
+    // `result` akan berisi teks caption dari ImagePreviewScreen
+    if (result != null && result is String) {
+      final String caption = result;
+      _uploadAndSendImage(File(image.path), caption);
+    }
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeri'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Kamera'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickImage(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadAndSendImage(File imageFile, String caption) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.token;
+    if (token == null) return;
+
+    // TODO: Tampilkan UI loading/uploading di sini
+
+    try {
+      final imageUrl = await _apiService.uploadChatImage(imageFile, token);
+
+      final messageData = {
+        'senderId': _myId,
+        'type': 'image',
+        'imageUrl': imageUrl,
+        'text': caption, // Simpan caption
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      final lastMessageText = caption.isNotEmpty ? caption : "🖼️ Gambar";
+      await _sendFirestoreMessage(messageData, lastMessageText);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal meng-upload gambar.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -411,6 +498,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: SafeArea(
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(Icons.attach_file, color: theme.hintColor),
+                    onPressed: _showImagePickerOptions,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -427,13 +518,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           horizontal: 16,
                         ),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      onSubmitted: (_) => _sendTextMessage(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.send, color: theme.colorScheme.primary),
-                    onPressed: _sendMessage,
+                    onPressed: _sendTextMessage,
                   ),
                 ],
               ),
@@ -488,34 +579,99 @@ class _ChatMessageBubble extends StatelessWidget {
     final alignment = isMyMessage
         ? CrossAxisAlignment.end
         : CrossAxisAlignment.start;
-    final color = isMyMessage
-        ? theme.colorScheme.primary
-        : theme.colorScheme.surfaceContainerHighest;
-    final textColor = isMyMessage
-        ? theme.colorScheme.onPrimary
-        : theme.colorScheme.onSurface;
+
+    Widget messageContent;
+
+    // --- PERBAIKAN UTAMA DI SINI ---
+    if (message.type == 'image' && message.imageUrl != null) {
+      messageContent = GestureDetector(
+        // 1. Bungkus dengan GestureDetector
+        onTap: () {
+          // 2. Navigasi ke layar pratinjau saat gambar ditekan
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  FullScreenImageViewer(imageUrl: message.imageUrl!),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            color: isMyMessage
+                ? theme.colorScheme.primary
+                : theme.colorScheme.surfaceContainerHighest,
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.6,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min, // Agar kolom pas dengan isinya
+              children: [
+                Image.network(
+                  message.imageUrl!,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => const Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: Icon(Icons.broken_image, size: 40),
+                  ),
+                ),
+                if (message.text != null && message.text!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    child: Text(
+                      message.text!,
+                      style: TextStyle(
+                        color: isMyMessage
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Logika untuk pesan teks (tidak berubah)
+      final color = isMyMessage
+          ? theme.colorScheme.primary
+          : theme.colorScheme.surfaceContainerHighest;
+      final textColor = isMyMessage
+          ? theme.colorScheme.onPrimary
+          : theme.colorScheme.onSurface;
+      messageContent = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          message.text ?? '',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: alignment,
       children: [
-        Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.7,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            message.text,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+        messageContent,
         const SizedBox(height: 4),
         Text(
           _formatTime(context, message.timestamp),
