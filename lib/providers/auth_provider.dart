@@ -1,11 +1,10 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:reang_app/models/admin_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-// Import Firebase Auth sudah tidak diperlukan di sini
 
 class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
@@ -23,11 +22,11 @@ class AuthProvider with ChangeNotifier {
       (_currentUser is AdminModel) ? _currentUser as AdminModel : null;
   String? get token => _token;
 
-  // Fungsi login sekarang hanya mengurus Laravel
   Future<void> login(Object userObject, String laravelToken) async {
     _currentUser = userObject;
     _token = laravelToken;
 
+    // Simpan data & role
     if (userObject is UserModel) {
       _role = userObject.role;
       await _storage.write(
@@ -45,11 +44,23 @@ class AuthProvider with ChangeNotifier {
     await _storage.write(key: 'user_token', value: laravelToken);
     await _storage.write(key: 'user_role', value: _role);
 
-    // Bagian login ke Firebase dihapus dari sini
+    // --- PERBAIKAN UTAMA DI SINI: Login Firebase HANYA untuk DOKTER ---
+    if (userObject is AdminModel) {
+      try {
+        final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
+        await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
+        debugPrint("Login proaktif ke Firebase untuk Dokter berhasil!");
+      } catch (e) {
+        debugPrint("Gagal login proaktif ke Firebase untuk Dokter: $e");
+        await logout();
+        throw Exception("Gagal otentikasi dengan Firebase.");
+      }
+    }
+    // ----------------------------------------------------------------
+
     notifyListeners();
   }
 
-  // tryAutoLogin sekarang hanya mengurus Laravel
   Future<void> tryAutoLogin() async {
     final storedToken = await _storage.read(key: 'user_token');
     final storedRole = await _storage.read(key: 'user_role');
@@ -71,7 +82,19 @@ class AuthProvider with ChangeNotifier {
       }
       _role = storedRole;
       _token = storedToken;
-      // Bagian auto-login ke Firebase dihapus dari sini
+
+      // --- PERBAIKAN UTAMA DI SINI: Auto-login Firebase HANYA untuk DOKTER ---
+      if (storedRole == 'dokter') {
+        try {
+          final firebaseToken = await _apiService.getFirebaseToken(storedToken);
+          await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
+          debugPrint("Auto-login proaktif ke Firebase untuk Dokter berhasil!");
+        } catch (e) {
+          debugPrint("Gagal auto-login proaktif ke Firebase: $e");
+          await logout();
+        }
+      }
+      // --------------------------------------------------------------------
     } else {
       await logout();
     }
@@ -80,17 +103,13 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      // 1. Coba logout dari Firebase terlebih dahulu
       if (FirebaseAuth.instance.currentUser != null) {
         await FirebaseAuth.instance.signOut();
         debugPrint("Berhasil logout dari Firebase.");
       }
     } catch (e) {
-      // Jika logout Firebase error, cukup catat errornya tapi jangan hentikan proses
       debugPrint("Error saat logout dari Firebase: $e");
     } finally {
-      // 2. BLOK INI AKAN SELALU DIJALANKAN, baik logout Firebase berhasil maupun gagal
-      // Hapus state dan data lokal Laravel
       _currentUser = null;
       _token = null;
       _role = null;

@@ -314,6 +314,14 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                   "Ulasan berhasil dihapus",
                   context: context,
                   backgroundColor: Colors.green,
+                  position: StyledToastPosition.bottom,
+                  animation: StyledToastAnimation.scale,
+                  reverseAnimation: StyledToastAnimation.fade,
+                  animDuration: const Duration(milliseconds: 150),
+                  duration: const Duration(seconds: 2),
+                  borderRadius: BorderRadius.circular(25),
+                  textStyle: const TextStyle(color: Colors.white),
+                  curve: Curves.fastOutSlowIn,
                 );
                 _loadDumasDetail();
               } catch (e) {
@@ -321,6 +329,14 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                   e.toString(),
                   context: context,
                   backgroundColor: Colors.red,
+                  position: StyledToastPosition.bottom,
+                  animation: StyledToastAnimation.scale,
+                  reverseAnimation: StyledToastAnimation.fade,
+                  animDuration: const Duration(milliseconds: 150),
+                  duration: const Duration(seconds: 2),
+                  borderRadius: BorderRadius.circular(25),
+                  textStyle: const TextStyle(color: Colors.white),
+                  curve: Curves.fastOutSlowIn,
                 );
               }
             },
@@ -442,6 +458,18 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                                   "Ulasan Anda berhasil disimpan!",
                                   context: context,
                                   backgroundColor: Colors.green,
+                                  position: StyledToastPosition.bottom,
+                                  animation: StyledToastAnimation.scale,
+                                  reverseAnimation: StyledToastAnimation.fade,
+                                  animDuration: const Duration(
+                                    milliseconds: 150,
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  borderRadius: BorderRadius.circular(25),
+                                  textStyle: const TextStyle(
+                                    color: Colors.white,
+                                  ),
+                                  curve: Curves.fastOutSlowIn,
                                 );
                                 Navigator.of(ctx).pop(); // Close the modal
                                 _loadDumasDetail(); // Refresh the detail page
@@ -449,6 +477,18 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                                 showToast(
                                   "Gagal mengirim ulasan: ${e.toString()}",
                                   context: context,
+                                  position: StyledToastPosition.bottom,
+                                  animation: StyledToastAnimation.scale,
+                                  reverseAnimation: StyledToastAnimation.fade,
+                                  animDuration: const Duration(
+                                    milliseconds: 150,
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  borderRadius: BorderRadius.circular(25),
+                                  textStyle: const TextStyle(
+                                    color: Colors.white,
+                                  ),
+                                  curve: Curves.fastOutSlowIn,
                                 );
                               } finally {
                                 if (mounted) {

@@ -46,7 +46,18 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 await authProvider.logout();
-                showToast("Anda telah keluar.", context: context);
+                showToast(
+                  "Anda telah keluar.",
+                  context: context,
+                  position: StyledToastPosition.bottom,
+                  animation: StyledToastAnimation.scale,
+                  reverseAnimation: StyledToastAnimation.fade,
+                  animDuration: const Duration(milliseconds: 150),
+                  duration: const Duration(seconds: 2),
+                  borderRadius: BorderRadius.circular(25),
+                  textStyle: const TextStyle(color: Colors.white),
+                  curve: Curves.fastOutSlowIn,
+                );
 
                 // Cek mounted sebelum navigasi
                 if (!context.mounted) return;

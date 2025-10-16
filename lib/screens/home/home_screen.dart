@@ -142,12 +142,14 @@ class _HomeScreenState extends State<HomeScreen> {
             context: context, // wajib di versi terbaru
             alignment: Alignment.bottomCenter, // pengganti gravity
             backgroundColor: Colors.grey.shade700, // sama seperti sebelumnya
-            textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
-            duration: const Duration(
-              seconds: 2,
-            ), // pengganti Toast.LENGTH_SHORT
-            animation: StyledToastAnimation.slideFromBottom,
+            position: StyledToastPosition.bottom,
+            animation: StyledToastAnimation.scale,
             reverseAnimation: StyledToastAnimation.fade,
+            animDuration: const Duration(milliseconds: 150),
+            duration: const Duration(seconds: 2),
+            borderRadius: BorderRadius.circular(25),
+            textStyle: const TextStyle(color: Colors.white),
+            curve: Curves.fastOutSlowIn,
           );
 
           // PERBAIKAN: Tambahkan timer untuk mereset status setelah 7 detik

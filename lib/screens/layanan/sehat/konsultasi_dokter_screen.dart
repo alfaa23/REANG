@@ -158,18 +158,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: theme.colorScheme.primary,
-              ),
-              onPressed: () {},
-            ),
-          ),
-        ],
       ),
       body: _buildBody(theme),
     );

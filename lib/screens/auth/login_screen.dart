@@ -41,6 +41,14 @@ class _LoginScreenState extends State<LoginScreen> {
         "Email dan password tidak boleh kosong.",
         context: context,
         backgroundColor: Colors.red,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale, // efek "pop"
+        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+        animDuration: const Duration(milliseconds: 150), // animasi cepat
+        duration: const Duration(seconds: 2), // tampil 2 detik
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       return;
     }
@@ -68,9 +76,17 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         showToast(
-          "Login Berhasil!",
+          'Login Berhasil!',
           context: context,
           backgroundColor: Colors.green,
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale, // efek "pop"
+          reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+          animDuration: const Duration(milliseconds: 150), // animasi cepat
+          duration: const Duration(seconds: 2), // tampil 2 detik
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
         );
 
         if (mounted) {
@@ -92,7 +108,14 @@ class _LoginScreenState extends State<LoginScreen> {
         e.toString(),
         context: context,
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
     } finally {
       if (mounted) {

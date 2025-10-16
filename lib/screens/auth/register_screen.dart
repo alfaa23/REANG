@@ -139,6 +139,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "Pendaftaran berhasil!",
           context: context,
           backgroundColor: Colors.green,
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale,
+          reverseAnimation: StyledToastAnimation.fade,
+          animDuration: const Duration(milliseconds: 150),
+          duration: const Duration(seconds: 2),
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
         );
 
         if (mounted) {
@@ -162,7 +170,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         e.toString(),
         context: context,
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
     } finally {
       if (mounted) {

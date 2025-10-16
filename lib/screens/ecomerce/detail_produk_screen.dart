@@ -479,24 +479,15 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
               showToast(
                 "Produk ditambahkan ke keranjang!",
                 context: context,
-
-                // 'gravity' diubah menjadi 'position'
-                position: StyledToastPosition.bottom,
-
-                // 'toastLength' diubah menjadi 'duration'
-                duration: const Duration(seconds: 2), // Durasi untuk SHORT
-                // backgroundColor tetap sama
                 backgroundColor: Colors.black.withOpacity(0.7),
-
-                // 'textColor' dan 'fontSize' digabung ke dalam 'textStyle'
-                textStyle: const TextStyle(color: Colors.white, fontSize: 16.0),
-
-                // Opsional: Tambahan untuk tampilan yang lebih bagus
-                borderRadius: BorderRadius.circular(8.0),
-                textPadding: const EdgeInsets.symmetric(
-                  horizontal: 18.0,
-                  vertical: 10.0,
-                ),
+                position: StyledToastPosition.bottom,
+                animation: StyledToastAnimation.scale,
+                reverseAnimation: StyledToastAnimation.fade,
+                animDuration: const Duration(milliseconds: 150),
+                duration: const Duration(seconds: 2),
+                borderRadius: BorderRadius.circular(25),
+                textStyle: const TextStyle(color: Colors.white),
+                curve: Curves.fastOutSlowIn,
               );
             },
             style: ElevatedButton.styleFrom(

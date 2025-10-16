@@ -1253,4 +1253,21 @@ class ApiService {
       throw Exception("Gagal upload gambar");
     }
   }
+
+  // notifikasi chat sehat yu
+  Future<DokterModel?> getDokterByAdminId(String adminId) async {
+    // Asumsi Anda punya endpoint untuk ini, contoh: /api/dokter/by-admin/{adminId}
+    // Jika tidak ada, kita perlu membuatnya di Laravel
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/dokter/by-admin/$adminId',
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        return DokterModel.fromJson(response.data);
+      }
+    } catch (e) {
+      debugPrint("Gagal fetch dokter by admin id: $e");
+    }
+    return null;
+  }
 }

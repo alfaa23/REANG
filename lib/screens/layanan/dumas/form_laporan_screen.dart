@@ -64,7 +64,18 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         setState(() {
           _isKategoriLoading = false; // Hentikan loading meskipun error
         });
-        showToast("Gagal memuat daftar kategori.", context: context);
+        showToast(
+          "Gagal memuat daftar kategori.",
+          context: context,
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale,
+          reverseAnimation: StyledToastAnimation.fade,
+          animDuration: const Duration(milliseconds: 150),
+          duration: const Duration(seconds: 2),
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
+        );
       }
     }
   }
@@ -137,6 +148,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         "Harap lengkapi semua kolom yang wajib diisi.",
         context: context,
         backgroundColor: Colors.red,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       return;
     }
@@ -146,6 +165,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         "Anda harus menyetujui pernyataan pertanggungjawaban.",
         context: context,
         backgroundColor: Colors.red,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       return;
     }
@@ -186,6 +213,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
       showToast(
         "Sesi Anda telah berakhir, silakan login kembali.",
         context: context,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       setState(() => _isSubmitting = false);
       return;
@@ -212,6 +247,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         "Laporan berhasil dikirim!",
         context: context,
         backgroundColor: Colors.green,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
 
       _unfocusGlobal();
@@ -227,6 +270,14 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         "Gagal mengirim laporan: ${e.toString()}",
         context: context,
         backgroundColor: Colors.red,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
     } finally {
       if (mounted) {

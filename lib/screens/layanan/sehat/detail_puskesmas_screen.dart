@@ -114,18 +114,6 @@ class _DetailPuskesmasScreenState extends State<DetailPuskesmasScreen> {
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: theme.colorScheme.primary,
-              ),
-              onPressed: () {},
-            ),
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

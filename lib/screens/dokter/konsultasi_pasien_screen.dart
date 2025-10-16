@@ -123,7 +123,21 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                 await authProvider.logout();
 
                 if (!context.mounted) return;
-                showToast("Anda telah keluar.", context: context);
+                showToast(
+                  "Anda telah keluar.",
+                  context: context,
+                  position: StyledToastPosition.bottom,
+                  animation: StyledToastAnimation.scale, // efek "pop"
+                  reverseAnimation:
+                      StyledToastAnimation.fade, // pas hilang fade out
+                  animDuration: const Duration(
+                    milliseconds: 150,
+                  ), // animasi cepat
+                  duration: const Duration(seconds: 2), // tampil 2 detik
+                  borderRadius: BorderRadius.circular(25),
+                  textStyle: const TextStyle(color: Colors.white),
+                  curve: Curves.fastOutSlowIn,
+                );
 
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const MainScreen()),
