@@ -637,6 +637,134 @@ class ApiService {
     }
   }
 
+  /// Mengambil daftar usulan pembangunan dengan paginasi (untuk infinite scroll).
+  /// Menggunakan endpoint: /renbang/ajuan/index
+  Future<PaginationResponseModel<RenbangModel>> fetchUsulanPembangunan({
+    required int page,
+    String?
+    token, // Token opsional, jika API memerlukan login untuk melihat daftar
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/renbang/ajuan/index',
+        queryParameters: {'page': page},
+        options: Options(
+          headers: (token != null) ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final responseData = response.data['data'];
+
+        // --- PERBAIKAN DI SINI ---
+        // 1. Ambil list data mentah dari JSON
+        final List<dynamic> items = responseData['data'];
+
+        // 2. Ubah setiap item di list menjadi objek RenbangModel
+        final List<RenbangModel> usulanList = items
+            .map((item) => RenbangModel.fromJson(item as Map<String, dynamic>))
+            .toList();
+
+        // 3. Gunakan konstruktor standar untuk membuat objek PaginationResponseModel
+        return PaginationResponseModel<RenbangModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: usulanList,
+        );
+        // --------------------------
+      } else {
+        throw Exception('Gagal memuat daftar usulan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil usulan: $e');
+    }
+  }
+
+  /// Mengambil daftar kategori yang tersedia untuk form usulan.
+  /// CATATAN: Endpoint diasumsikan /renbang/ajuan/kategori
+  Future<List<String>> fetchUsulanKategori() async {
+    try {
+      // Endpoint ini disesuaikan agar lebih relevan dengan 'ajuan'
+      final response = await _dio.get(
+        '$_baseUrlBackend/renbang/ajuan/kategori',
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        return List<String>.from(response.data);
+      } else {
+        throw Exception('Gagal memuat daftar kategori usulan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil kategori: $e');
+    }
+  }
+
+  /// Mengirim usulan pembangunan baru dari form.
+  /// Memerlukan token otentikasi.
+  Future<Map<String, dynamic>> postUsulanPembangunan({
+    required String judul,
+    required String kategori,
+    required String lokasi,
+    required String deskripsi,
+    required String token, // Token wajib
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/renbang/ajuan',
+        data: {
+          'judul': judul,
+          'kategori': kategori,
+          'lokasi': lokasi,
+          'deskripsi': deskripsi,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data; // Mengembalikan response sukses dari API
+      } else {
+        throw Exception('Gagal mengirim usulan');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Terjadi kesalahan server.',
+      );
+    }
+  }
+
+  /// Memberi atau menarik dukungan (like) pada sebuah usulan.
+  /// Memerlukan token otentikasi.
+  Future<Map<String, dynamic>> likeUsulan({
+    required int usulanId,
+    required String token, // Token wajib
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/renbang/ajuan/like/$usulanId',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode == 200) {
+        // Mengembalikan { "status": "liked/unliked", "likes_count": ... }
+        return response.data;
+      } else {
+        throw Exception('Gagal memberikan dukungan');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Terjadi kesalahan server.',
+      );
+    }
+  }
+
   // =======================================================================
   // API REGISTRASI (BARU)
   // =======================================================================

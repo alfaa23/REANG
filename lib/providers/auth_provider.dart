@@ -26,7 +26,6 @@ class AuthProvider with ChangeNotifier {
     _currentUser = userObject;
     _token = laravelToken;
 
-    // Simpan data & role
     if (userObject is UserModel) {
       _role = userObject.role;
       await _storage.write(
@@ -44,19 +43,17 @@ class AuthProvider with ChangeNotifier {
     await _storage.write(key: 'user_token', value: laravelToken);
     await _storage.write(key: 'user_role', value: _role);
 
-    // --- PERBAIKAN UTAMA DI SINI: Login Firebase HANYA untuk DOKTER ---
     if (userObject is AdminModel) {
       try {
         final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
         await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
         debugPrint("Login proaktif ke Firebase untuk Dokter berhasil!");
       } catch (e) {
-        debugPrint("Gagal login proaktif ke Firebase untuk Dokter: $e");
+        debugPrint("Gagal login proaktif ke Firebase: $e");
         await logout();
         throw Exception("Gagal otentikasi dengan Firebase.");
       }
     }
-    // ----------------------------------------------------------------
 
     notifyListeners();
   }
@@ -83,18 +80,24 @@ class AuthProvider with ChangeNotifier {
       _role = storedRole;
       _token = storedToken;
 
-      // --- PERBAIKAN UTAMA DI SINI: Auto-login Firebase HANYA untuk DOKTER ---
-      if (storedRole == 'dokter') {
+      // --- PERBAIKAN UTAMA DI SINI ---
+      // Cek dulu apakah sesi Firebase sudah ada.
+      if (storedRole == 'dokter' && FirebaseAuth.instance.currentUser == null) {
+        debugPrint(
+          "Sesi Firebase tidak ada, mencoba login ulang ke Firebase...",
+        );
         try {
           final firebaseToken = await _apiService.getFirebaseToken(storedToken);
           await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
-          debugPrint("Auto-login proaktif ke Firebase untuk Dokter berhasil!");
+          debugPrint("Auto-login proaktif ke Firebase berhasil!");
         } catch (e) {
           debugPrint("Gagal auto-login proaktif ke Firebase: $e");
           await logout();
         }
+      } else if (storedRole == 'dokter') {
+        debugPrint("Sesi Firebase sudah ada, tidak perlu login ulang.");
       }
-      // --------------------------------------------------------------------
+      // --------------------------------
     } else {
       await logout();
     }
