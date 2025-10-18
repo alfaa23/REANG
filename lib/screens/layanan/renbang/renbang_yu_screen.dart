@@ -3,7 +3,6 @@ import 'package:reang_app/models/renbang_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/renbang/detail_renbang_screen.dart';
 import 'package:reang_app/screens/layanan/renbang/usulan_pembangunan_view.dart';
-import 'package:reang_app/screens/layanan/renbang/progress_pembangunan_view.dart';
 
 // --- PERBAIKAN: Kelas helper untuk data cache per filter ---
 class _CachedRenbangData {
@@ -21,7 +20,7 @@ class RenbangYuScreen extends StatefulWidget {
 
 class _RenbangYuScreenState extends State<RenbangYuScreen> {
   int _selectedMain = 0;
-  final List<String> _mainTabs = ['Rencana', 'Usulan', 'Progress'];
+  final List<String> _mainTabs = ['Rencana', 'Usulan'];
 
   // --- PERBAIKAN: Mengembalikan flag lazy load sesuai permintaan ---
   bool _isUsulanInitiated = false;
@@ -64,10 +63,6 @@ class _RenbangYuScreenState extends State<RenbangYuScreen> {
                   // --- PERBAIKAN: Menerapkan kembali logika lazy load ---
                   if (_isUsulanInitiated)
                     const UsulanPembangunanView()
-                  else
-                    Container(),
-                  if (_isProgressInitiated)
-                    const ProgressPembangunanView()
                   else
                     Container(),
                 ],

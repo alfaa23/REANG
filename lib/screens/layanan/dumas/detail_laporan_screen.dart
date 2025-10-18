@@ -21,7 +21,7 @@ class DetailLaporanScreen extends StatefulWidget {
 }
 
 class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
-  final ApiService _apiService = ApiService();
+  final ApiService _api_service = ApiService();
   late Future<DumasModel> _dumasFuture;
 
   @override
@@ -34,7 +34,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
   void _loadDumasDetail() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     setState(() {
-      _dumasFuture = _apiService.fetchDumasDetail(
+      _dumasFuture = _api_service.fetchDumasDetail(
         widget.dumasId,
         token: auth.isLoggedIn ? auth.token : null,
       );
@@ -43,7 +43,10 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.background,
       body: FutureBuilder<DumasModel>(
         future: _dumasFuture,
         builder: (context, snapshot) {
@@ -68,22 +71,20 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
           }
 
           final data = snapshot.data!;
-          final theme = Theme.of(context);
-
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
               _buildSliverAppBar(context, theme, data),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeaderCard(theme, data),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
                       _buildDetailInfo(theme, data),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
                       Text(
                         'Status Laporan',
                         style: theme.textTheme.titleLarge?.copyWith(
@@ -92,7 +93,6 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildDynamicTimeline(theme, data),
-                      // --- PERBAIKAN: Tampilkan bagian ulasan jika status selesai ---
                       if (data.status.toLowerCase() == 'selesai')
                         _buildFeedbackSection(context, theme, data),
                     ],
@@ -106,7 +106,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     );
   }
 
-  // --- PERBAIKAN: Logika diubah untuk menampilkan ulasan ke publik ---
+  // --- FEEDBACK SECTION (UI DIPERBAIK) ---
   Widget _buildFeedbackSection(
     BuildContext context,
     ThemeData theme,
@@ -118,30 +118,30 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Ulasan Laporan', // Judul diubah menjadi lebih umum
+            'Ulasan Laporan',
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
-          // Jika ada rating, tampilkan ke semua orang
           if (data.userRating != null)
             _buildAlreadyRatedView(context, theme, data)
-          // Jika belum ada rating, hanya pemilik laporan yang melihat prompt
           else if (widget.isMyReport)
             _buildGiveRatingPrompt(context, theme, data)
-          // Jika belum ada rating dan bukan pemilik, tampilkan pesan
           else
             Card(
               elevation: 1,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 side: BorderSide(color: theme.dividerColor),
               ),
-              child: const Padding(
-                padding: EdgeInsets.all(16.0),
+              child: Padding(
+                padding: const EdgeInsets.all(18.0),
                 child: Center(
-                  child: Text('Belum ada ulasan untuk laporan ini.'),
+                  child: Text(
+                    'Belum ada ulasan untuk laporan ini.',
+                    style: theme.textTheme.bodyLarge,
+                  ),
                 ),
               ),
             ),
@@ -150,14 +150,14 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     );
   }
 
-  // Tampilan prompt untuk memberi ulasan
+  // Tampilan prompt untuk memberi ulasan — tombol dibuat besar & jelas
   Widget _buildGiveRatingPrompt(
     BuildContext context,
     ThemeData theme,
     DumasModel data,
   ) {
     return Card(
-      elevation: 1,
+      elevation: 2,
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -179,7 +179,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Bantu kami meningkatkan kualitas layanan dengan memberikan penilaian Anda.',
               textAlign: TextAlign.center,
@@ -188,16 +188,26 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade800,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            // Tombol jelas dengan ikon + teks (full width)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _showRatingBottomSheet(context, data),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.star_border),
+                    SizedBox(width: 10),
+                    Text('Beri Ulasan', style: TextStyle(fontSize: 16)),
+                  ],
                 ),
               ),
-              onPressed: () => _showRatingBottomSheet(context, data),
-              child: const Text('Beri Ulasan'),
             ),
           ],
         ),
@@ -205,7 +215,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     );
   }
 
-  // --- PERBAIKAN: Tombol opsi sekarang kondisional ---
+  // --- RATING VIEW (saat sudah ada rating) diperbagus & bintang dikecilkan ---
   Widget _buildAlreadyRatedView(
     BuildContext context,
     ThemeData theme,
@@ -213,10 +223,13 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
   ) {
     final auth = Provider.of<AuthProvider>(context, listen: false);
 
+    // kecilkan bintang tampilan agar tidak terlalu besar
+    const double starSize = 25.0;
+
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: theme.dividerColor),
       ),
       child: Padding(
@@ -224,22 +237,36 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Rating header: compact stars + numeric value + menu
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < (data.userRating ?? 0)
-                          ? Icons.star
-                          : Icons.star_border,
-                      color: Colors.amber,
-                      size: 24,
-                    );
-                  }),
+                  children: [
+                    // Compact stars with subtle spacing
+                    Row(
+                      children: List.generate(5, (index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: Icon(
+                            index < (data.userRating ?? 0)
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber,
+                            size: starSize,
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${(data.userRating ?? 0).toStringAsFixed(0)}/5',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-                // Hanya tampilkan tombol opsi jika ini laporan milik user
                 if (widget.isMyReport && auth.isLoggedIn)
                   PopupMenuButton<String>(
                     onSelected: (value) {
@@ -276,10 +303,31 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                   ),
               ],
             ),
+
+            const SizedBox(height: 12),
+
+            // Ulasan teks
             if (data.userComment != null && data.userComment!.isNotEmpty) ...[
-              const Divider(height: 24),
-              Text(data.userComment!, style: theme.textTheme.bodyMedium),
-            ],
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Text(
+                  data.userComment!,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ] else
+              Text(
+                'Pengguna tidak menambahkan komentar.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
           ],
         ),
       ),
@@ -306,7 +354,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
             onPressed: () async {
               Navigator.of(ctx).pop();
               try {
-                await _apiService.deleteDumasRating(
+                await _api_service.deleteDumasRating(
                   dumasId: widget.dumasId,
                   token: authProvider.token!,
                 );
@@ -448,7 +496,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                           ? () async {
                               setSheetState(() => isSubmitting = true);
                               try {
-                                await _apiService.postDumasRating(
+                                await _api_service_postRating_wrapper(
                                   dumasId: widget.dumasId,
                                   rating: tempRating.toDouble(),
                                   comment: commentController.text,
@@ -517,15 +565,33 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     );
   }
 
+  // wrapper supaya statemen await _api_service.postDumasRating tetap sama struktur panggilannya
+  Future<void> _api_service_postRating_wrapper({
+    required int dumasId,
+    required double rating,
+    required String comment,
+    required String token,
+  }) {
+    return _api_service.postDumasRating(
+      dumasId: dumasId,
+      rating: rating,
+      comment: comment,
+      token: token,
+    );
+  }
+
   Widget _buildSliverAppBar(
     BuildContext context,
     ThemeData theme,
     DumasModel data,
   ) {
+    // Foto murni, tanpa judul dan tanpa gradient (sesuai permintaan)
     return SliverAppBar(
-      expandedHeight: 240.0,
+      expandedHeight: 260.0,
       pinned: true,
       stretch: true,
+      elevation: 8,
+      backgroundColor: theme.colorScheme.surface,
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
         child: CircleAvatar(
@@ -538,13 +604,19 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
         ),
       ),
       flexibleSpace: FlexibleSpaceBar(
-        background: (data.buktiLaporan != null && data.buktiLaporan!.isNotEmpty)
-            ? Image.network(
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (data.buktiLaporan != null && data.buktiLaporan!.isNotEmpty)
+              Image.network(
                 data.buktiLaporan!,
                 fit: BoxFit.cover,
                 errorBuilder: (c, e, s) => _buildImageError(theme),
               )
-            : _buildImageError(theme),
+            else
+              _buildImageError(theme),
+          ],
+        ),
       ),
     );
   }
@@ -555,59 +627,129 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
       child: Center(
         child: Icon(
           Icons.image_not_supported_outlined,
-          size: 48,
+          size: 56,
           color: theme.hintColor,
         ),
       ),
     );
   }
 
+  // Header card: KEMBALI ke pill lonjong (tanpa waktu) — sesuai permintaanmu
   Widget _buildHeaderCard(ThemeData theme, DumasModel data) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ID Laporan',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('#${data.id}'),
-                ],
-              ),
+    final statusKey = data.status.toLowerCase();
+    final statusColor = _statusColorFor(statusKey);
+    final statusIcon = _getStatusIcon(statusKey);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        children: [
+          // Icon box (lebih besar, visual kuat)
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Status',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(data.status),
-                      const SizedBox(width: 6),
-                      Icon(Icons.circle, size: 12, color: data.statusColor),
-                    ],
-                  ),
-                ],
-              ),
+            child: Center(
+              child: Icon(statusIcon, color: Colors.white, size: 30),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ID Laporan',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('#${data.id}', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: theme.hintColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        data.lokasiLaporan,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // === INI BAGIAN YANG KAMU MAU TETAPKAN: lonjong tanpa waktu ===
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Status',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: statusColor.withOpacity(0.85)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(statusIcon, size: 20, color: statusColor),
+                    const SizedBox(width: 10),
+                    Text(
+                      data.status[0].toUpperCase() + data.status.substring(1),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -616,17 +758,42 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: theme.dividerColor),
-        borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow(theme, 'Judul Laporan:', data.jenisLaporan),
-          _buildDetailRow(theme, 'Kategori:', data.kategoriLaporan),
-          _buildDetailRow(theme, 'Alamat:', data.lokasiLaporan),
-          _buildDetailRow(theme, 'Deskripsi:', data.deskripsi, isLast: true),
+          _buildDetailRow(
+            theme,
+            Icons.report_gmailerrorred_outlined,
+            'Judul Laporan',
+            data.jenisLaporan,
+          ),
+          const SizedBox(height: 12),
+          _buildDetailRow(
+            theme,
+            Icons.category_outlined,
+            'Kategori',
+            data.kategoriLaporan,
+          ),
+          const SizedBox(height: 12),
+          _buildDetailRow(
+            theme,
+            Icons.place_outlined,
+            'Alamat',
+            data.lokasiLaporan,
+          ),
+          const SizedBox(height: 12),
+          _buildDetailRow(
+            theme,
+            Icons.description_outlined,
+            'Deskripsi',
+            data.deskripsi,
+            isLast: true,
+          ),
         ],
       ),
     );
@@ -634,55 +801,96 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
 
   Widget _buildDetailRow(
     ThemeData theme,
+    IconData icon,
     String title,
     String value, {
     bool isLast = false,
   }) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: theme.hintColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(value, style: theme.textTheme.bodyMedium),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(value, style: theme.textTheme.bodyMedium),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
+  /// TAMPILAN TIMELINE (VERTIKAL) YANG DIPERBAIKI — TIDAK ADA DUPLIKASI STATUS
   Widget _buildDynamicTimeline(ThemeData theme, DumasModel data) {
     final statusOrder = ['menunggu', 'diproses', 'selesai'];
     final currentStatus = data.status.toLowerCase();
     int currentStatusIndex = statusOrder.indexOf(currentStatus);
 
+    // Konfigurasi langkah (label, warna, ikon)
+    final List<Map<String, dynamic>> timelineConfig = [
+      {
+        'status': 'Menunggu',
+        'key': 'menunggu',
+        'subtitle': 'Laporan diterima oleh sistem',
+        'color': Colors.orange,
+        'icon': Icons.watch_later_outlined,
+      },
+      {
+        'status': 'Diproses',
+        'key': 'diproses',
+        'subtitle': 'Laporan sedang ditindaklanjuti oleh instansi terkait',
+        'color': Colors.blue,
+        'icon': Icons.settings_suggest_outlined,
+      },
+      {
+        'status': 'Selesai',
+        'key': 'selesai',
+        'subtitle': 'Laporan telah selesai ditindaklanjuti',
+        'color': Colors.green,
+        'icon': Icons.check_circle_outline,
+      },
+    ];
+
+    // Jika status ditolak -> khusus, tetap vertical
     if (currentStatus == 'ditolak') {
       return Column(
         children: [
-          _TimelineEntry(
-            dotColor: Colors.grey,
+          _buildTimelineCard(
+            theme,
             title: 'Menunggu',
             subtitle: 'Laporan diterima oleh sistem',
-            timestamp: timeago.format(data.createdAt, locale: 'id'),
+            color: Colors.orange,
+            icon: Icons.watch_later_outlined,
+            active: true,
+            time: timeago.format(data.createdAt, locale: 'id'),
           ),
-          _TimelineEntry(
-            dotColor: Colors.red,
+          const SizedBox(height: 12),
+          _buildTimelineCard(
+            theme,
             title: 'Ditolak',
             subtitle: 'Laporan ditolak oleh instansi terkait.',
-            timestamp: timeago.format(data.createdAt, locale: 'id'),
+            color: Colors.red,
+            icon: Icons.block,
+            active: true,
+            time: timeago.format(data.createdAt, locale: 'id'),
             comment: data.tanggapan,
-            isLast: true,
           ),
         ],
       );
     }
 
     if (currentStatusIndex == -1) {
+      // unknown status: tampilkan single entry
       return _TimelineEntry(
         dotColor: data.statusColor,
         title: data.status,
@@ -692,49 +900,159 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
       );
     }
 
-    final List<Map<String, dynamic>> timelineConfig = [
-      {
-        'status': 'Menunggu',
-        'subtitle': 'Laporan diterima oleh sistem',
-        'color': Colors.orange,
-      },
-      {
-        'status': 'Diproses',
-        'subtitle': 'Laporan sedang ditindaklanjuti oleh instansi terkait',
-        'color': Colors.blue,
-      },
-      {
-        'status': 'Selesai',
-        'subtitle': 'Laporan telah selesai ditindaklanjuti',
-        'color': Colors.green,
-      },
-    ];
+    // Build vertical cards for each step up to current
+    final List<Widget> list = [];
+    for (int i = 0; i <= currentStatusIndex; i++) {
+      final step = timelineConfig[i];
+      final bool isActive = i == currentStatusIndex;
+      list.add(
+        _buildTimelineCard(
+          theme,
+          title: step['status'] as String,
+          subtitle: step['subtitle'] as String,
+          color: step['color'] as Color,
+          icon: step['icon'] as IconData,
+          active: isActive,
+          time: timeago.format(data.createdAt, locale: 'id'),
+          comment: isActive ? data.tanggapan : null,
+        ),
+      );
+      if (i < currentStatusIndex) list.add(const SizedBox(height: 12));
+    }
 
-    return Column(
-      children: List.generate(currentStatusIndex + 1, (index) {
-        final step = timelineConfig[index];
-        final bool isLast = index == currentStatusIndex;
+    return Column(children: list);
+  }
 
-        return _TimelineEntry(
-          dotColor: isLast ? step['color'] : Colors.grey,
-          title: step['status'],
-          subtitle: step['subtitle'],
-          timestamp: timeago.format(data.createdAt, locale: 'id'),
-          isLast: isLast,
-          comment: (isLast) ? data.tanggapan : null,
-        );
-      }),
+  // single card for timeline step (visual only)
+  Widget _buildTimelineCard(
+    ThemeData theme, {
+    required String title,
+    required String subtitle,
+    required Color color,
+    required IconData icon,
+    required bool active,
+    required String time,
+    String? comment,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: active ? color.withOpacity(0.06) : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: active ? color.withOpacity(0.9) : theme.dividerColor,
+        ),
+        boxShadow: active
+            ? [
+                BoxShadow(
+                  color: color.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // big icon circle
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: active ? color : color.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                icon,
+                size: active ? 26 : 22,
+                color: active ? Colors.white : color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: active ? color : null,
+                        ),
+                      ),
+                    ),
+                    if (active)
+                      Text(
+                        time,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(subtitle, style: theme.textTheme.bodyMedium),
+                if (comment != null && comment.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: theme.dividerColor),
+                    ),
+                    child: Text(comment, style: theme.textTheme.bodyMedium),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  // Helpers: mapping status to color/icon (visual only)
+  Color _statusColorFor(String status) {
+    switch (status.toLowerCase()) {
+      case 'diproses':
+        return Colors.blue;
+      case 'selesai':
+        return Colors.green;
+      case 'ditolak':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'diproses':
+        return Icons.build_circle_outlined;
+      case 'selesai':
+        return Icons.check_circle;
+      case 'ditolak':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.pending_outlined;
+    }
   }
 }
 
-// --- Widget Timeline Entry (Tidak Berubah) ---
+// --- Widget Timeline Entry (tampilan sedikit disesuaikan) ---
 class _TimelineEntry extends StatelessWidget {
   final Color dotColor;
   final String title;
   final String subtitle;
   final String timestamp;
-  final String? comment;
   final bool isLast;
 
   const _TimelineEntry({
@@ -742,7 +1060,6 @@ class _TimelineEntry extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.timestamp,
-    this.comment,
     this.isLast = false,
   });
 
@@ -755,54 +1072,55 @@ class _TimelineEntry extends StatelessWidget {
       children: [
         Column(
           children: [
+            // Dot with icon slightly larger but balanced
             Container(
-              width: 12,
-              height: 12,
+              width: 20,
+              height: 20,
               decoration: BoxDecoration(
                 color: dotColor,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: dotColor.withOpacity(0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
             ),
             if (!isLast)
-              Container(width: 2, height: 120, color: theme.dividerColor),
+              Container(width: 2, height: 110, color: theme.dividerColor),
           ],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: dotColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(subtitle, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Text(
-                timestamp,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.hintColor,
-                ),
-              ),
-              if (comment != null && comment!.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: theme.dividerColor),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: dotColor,
+                    fontSize: 15,
                   ),
-                  child: Text(comment!, style: theme.textTheme.bodyMedium),
                 ),
+                const SizedBox(height: 6),
+                Text(subtitle, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                Text(
+                  timestamp,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+                if (!isLast) const SizedBox(height: 18),
               ],
-              if (!isLast) const SizedBox(height: 24),
-            ],
+            ),
           ),
         ),
       ],

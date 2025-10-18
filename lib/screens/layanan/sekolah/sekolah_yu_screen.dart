@@ -13,9 +13,7 @@ class SekolahYuScreen extends StatefulWidget {
 
 class _SekolahYuScreenState extends State<SekolahYuScreen> {
   int _selectedTab = 0;
-  // --- PERUBAHAN 1: Tambahkan state untuk menyimpan jumlah sekolah --- hehehe
   Map<String, int> _schoolCounts = {};
-  // -----------------------------------------------------------------
 
   final List<Map<String, dynamic>> _tabs = const [
     {'label': 'Cari Sekolah', 'icon': Icons.search},
@@ -24,10 +22,10 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
   ];
 
   bool _isPpdbInitiated = false;
-  // --- TAMBAHAN BARU: State untuk lazy load Berita Pendidikan ---
   bool _isBeritaInitiated = false;
   WebViewController? _ppdbWebViewController;
 
+  // Daftar sekolah dengan semua kemungkinan nama 'fitur'
   final List<Map<String, dynamic>> _schools = const [
     {
       'icon': Icons.palette_outlined,
@@ -36,7 +34,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Usia 4-6 tahun',
       'description':
           'Pendidikan anak usia dini dengan metode bermain sambil belajar',
-      'fitur': 'tk',
+      'fitur': ['tk', 'taman kanak-kanak'],
     },
     {
       'icon': Icons.menu_book_outlined,
@@ -45,7 +43,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 1-6',
       'description':
           'Pendidikan dasar 6 tahun untuk membangun fondasi akademik yang kuat',
-      'fitur': 'sd',
+      'fitur': ['sekolah dasar', 'sd'],
     },
     {
       'icon': Icons.school_outlined,
@@ -54,7 +52,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 7-9',
       'description':
           'Pendidikan menengah pertama dengan kurikulum wajib & peminatan ringan',
-      'fitur': 'smp',
+      'fitur': ['smp', 'sekolah menengah pertama'],
     },
     {
       'icon': Icons.cast_for_education_outlined,
@@ -63,7 +61,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'Kelas 10-12',
       'description':
           'Pendidikan menengah dengan berbagai jurusan dan peminatan',
-      'fitur': 'sma',
+      'fitur': ['sma', 'sekolah menengah atas'],
     },
     {
       'icon': Icons.account_balance_outlined,
@@ -72,45 +70,64 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       'subtitle': 'S1/S2/S3',
       'description':
           'Pendidikan tinggi dengan berbagai program studi dan fakultas',
-      'fitur': 'kuliah',
+      'fitur': ['kuliah', 'universitas', 'perguruan tinggi'],
     },
   ];
 
-  // --- PERUBAHAN 2: Panggil fungsi untuk fetch data saat screen pertama kali dibuka ---
   @override
   void initState() {
     super.initState();
     _fetchSchoolCounts();
   }
-  // ----------------------------------------------------------------------------------
 
-  // --- PERUBAHAN 3: Buat fungsi baru untuk mengambil data jumlah sekolah ---
-  // Fungsi ini berjalan di latar belakang tanpa mengganggu UI.
-  // Jika gagal (tidak ada internet), _schoolCounts akan tetap kosong (default 0).
   Future<void> _fetchSchoolCounts() async {
     try {
-      final sekolahList = await ApiService().fetchTempatSekolah();
+      final sekolahListFromApi = await ApiService().fetchTempatSekolah();
       final Map<String, int> counts = {};
-      for (var s in sekolahList) {
-        counts[s.fitur] = (counts[s.fitur] ?? 0) + 1;
+
+      // Inisialisasi penghitung untuk setiap kategori utama
+      for (var schoolConfig in _schools) {
+        final primaryFitur = (schoolConfig['fitur'] as List<String>).first;
+        counts[primaryFitur] = 0;
       }
-      // Cek jika widget masih ada di tree sebelum setState
+
+      // Lakukan penghitungan berdasarkan semua kemungkinan nama fitur
+      for (var apiSchool in sekolahListFromApi) {
+        final apiFitur = apiSchool.fitur.toLowerCase();
+        for (var schoolConfig in _schools) {
+          final fiturList = (schoolConfig['fitur'] as List<String>);
+          if (fiturList.contains(apiFitur)) {
+            final primaryFitur = fiturList.first;
+            counts[primaryFitur] = (counts[primaryFitur] ?? 0) + 1;
+            break;
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _schoolCounts = counts;
         });
       }
     } catch (e) {
-      // Jika terjadi error (misal: tidak ada koneksi), biarkan saja.
-      // Tidak perlu menampilkan pesan error di halaman ini.
-      // _schoolCounts akan tetap kosong, sehingga count akan jadi 0.
       debugPrint("Gagal mengambil data jumlah sekolah: $e");
     }
   }
-  // -------------------------------------------------------------------------
 
-  void _openMap(BuildContext context, String jenjang, String judulHalaman) {
-    final String apiUrl = 'tempat-sekolah?fitur=$jenjang';
+  // --- PENYESUAIAN KEMBALI ---
+  // Inilah bagian kuncinya. Kita kembali menggunakan join(',')
+  // untuk mengirim semua kemungkinan fitur ke API yang sudah fleksibel.
+  void _openMap(
+    BuildContext context,
+    List<String> fiturList,
+    String judulHalaman,
+  ) {
+    // Gabungkan semua kemungkinan fitur menjadi satu string dipisahkan koma
+    // Contoh: ['sekolah dasar', 'sd'] akan menjadi "sekolah dasar,sd"
+    final String fiturQuery = fiturList.join(',');
+
+    // Buat URL API dengan query yang baru
+    final String apiUrl = 'tempat-sekolah?fitur=$fiturQuery';
 
     Navigator.push(
       context,
@@ -124,6 +141,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
       ),
     );
   }
+  // --- AKHIR PENYESUAIAN ---
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +191,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                           },
                         )
                       : Container(),
-                  // --- PERUBAHAN: Menerapkan lazy load ---
                   _isBeritaInitiated
                       ? const BeritaPendidikanView()
                       : Container(),
@@ -204,7 +221,6 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
                 if (i == 1 && !_isPpdbInitiated) {
                   _isPpdbInitiated = true;
                 }
-                // --- PERUBAHAN: Mengaktifkan lazy load untuk Berita ---
                 if (i == 2 && !_isBeritaInitiated) {
                   _isBeritaInitiated = true;
                 }
@@ -248,9 +264,7 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
     );
   }
 
-  // --- PERUBAHAN 4: Hapus FutureBuilder ---
   Widget _buildCariSekolahView(ThemeData theme) {
-    // Tidak ada lagi FutureBuilder, langsung bangun ListView.
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       physics: const BouncingScrollPhysics(),
@@ -267,26 +281,24 @@ class _SekolahYuScreenState extends State<SekolahYuScreen> {
           style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
         ),
         const SizedBox(height: 16),
-        // Gunakan data dari state _schoolCounts
         ..._schools.map((s) {
-          final fitur = s['fitur'] as String;
-          // Ambil jumlah dari state, jika tidak ada, defaultnya 0.
-          final count = _schoolCounts[fitur] ?? 0;
+          final fiturList = s['fitur'] as List<String>;
+          final primaryFitur = fiturList.first;
+          final count = _schoolCounts[primaryFitur] ?? 0;
+
           return _SchoolCard(
             data: {
               ...s,
               'countText': count > 0
                   ? "$count Sekolah Tersedia"
-                  : "0 Sekolah Tersedia", // Tampilkan 0 jika tidak ada
+                  : "0 Sekolah Tersedia",
             },
-            onTapCari: () => _openMap(context, fitur, s['title']),
+            onTapCari: () => _openMap(context, fiturList, s['title']),
           );
         }).toList(),
       ],
     );
   }
-
-  // -------------------------------------------
 }
 
 class _SchoolCard extends StatelessWidget {
