@@ -6,6 +6,7 @@ import 'package:reang_app/models/dokter_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/screens/auth/login_screen.dart';
 
 class DetailDokterScreen extends StatefulWidget {
   final DokterModel dokter;
@@ -19,7 +20,6 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -36,11 +36,13 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
                     headers: const {'ngrok-skip-browser-warning': 'true'},
                     width: double.infinity,
                     height: 240,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain, // <-- UBAH DI SINI
                     errorBuilder: (_, __, ___) => Container(
                       height: 240,
                       width: double.infinity,
-                      color: theme.colorScheme.surface,
+                      color: theme
+                          .colorScheme
+                          .surface, // Beri warna latar belakang
                       child: Center(
                         child: Icon(
                           Icons.person,
@@ -137,53 +139,38 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
         child: ElevatedButton(
-          onPressed: authProvider.role == 'dokter'
-              ? null
-              : () async {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) =>
-                        const Center(child: CircularProgressIndicator()),
-                  );
+          onPressed: () async {
+            // --- MULAI GANTI DENGAN INI ---
+            final authProvider = Provider.of<AuthProvider>(
+              context,
+              listen: false,
+            );
 
-                  if (FirebaseAuth.instance.currentUser == null) {
-                    try {
-                      final laravelToken = authProvider.token;
-                      if (laravelToken == null) {
-                        throw Exception("Token Laravel tidak ditemukan.");
-                      }
+            // Jangan izinkan dokter chat dengan dokter lain
+            if (authProvider.role == 'dokter') {
+              return;
+            }
 
-                      final firebaseToken = await ApiService().getFirebaseToken(
-                        laravelToken,
-                      );
-                      await FirebaseAuth.instance.signInWithCustomToken(
-                        firebaseToken,
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Gagal terhubung ke server chat.'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-                  }
+            // CEK DULU APAKAH SUDAH LOGIN ATAU BELUM
+            if (authProvider.isLoggedIn) {
+              // Jika sudah login, langsung panggil fungsi untuk memulai chat
+              await _initiateChat();
+            } else {
+              // Jika belum login, arahkan ke halaman login
+              final result = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(popOnSuccess: true),
+                ),
+              );
 
-                  if (mounted) {
-                    Navigator.of(context).pop();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(recipient: widget.dokter),
-                      ),
-                    );
-                  }
-                },
+              // Setelah kembali dari login, jika berhasil, baru panggil fungsi chat
+              if (result == true && mounted) {
+                await _initiateChat();
+              }
+            }
+            // --- GANTI SAMPAI SINI ---
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: theme.colorScheme.onPrimary,
@@ -199,6 +186,53 @@ class _DetailDokterScreenState extends State<DetailDokterScreen> {
         ),
       ),
     );
+  }
+
+  // Letakkan fungsi ini di dalam class _DetailDokterScreenState
+  Future<void> _initiateChat() async {
+    // Tampilkan dialog loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Logika untuk login ke Firebase jika belum ada sesi
+      if (FirebaseAuth.instance.currentUser == null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final laravelToken = authProvider.token;
+
+        if (laravelToken == null) {
+          throw Exception("Sesi Anda berakhir. Silakan coba lagi.");
+        }
+
+        final firebaseToken = await ApiService().getFirebaseToken(laravelToken);
+        await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
+      }
+
+      // Jika semua berhasil, tutup dialog dan buka halaman chat
+      if (mounted) {
+        Navigator.of(context).pop(); // Tutup dialog loading
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(recipient: widget.dokter),
+          ),
+        );
+      }
+    } catch (e) {
+      // Jika ada error, tutup dialog dan tampilkan pesan
+      if (mounted) {
+        Navigator.of(context).pop(); // Tutup dialog loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memulai chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildOnlineStatus(ThemeData theme) {

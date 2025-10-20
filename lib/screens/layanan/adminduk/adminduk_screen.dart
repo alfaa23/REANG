@@ -2,6 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:reang_app/models/info_adminduk_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/adminduk/detail_adminduk_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
+
+Future<void> openAppLink(String appName, BuildContext context) async {
+  String? url;
+
+  if (appName == 'Si Pandan Ayu') {
+    if (Platform.isAndroid) {
+      url =
+          'https://play.google.com/store/apps/details?id=gov.disdukcapilkabindramayu.sipandanayu.bermartabat';
+    }
+  } else if (appName == 'IKD') {
+    if (Platform.isAndroid) {
+      url = 'https://play.google.com/store/apps/details?id=id.go.dukcapil.ikd';
+    } else if (Platform.isIOS) {
+      url =
+          'https://apps.apple.com/id/app/identitas-kependudukan-digital/id6448944056';
+    }
+  }
+
+  if (url != null) {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka tautan.')),
+      );
+    }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Aplikasi tidak tersedia di platform ini.')),
+    );
+  }
+}
 
 class AdmindukScreen extends StatefulWidget {
   const AdmindukScreen({super.key});
@@ -30,19 +65,15 @@ class _AdmindukScreenState extends State<AdmindukScreen> {
     {
       'title': 'Jam Operasional',
       'icon': Icons.access_time_outlined,
-      'lines': [
-        'Senin – Jumat: 08:00 – 16:00',
-        'Sabtu: 08:00 – 12:00',
-        'Minggu: Tutup',
-      ],
+      'lines': ['Senin – Jumat: 08:00 – 16:00', 'Sabtu-Minggu: Tutup'],
     },
     {
       'title': 'Kontak Bantuan',
       'icon': Icons.phone_outlined,
       'lines': [
-        'Telepon: (021) 123‑4567',
-        'WhatsApp: 0812‑3456‑7890',
-        'Email: adminduk@desa.go.id',
+        'Telepon: 0234-272312',
+        'Website: disdukcapil.indramayukab.go.id',
+        'Email: disdukindramayu597@gmail.com',
       ],
     },
     {
@@ -160,16 +191,16 @@ class _AdmindukScreenState extends State<AdmindukScreen> {
                 children: [
                   _RecommendationCard(
                     title: 'Identitas Kependudukan Digital',
-                    logoPath: 'assets/logos/ikd.png',
+                    logoPath: 'assets/logos/ikd.webp',
                     logoBackgroundColor: Colors.blue.shade800,
-                    onTap: () {},
+                    onTap: () => openAppLink('IKD', context),
                   ),
                   const SizedBox(height: 12),
                   _RecommendationCard(
-                    title: 'Layanan BPJS Kesehatan',
-                    logoPath: 'assets/logos/bpjs.png',
-                    logoBackgroundColor: theme.colorScheme.primary,
-                    onTap: () {},
+                    title: 'Sipandan Ayu',
+                    logoPath: 'assets/logos/sipandan.webp',
+                    logoBackgroundColor: Colors.blue.shade800,
+                    onTap: () => openAppLink('Si Pandan Ayu', context),
                   ),
                 ],
               ),
@@ -431,8 +462,8 @@ class _RecommendationCard extends StatelessWidget {
                 ),
                 child: Image.asset(
                   logoPath,
-                  width: 40,
-                  height: 40,
+                  width: 52,
+                  height: 52,
                   errorBuilder: (context, error, stackTrace) {
                     return const SizedBox(width: 40, height: 40);
                   },

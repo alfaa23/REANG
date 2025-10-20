@@ -143,7 +143,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     if (_jenisController.text.isEmpty ||
         _selectedKategori == null ||
         _lokasiController.text.isEmpty ||
-        _deskripsiController.text.isEmpty) {
+        _deskripsiController.text.isEmpty ||
+        _pickedImage == null) {
       showToast(
         "Harap lengkapi semua kolom yang wajib diisi.",
         context: context,
