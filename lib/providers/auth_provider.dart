@@ -33,7 +33,7 @@ class AuthProvider with ChangeNotifier {
         value: json.encode(userObject.toMap()),
       );
     } else if (userObject is AdminModel) {
-      _role = userObject.role;
+      _role = userObject.role; // Ini akan menjadi 'puskesmas'
       await _storage.write(
         key: 'user_data',
         value: json.encode(userObject.toMap()),
@@ -43,18 +43,20 @@ class AuthProvider with ChangeNotifier {
     await _storage.write(key: 'user_token', value: laravelToken);
     await _storage.write(key: 'user_role', value: _role);
 
+    // --- PERBAIKAN: Login Firebase HANYA untuk ADMIN (Puskesmas) ---
     if (userObject is AdminModel) {
       try {
         final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
         await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
-        debugPrint("Login proaktif ke Firebase untuk Dokter berhasil!");
+        debugPrint(
+          "Login proaktif ke Firebase untuk Admin Puskesmas berhasil!",
+        );
       } catch (e) {
         debugPrint("Gagal login proaktif ke Firebase: $e");
         await logout();
         throw Exception("Gagal otentikasi dengan Firebase.");
       }
     }
-
     notifyListeners();
   }
 
@@ -72,7 +74,8 @@ class AuthProvider with ChangeNotifier {
 
     if (tokenIsValid) {
       final userDataMap = json.decode(userDataString);
-      if (storedRole == 'dokter') {
+      // --- PERBAIKAN: Cek untuk role 'puskesmas' ---
+      if (storedRole == 'puskesmas') {
         _currentUser = AdminModel.fromMap(userDataMap);
       } else {
         _currentUser = UserModel.fromMap(userDataMap);
@@ -80,12 +83,10 @@ class AuthProvider with ChangeNotifier {
       _role = storedRole;
       _token = storedToken;
 
-      // --- PERBAIKAN UTAMA DI SINI ---
-      // Cek dulu apakah sesi Firebase sudah ada.
-      if (storedRole == 'dokter' && FirebaseAuth.instance.currentUser == null) {
-        debugPrint(
-          "Sesi Firebase tidak ada, mencoba login ulang ke Firebase...",
-        );
+      // --- PERBAIKAN: Auto-login Firebase HANYA untuk ADMIN (Puskesmas) ---
+      if (storedRole == 'puskesmas' &&
+          FirebaseAuth.instance.currentUser == null) {
+        debugPrint("Sesi Firebase tidak ada, mencoba login ulang...");
         try {
           final firebaseToken = await _apiService.getFirebaseToken(storedToken);
           await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
@@ -94,10 +95,7 @@ class AuthProvider with ChangeNotifier {
           debugPrint("Gagal auto-login proaktif ke Firebase: $e");
           await logout();
         }
-      } else if (storedRole == 'dokter') {
-        debugPrint("Sesi Firebase sudah ada, tidak perlu login ulang.");
       }
-      // --------------------------------
     } else {
       await logout();
     }

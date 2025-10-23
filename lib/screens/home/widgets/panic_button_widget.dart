@@ -110,7 +110,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
         children: [
           // --- PENAMBAHAN: Tombol Pemadam Kebakaran ---
           _buildOption(
-            -230.0, // Posisi paling atas
+            -285.0, // Posisi paling atas
             'Pemadam',
             Icons.local_fire_department_outlined,
             () => _navigateToHoldScreen(
@@ -124,7 +124,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
           ),
           // --- PENAMBAHAN: Tombol Polisi ---
           _buildOption(
-            -175.0, // Posisi kedua
+            -230.0, // Posisi kedua
             'Polisi',
             Icons.local_police_outlined,
             () => _navigateToHoldScreen(
@@ -137,7 +137,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
             ),
           ),
           _buildOption(
-            -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
+            -175.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'Ambulans',
             FontAwesomeIcons.ambulance,
             // --- PERUBAHAN: Panggil fungsi navigasi ---
@@ -151,7 +151,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
             ),
           ),
           _buildOption(
-            -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
+            -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
             'PMI',
             Icons.local_hospital_outlined,
             // --- PERUBAHAN: Panggil fungsi navigasi ---
@@ -159,6 +159,20 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
               PanicService(
                 name: 'Panggilan Darurat',
                 phoneNumber: _PMI ?? '085133468780',
+                info:
+                    'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
+              ),
+            ),
+          ),
+          _buildOption(
+            -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
+            'BPBD',
+            Icons.report,
+            // --- PERUBAHAN: Panggil fungsi navigasi ---
+            () => _navigateToHoldScreen(
+              PanicService(
+                name: 'Panggilan Darurat',
+                phoneNumber: _PMI ?? '081911019911',
                 info:
                     'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
               ),
@@ -225,6 +239,22 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     IconData icon,
     VoidCallback onPressed,
   ) {
+    // --- PERUBAHAN DIMULAI DI SINI ---
+
+    // 1. Dapatkan tema saat ini di dalam fungsi
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    // 2. Tentukan warna latar belakang yang kontras
+    final contrastBackgroundColor = isDarkMode
+        ? Colors.white
+        : Colors.grey[850];
+
+    // 3. Tentukan warna teks yang kontras
+    final contrastTextColor = isDarkMode ? Colors.black : Colors.white;
+
+    // --- AKHIR PERUBAHAN ---
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -244,7 +274,8 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
+                // --- GUNAKAN WARNA KONTRAST DI SINI ---
+                color: contrastBackgroundColor,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -253,12 +284,14 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
                   ),
                 ],
               ),
-              child: Text(label),
+              // --- BERI WARNA PADA TEKS AGAR TERBACA ---
+              child: Text(label, style: TextStyle(color: contrastTextColor)),
             ),
             const SizedBox(width: 12),
             CircleAvatar(
               radius: 22,
-              backgroundColor: Theme.of(context).cardColor,
+              // --- GUNAKAN WARNA KONTRAST DI SINI JUGA ---
+              backgroundColor: contrastBackgroundColor,
               child: Icon(icon, color: Colors.red),
             ),
           ],

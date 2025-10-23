@@ -5,21 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/dokter_model.dart'; // Tetap diperlukan untuk tipe data
+import 'package:reang_app/models/puskesmas_model.dart'; // <-- IMPORT BARU
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:reang_app/screens/layanan/sehat/image_preview_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/full_screen_image_viewer.dart';
+import 'package:shimmer/shimmer.dart';
 
 // Model untuk pesan dari Firestore (sudah mendukung teks dan gambar)
 class FirestoreMessage {
   final String senderId;
-  final String? text; // Jadi nullable
+  final String? text;
   final Timestamp? timestamp;
-  final String type; // 'text' atau 'image'
-  final String? imageUrl; // Jadi nullable
+  final String type;
+  final String? imageUrl;
 
   FirestoreMessage({
     required this.senderId,
@@ -42,7 +43,8 @@ class FirestoreMessage {
 }
 
 class ChatScreen extends StatefulWidget {
-  final dynamic recipient;
+  final dynamic
+  recipient; // Sekarang bisa UserModel, DokterModel, atau PuskesmasModel
   const ChatScreen({super.key, required this.recipient});
 
   @override
@@ -109,20 +111,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
+    // ID saya (User atau Admin Puskesmas)
     _myId =
-        (authProvider.role == 'dokter'
+        (authProvider.role == 'puskesmas'
                 ? authProvider.admin!.id
                 : authProvider.user!.id)
             .toString();
-    _recipientId = (widget.recipient is DokterModel)
-        ? (widget.recipient as DokterModel).adminId.toString()
-        : widget.recipient.id.toString();
+
+    // --- PERBAIKAN UTAMA: Dapatkan ID Admin dari Puskesmas ---
+    if (widget.recipient is DokterModel) {
+      _recipientId = (widget.recipient as DokterModel).adminId.toString();
+    } else if (widget.recipient is PuskesmasModel) {
+      _recipientId = (widget.recipient as PuskesmasModel).adminId.toString();
+    } else if (widget.recipient is UserModel) {
+      _recipientId = widget.recipient.id.toString();
+    } else {
+      // Fallback jika tipe recipient tidak dikenal
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "Penerima tidak valid.";
+      });
+      return;
+    }
+    // --------------------------------------------------------
 
     List<String> ids = [_myId, _recipientId]..sort();
     _chatId = ids.join('_');
 
     _listenToMessages();
-    _markMessagesAsRead();
+    _clearUnreadForChat(_chatId, _myId);
   }
 
   void _listenToMessages() {
@@ -157,10 +174,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
   }
 
-  void _markMessagesAsRead() {
-    FirebaseFirestore.instance.collection('chats').doc(_chatId).set({
-      'unreadCount': {_myId: 0},
-    }, SetOptions(merge: true));
+  Future<void> _clearUnreadForChat(String chatDocId, String myId) async {
+    if (chatDocId.isEmpty || myId.isEmpty) return;
+    final chatDocRef = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatDocId);
+    try {
+      await chatDocRef.update({'unreadCount.$myId': 0});
+    } catch (e) {
+      try {
+        await chatDocRef.set({
+          'unreadCount': {myId: 0},
+        }, SetOptions(merge: true));
+      } catch (e2) {
+        debugPrint('Gagal membersihkan unread count: $e2');
+      }
+    }
   }
 
   Future<void> _sendFirestoreMessage(
@@ -168,12 +197,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     String lastMessageText,
   ) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final myName = authProvider.role == 'dokter'
+    final myName = authProvider.role == 'puskesmas'
         ? authProvider.admin!.name
         : authProvider.user!.name;
-    final recipientName = (widget.recipient is UserModel)
-        ? (widget.recipient as UserModel).name
-        : (widget.recipient as DokterModel).nama;
+
+    // --- PERBAIKAN: Dapatkan nama penerima dari berbagai tipe model ---
+    String recipientName = 'Tidak Dikenal';
+    if (widget.recipient is UserModel) {
+      recipientName = (widget.recipient as UserModel).name;
+    } else if (widget.recipient is DokterModel) {
+      recipientName = (widget.recipient as DokterModel).nama;
+    } else if (widget.recipient is PuskesmasModel) {
+      recipientName = (widget.recipient as PuskesmasModel).nama;
+    }
+    // -------------------------------------------------------------
 
     try {
       final firestore = FirebaseFirestore.instance;
@@ -221,7 +258,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  // --- LOGIKA MENGIRIM GAMBAR DIPERBARUI ---
   Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(
       source: source,
@@ -230,14 +266,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
     if (image == null) return;
 
-    final result = await Navigator.of(context).push(
+    final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (context) => ImagePreviewScreen(imageFile: File(image.path)),
       ),
     );
 
-    // `result` akan berisi teks caption dari ImagePreviewScreen
-    if (result != null && result is String) {
+    if (result != null) {
       final String caption = result;
       _uploadAndSendImage(File(image.path), caption);
     }
@@ -276,8 +311,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final token = authProvider.token;
     if (token == null) return;
 
-    // TODO: Tampilkan UI loading/uploading di sini
-
     try {
       final imageUrl = await _apiService.uploadChatImage(imageFile, token);
 
@@ -285,7 +318,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         'senderId': _myId,
         'type': 'image',
         'imageUrl': imageUrl,
-        'text': caption, // Simpan caption
+        'text': caption,
         'timestamp': FieldValue.serverTimestamp(),
       };
 
@@ -372,6 +405,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // --- PERBAIKAN UTAMA: Logika untuk AppBar ---
     String recipientName;
     String? recipientFotoUrl;
 
@@ -381,10 +416,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } else if (widget.recipient is UserModel) {
       recipientName = (widget.recipient as UserModel).name;
       recipientFotoUrl = null;
+    } else if (widget.recipient is PuskesmasModel) {
+      recipientName = (widget.recipient as PuskesmasModel).nama;
+      recipientFotoUrl = null; // Puskesmas tidak punya foto
     } else {
       recipientName = 'Tidak Dikenal';
       recipientFotoUrl = null;
     }
+    // ---------------------------------------------
 
     final ScrollPhysics physics = _canScroll
         ? const BouncingScrollPhysics()
@@ -406,11 +445,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     )
                   : null,
               child: (recipientFotoUrl == null || recipientFotoUrl.isEmpty)
-                  ? Text(
-                      recipientName.isNotEmpty
-                          ? recipientName.substring(0, 1).toUpperCase()
-                          : '?',
-                    )
+                  // --- PERBAIKAN: Tampilkan ikon RS/Puskesmas ---
+                  ? (widget.recipient is PuskesmasModel
+                        ? const Icon(Icons.local_hospital)
+                        : Text(
+                            recipientName.isNotEmpty
+                                ? recipientName.substring(0, 1).toUpperCase()
+                                : '?',
+                          ))
                   : null,
             ),
             const SizedBox(width: 8),
@@ -579,15 +621,14 @@ class _ChatMessageBubble extends StatelessWidget {
     final alignment = isMyMessage
         ? CrossAxisAlignment.end
         : CrossAxisAlignment.start;
+    final color = isMyMessage
+        ? theme.colorScheme.primary
+        : theme.colorScheme.surfaceContainerHighest;
 
     Widget messageContent;
-
-    // --- PERBAIKAN UTAMA DI SINI ---
     if (message.type == 'image' && message.imageUrl != null) {
       messageContent = GestureDetector(
-        // 1. Bungkus dengan GestureDetector
         onTap: () {
-          // 2. Navigasi ke layar pratinjau saat gambar ditekan
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -599,15 +640,13 @@ class _ChatMessageBubble extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            color: isMyMessage
-                ? theme.colorScheme.primary
-                : theme.colorScheme.surfaceContainerHighest,
+            color: color,
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.6,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min, // Agar kolom pas dengan isinya
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Image.network(
                   message.imageUrl!,
@@ -644,10 +683,6 @@ class _ChatMessageBubble extends StatelessWidget {
         ),
       );
     } else {
-      // Logika untuk pesan teks (tidak berubah)
-      final color = isMyMessage
-          ? theme.colorScheme.primary
-          : theme.colorScheme.surfaceContainerHighest;
       final textColor = isMyMessage
           ? theme.colorScheme.onPrimary
           : theme.colorScheme.onSurface;
@@ -671,7 +706,12 @@ class _ChatMessageBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: alignment,
       children: [
-        messageContent,
+        Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.7,
+          ),
+          child: messageContent,
+        ),
         const SizedBox(height: 4),
         Text(
           _formatTime(context, message.timestamp),

@@ -1,10 +1,16 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:provider/provider.dart';
 import 'package:reang_app/models/puskesmas_model.dart';
-import 'package:reang_app/screens/layanan/sehat/detail_puskesmas_screen.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/screens/auth/login_screen.dart';
+import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
+// --- Debouncer (untuk pencarian) ---
 class Debouncer {
   final int milliseconds;
   Timer? _timer;
@@ -87,9 +93,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
       String friendlyMessage = 'Terjadi kesalahan.';
       if (err is DioException &&
           (err.type == DioExceptionType.connectionError ||
-              err.type == DioExceptionType.connectionTimeout ||
-              err.type == DioExceptionType.receiveTimeout ||
-              err.type == DioExceptionType.sendTimeout)) {
+              err.type == DioExceptionType.connectionTimeout)) {
         friendlyMessage = 'Gagal terhubung. Periksa koneksi internet Anda.';
       }
       setState(() {
@@ -102,7 +106,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     });
   }
 
-  void _loadMore() async {
+  Future<void> _loadMore() async {
     if (_hasNextPage &&
         !_isFirstLoadRunning &&
         !_isLoadMoreRunning &&
@@ -130,11 +134,101 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
           });
         }
       } catch (err) {
-        print("Gagal memuat halaman berikutnya: $err");
+        debugPrint("Gagal memuat halaman berikutnya: $err");
       }
       setState(() {
         _isLoadMoreRunning = false;
       });
+    }
+  }
+
+  // --- FUNGSI LOGIKA UNTUK MENANGANI SAAT PUSKESMAS DI-TAP ---
+  Future<void> _handleChatTap(PuskesmasModel puskesmas) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // 1. Cek login Laravel
+    if (!authProvider.isLoggedIn) {
+      // Arahkan ke LoginScreen, tunggu hasilnya, dan gunakan popOnSuccess
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const LoginScreen(popOnSuccess: true), // <-- Beri parameter ini
+        ),
+      );
+
+      // Jika login TIDAK berhasil (result bukan true), hentikan proses
+      if (result != true) {
+        return;
+      }
+      // Jika login BERHASIL (result == true), panggil kembali fungsi ini
+      // untuk melanjutkan alur pengecekan berikutnya (adminId, Firebase, dll.)
+      // Pastikan widget masih ada (mounted) sebelum memanggil lagi
+      if (mounted) {
+        _handleChatTap(puskesmas); // Panggil ulang fungsi ini
+      }
+      return; // Hentikan eksekusi alur yang pertama
+    }
+
+    // 2. Cek apakah Puskesmas punya admin untuk di-chat
+    if (puskesmas.adminId == null) {
+      if (mounted) {
+        showToast(
+          'Layanan chat untuk puskesmas ini belum tersedia.', // 1. Isi pesan
+          context: context, // 2. Tambahkan context
+          backgroundColor: Colors.orange, // 3. Pindahkan backgroundColor
+          // 4. Salin semua style yang Anda inginkan
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale,
+          reverseAnimation: StyledToastAnimation.fade,
+          animDuration: const Duration(milliseconds: 150),
+          duration: const Duration(seconds: 2),
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
+        );
+      }
+      return;
+    }
+
+    // 3. Tampilkan loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // 4. Cek login Firebase
+    if (FirebaseAuth.instance.currentUser == null) {
+      try {
+        // Ambil token Laravel terbaru dari provider yang sudah ter-update
+        final token = Provider.of<AuthProvider>(context, listen: false).token!;
+        final firebaseToken = await _apiService.getFirebaseToken(token);
+        await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Hapus loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gagal terhubung ke server chat.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // 5. Jika semua beres, hapus loading dan navigasi ke ChatScreen
+    if (mounted) {
+      Navigator.of(context).pop(); // Hapus loading
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          // Langsung ke ChatScreen
+          builder: (context) => ChatScreen(recipient: puskesmas),
+        ),
+      );
     }
   }
 
@@ -148,12 +242,12 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Konsultasi Dokter',
+              'Konsultasi Puskesmas',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 2),
             Text(
-              'Terhubung dengan dokter puskesmas',
+              'Terhubung dengan admin puskesmas',
               style: TextStyle(fontSize: 12, color: theme.hintColor),
             ),
           ],
@@ -163,9 +257,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     );
   }
 
-  // --- PERUBAHAN UTAMA: Struktur body dirombak agar loading tidak satu halaman penuh ---
   Widget _buildBody(ThemeData theme) {
-    // Tampilan error jaringan tetap satu halaman penuh
     if (_errorMessage != null) {
       return _buildErrorWidget(theme);
     }
@@ -177,7 +269,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            // Widget Search Bar (selalu tampil)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -203,7 +294,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
                 ),
               ),
             ),
-            // Widget Judul (selalu tampil)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -236,8 +326,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
                 ),
               ),
             ),
-
-            // Bagian konten list yang dinamis (Loading / Hasil Kosong / Daftar)
             if (_isFirstLoadRunning)
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
@@ -252,12 +340,13 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
                   separatorBuilder: (context, index) =>
                       const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    return _PuskesmasCard(puskesmas: _puskesmasList[index]);
+                    return _PuskesmasCard(
+                      puskesmas: _puskesmasList[index],
+                      onTap: () => _handleChatTap(_puskesmasList[index]),
+                    );
                   },
                 ),
               ),
-
-            // Indikator loading untuk infinite scroll
             if (_isLoadMoreRunning)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -271,8 +360,6 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
     );
   }
 
-  // Sisa kode di bawah ini tidak ada yang berubah
-  // ...
   Widget _buildErrorWidget(ThemeData theme) {
     return Center(
       child: Padding(
@@ -320,7 +407,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
             Text(
               _searchController.text.isEmpty
                   ? 'Saat ini belum ada data puskesmas yang tersedia.'
-                  : 'Maaf, kami tidak dapat menemukan puskesmas dengan kata kunci "${_searchController.text}". Silakan coba kata kunci lain.',
+                  : 'Maaf, kami tidak dapat menemukan puskesmas dengan kata kunci "${_searchController.text}".',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.hintColor,
@@ -333,71 +420,78 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
   }
 }
 
+// --- WIDGET CARD UNTUK PUSKESMAS ---
 class _PuskesmasCard extends StatelessWidget {
   final PuskesmasModel puskesmas;
-  const _PuskesmasCard({required this.puskesmas});
+  final VoidCallback onTap;
+  const _PuskesmasCard({required this.puskesmas, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool canChat = puskesmas.adminId != null;
+
     return Card(
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              puskesmas.nama,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Icon(Icons.local_hospital, color: Colors.red),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              puskesmas.alamat,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              theme,
-              Icons.access_time_outlined,
-              'Buka: ${puskesmas.jam}',
-            ),
-            const SizedBox(height: 4),
-            _buildInfoRow(
-              theme,
-              Icons.person_outline,
-              (puskesmas.dokterTersedia != null &&
-                      puskesmas.dokterTersedia! > 0)
-                  ? '${puskesmas.dokterTersedia} Dokter tersedia'
-                  : 'Dokter tidak tersedia',
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          DetailPuskesmasScreen(puskesmas: puskesmas),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      puskesmas.nama,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(height: 4),
+                    Text(
+                      puskesmas.alamat,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      theme,
+                      Icons.access_time_outlined,
+                      'Buka: ${puskesmas.jam}',
+                    ),
+                    const SizedBox(height: 4),
+                    _buildInfoRow(
+                      theme,
+                      Icons.person_outline,
+                      '${puskesmas.dokterTersedia} Dokter tersedia',
+                    ),
+                  ],
                 ),
-                child: const Text('Cari Dokter'),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chat_bubble_outline,
+                color: canChat
+                    ? theme.colorScheme.primary
+                    : theme.disabledColor.withOpacity(0.3),
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

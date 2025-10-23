@@ -32,7 +32,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://41d07806e41e.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://0b9729a78741.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -1305,6 +1305,19 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data puskesmas: $e');
+    }
+  }
+
+  // FUNGSI BARU UNTUK MENGAMBIL DAFTAR PUSKESMAS
+  Future<List<PuskesmasModel>> fetchPuskesmasList() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/puskesmas');
+      // Data Anda ter-bungkus di dalam key 'data' karena paginasi
+      List<dynamic> list = response.data['data'];
+      return list.map((e) => PuskesmasModel.fromJson(e)).toList();
+    } on DioException catch (e) {
+      debugPrint("Gagal mengambil daftar puskesmas: $e");
+      throw Exception('Gagal memuat data puskesmas');
     }
   }
 
