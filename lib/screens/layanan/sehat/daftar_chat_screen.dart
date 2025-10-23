@@ -195,9 +195,6 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                     return _buildShimmerTile();
                   }
 
-                  final puskesmas = puskesmasSnapshot.data; // <-- DIUBAH
-                  final displayName = puskesmas?.nama ?? recipientName;
-
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 8,
@@ -208,7 +205,9 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                       // Puskesmas tidak punya fotoUrl, jadi kita hapus backgroundImage
                       // dan langsung gunakan 'child' untuk inisial.
                       child: Text(
-                        getInitials(displayName), // Gunakan fungsi getInitials
+                        getInitials(
+                          recipientName,
+                        ), // Gunakan fungsi getInitials
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize:
@@ -217,7 +216,7 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                       ),
                     ),
                     title: Text(
-                      displayName,
+                      recipientName,
                       style: TextStyle(
                         fontWeight: hasUnread
                             ? FontWeight.bold
