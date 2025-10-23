@@ -1321,6 +1321,21 @@ class ApiService {
     }
   }
 
+  // --- TAMBAHKAN FUNGSI BARU INI ---
+  Future<PuskesmasModel?> getPuskesmasByAdminId(String adminId) async {
+    // Pastikan Anda membuat endpoint ini di Laravel
+    final String apiUrl = '$_baseUrlBackend/puskesmas/by-admin/$adminId';
+    try {
+      final response = await _dio.get(apiUrl);
+      if (response.statusCode == 200 && response.data != null) {
+        return PuskesmasModel.fromJson(response.data);
+      }
+    } catch (e) {
+      debugPrint("Gagal mengambil Puskesmas by Admin ID: $e");
+    }
+    return null;
+  }
+
   /// Mengambil daftar dokter berdasarkan ID puskesmas.
   /// CATATAN: Endpoint diasumsikan /api/dokter?puskesmas_id={id}
   Future<List<DokterModel>> fetchDokterByPuskesmas(int puskesmasId) async {

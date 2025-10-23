@@ -447,7 +447,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: (recipientFotoUrl == null || recipientFotoUrl.isEmpty)
                   // --- PERBAIKAN: Tampilkan ikon RS/Puskesmas ---
                   ? (widget.recipient is PuskesmasModel
-                        ? const Icon(Icons.local_hospital)
+                        ? const Icon(Icons.local_hospital, color: Colors.red)
                         : Text(
                             recipientName.isNotEmpty
                                 ? recipientName.substring(0, 1).toUpperCase()

@@ -1,10 +1,9 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/puskesmas_model.dart'; // <-- DIUBAH
 import 'package:reang_app/services/api_service.dart';
 import 'package:shimmer/shimmer.dart';
 import 'chat_screen.dart';
@@ -22,7 +21,7 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
   StreamSubscription<User?>? _authSub;
 
   // Cache futures untuk menghindari fetch ulang setiap rebuild
-  final Map<String, Future<DokterModel?>> _dokterCache = {};
+  final Map<String, Future<PuskesmasModel?>> _puskesmasCache = {}; // <-- DIUBAH
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
           ? null
           : FirebaseAuth.instance.currentUser?.uid;
       if (user?.uid != currentUid) {
-        // Ganti stream hanya kalau benar-benar berubah
         _initializeStream();
         if (mounted) setState(() {});
       }
@@ -51,7 +49,6 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
   void _initializeStream() {
     final myId = FirebaseAuth.instance.currentUser?.uid;
     if (myId != null) {
-      // gunakan query stream langsung (disimpan sekali di init atau saat uid berubah)
       _chatsStream = FirebaseFirestore.instance
           .collection('chats')
           .where('participants', arrayContains: myId)
@@ -62,14 +59,14 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
     }
   }
 
-  Future<DokterModel?> _getDokterFuture(String adminId) {
+  // --- FUNGSI DIGANTI UNTUK MENGAMBIL PUSKESMAS ---
+  Future<PuskesmasModel?> _getPuskesmasFuture(String adminId) {
     if (adminId.isEmpty) {
-      // return a completed future with null to avoid unnecessary calls
       return Future.value(null);
     }
-    return _dokterCache.putIfAbsent(
+    return _puskesmasCache.putIfAbsent(
       adminId,
-      () => _apiService.getDokterByAdminId(adminId),
+      () => _apiService.getPuskesmasByAdminId(adminId), // <-- DIUBAH
     );
   }
 
@@ -93,9 +90,11 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = DateTime(now.year, now.month, now.day - 1);
 
-    if (messageDate.isAfter(today))
+    if (messageDate.isAfter(today)) {
       return DateFormat('HH:mm').format(messageDate);
-    if (messageDate.isAfter(yesterday)) return 'Kemarin';
+    } else if (messageDate.isAfter(yesterday)) {
+      return 'Kemarin';
+    }
     return DateFormat('dd/MM/yy').format(messageDate);
   }
 
@@ -113,7 +112,7 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Padding(
+            child: const Padding(
               padding: EdgeInsets.all(12.0),
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -139,10 +138,8 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // pakai stream yang sudah dibuat di initState (jangan re-create lagi di build)
         stream: _chatsStream,
         builder: (context, snapshot) {
-          // Jika stream belum siap (initial) tampilkan shimmer
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildShimmerEffect();
           }
@@ -163,7 +160,7 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
               final chatDoc = chatDocs[index];
               final chatData = chatDoc.data() as Map<String, dynamic>;
 
-              String recipientName = 'Dokter';
+              String recipientName = 'Puskesmas'; // <-- DIUBAH
               String recipientAdminId = '';
               final pNames = List<String>.from(
                 chatData['participantNames'] ?? [],
@@ -173,15 +170,8 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
               for (int i = 0; i < pIds.length; i++) {
                 if (pIds[i] != myId) {
                   recipientAdminId = pIds[i];
-                  // Ambil nama dari participantNames jika tersedia
                   if (i < pNames.length) {
-                    final nameParts = pNames[i].split(' ');
-                    if (nameParts.length > 1 &&
-                        (nameParts[0] == 'Dr.' || nameParts[0] == 'dr.')) {
-                      recipientName = nameParts.sublist(1).join(' ');
-                    } else {
-                      recipientName = pNames[i];
-                    }
+                    recipientName = pNames[i];
                   }
                   break;
                 }
@@ -191,23 +181,22 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                   .toInt();
               final hasUnread = unreadCount > 0;
 
-              // PREFETCH ringan: minta future berjalan sedini mungkin (tidak awaited)
-              _getDokterFuture(recipientAdminId);
+              // PREFETCH
+              _getPuskesmasFuture(recipientAdminId); // <-- DIUBAH
 
-              return FutureBuilder<DokterModel?>(
-                // gunakan future cached agar tidak re-fetch setiap snapshot update
-                future: _dokterCache[recipientAdminId],
-                builder: (context, dokterSnapshot) {
-                  // Jika dokterSnapshot sedang menunggu dan kita belum pernah mem-fetch sebelumnya,
-                  // tampilkan placeholder kecil (tapi bukan shimmer full list) — agar tidak mengganti seluruh daftar.
-                  if (dokterSnapshot.connectionState ==
+              return FutureBuilder<PuskesmasModel?>(
+                // <-- DIUBAH
+                future: _puskesmasCache[recipientAdminId], // <-- DIUBAH
+                builder: (context, puskesmasSnapshot) {
+                  // <-- DIUBAH
+                  if (puskesmasSnapshot.connectionState ==
                           ConnectionState.waiting &&
-                      !_dokterCache.containsKey(recipientAdminId)) {
+                      !_puskesmasCache.containsKey(recipientAdminId)) {
                     return _buildShimmerTile();
                   }
 
-                  final dokter = dokterSnapshot.data;
-                  final displayName = dokter?.nama ?? recipientName;
+                  final puskesmas = puskesmasSnapshot.data; // <-- DIUBAH
+                  final displayName = puskesmas?.nama ?? recipientName;
 
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
@@ -216,20 +205,16 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                     ),
                     leading: CircleAvatar(
                       radius: 28,
-                      backgroundImage:
-                          (dokter?.fotoUrl != null &&
-                              dokter!.fotoUrl!.isNotEmpty)
-                          ? NetworkImage(dokter.fotoUrl!)
-                          : null,
-                      child:
-                          (dokter?.fotoUrl == null || dokter!.fotoUrl!.isEmpty)
-                          ? Text(
-                              getInitials(displayName),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
+                      // Puskesmas tidak punya fotoUrl, jadi kita hapus backgroundImage
+                      // dan langsung gunakan 'child' untuk inisial.
+                      child: Text(
+                        getInitials(displayName), // Gunakan fungsi getInitials
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize:
+                              18, // Samakan style-nya dengan halaman dokter
+                        ),
+                      ),
                     ),
                     title: Text(
                       displayName,
@@ -280,39 +265,35 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                       ],
                     ),
                     onTap: () async {
-                      // Set unreadCount to 0 (fire-and-forget) supaya UI cepat
+                      // Set unreadCount to 0 (fire-and-forget)
                       chatDoc.reference
                           .set({
                             'unreadCount': {myId: 0},
                           }, SetOptions(merge: true))
                           .catchError((e) {});
 
-                      // Tampilkan loading kecil agar user tahu proses fetch sedang berjalan.
                       _showLoadingDialog(context);
 
-                      DokterModel? dokterToOpen;
+                      PuskesmasModel? puskesmasToOpen; // <-- DIUBAH
                       try {
-                        // Tunggu maksimal 7 detik agar tidak menggantung
-                        dokterToOpen = await _getDokterFuture(
+                        puskesmasToOpen = await _getPuskesmasFuture(
+                          // <-- DIUBAH
                           recipientAdminId,
                         ).timeout(const Duration(seconds: 7));
-                      } on TimeoutException {
-                        dokterToOpen = null;
                       } catch (e) {
-                        dokterToOpen = null;
+                        puskesmasToOpen = null;
                       }
 
-                      // Tutup dialog loading jika masih terbuka
-                      if (mounted)
+                      if (mounted) {
                         Navigator.of(context, rootNavigator: true).pop();
+                      }
 
-                      if (dokterToOpen == null) {
-                        // Gagal fetch dokter — beri info dan jangan buka ChatScreen karena ChatScreen butuh DokterModel valid
+                      if (puskesmasToOpen == null) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Gagal memuat data dokter. Coba lagi.',
+                                'Gagal memuat data puskesmas. Coba lagi.',
                               ),
                             ),
                           );
@@ -320,16 +301,17 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
                         return;
                       }
 
-                      // Sekarang navigasi ke ChatScreen dengan dokter yang valid
+                      // Navigasi ke ChatScreen dengan PuskesmasModel
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              ChatScreen(recipient: dokterToOpen),
+                          builder: (context) => ChatScreen(
+                            recipient: puskesmasToOpen,
+                          ), // <-- DIUBAH
                         ),
                       );
 
-                      // Setelah kembali dari ChatScreen, pastikan unread lagi (fire-and-forget)
+                      // Refresh setelah kembali
                       if (!mounted) return;
                       chatDoc.reference
                           .set({
