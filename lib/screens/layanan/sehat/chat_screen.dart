@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:reang_app/models/dokter_model.dart'; // Tetap diperlukan untuk tipe data
-import 'package:reang_app/models/puskesmas_model.dart'; // <-- IMPORT BARU
+import 'package:reang_app/models/dokter_model.dart';
+import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
@@ -14,7 +14,7 @@ import 'package:reang_app/screens/layanan/sehat/image_preview_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/full_screen_image_viewer.dart';
 import 'package:shimmer/shimmer.dart';
 
-// Model untuk pesan dari Firestore (sudah mendukung teks dan gambar)
+// Model untuk pesan dari Firestore
 class FirestoreMessage {
   final String senderId;
   final String? text;
@@ -43,8 +43,7 @@ class FirestoreMessage {
 }
 
 class ChatScreen extends StatefulWidget {
-  final dynamic
-  recipient; // Sekarang bisa UserModel, DokterModel, atau PuskesmasModel
+  final dynamic recipient;
   const ChatScreen({super.key, required this.recipient});
 
   @override
@@ -111,14 +110,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // ID saya (User atau Admin Puskesmas)
     _myId =
         (authProvider.role == 'puskesmas'
                 ? authProvider.admin!.id
                 : authProvider.user!.id)
             .toString();
 
-    // --- PERBAIKAN UTAMA: Dapatkan ID Admin dari Puskesmas ---
     if (widget.recipient is DokterModel) {
       _recipientId = (widget.recipient as DokterModel).adminId.toString();
     } else if (widget.recipient is PuskesmasModel) {
@@ -126,14 +123,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } else if (widget.recipient is UserModel) {
       _recipientId = widget.recipient.id.toString();
     } else {
-      // Fallback jika tipe recipient tidak dikenal
       setState(() {
         _isLoading = false;
         _errorMessage = "Penerima tidak valid.";
       });
       return;
     }
-    // --------------------------------------------------------
 
     List<String> ids = [_myId, _recipientId]..sort();
     _chatId = ids.join('_');
@@ -197,11 +192,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     String lastMessageText,
   ) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // --- PERBAIKAN NULL CHECK DI SINI ---
     final myName = authProvider.role == 'puskesmas'
-        ? authProvider.admin!.name
+        ? (authProvider.puskesmas?.nama ??
+              authProvider
+                  .admin!
+                  .name) // Fallback ke nama admin jika puskesmas null
         : authProvider.user!.name;
 
-    // --- PERBAIKAN: Dapatkan nama penerima dari berbagai tipe model ---
     String recipientName = 'Tidak Dikenal';
     if (widget.recipient is UserModel) {
       recipientName = (widget.recipient as UserModel).name;
@@ -210,7 +209,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } else if (widget.recipient is PuskesmasModel) {
       recipientName = (widget.recipient as PuskesmasModel).nama;
     }
-    // -------------------------------------------------------------
 
     try {
       final firestore = FirebaseFirestore.instance;
@@ -227,7 +225,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         'unreadCount': {_recipientId: FieldValue.increment(1)},
       }, SetOptions(merge: true));
       batch.set(messageDocRef, messageData);
+
       await batch.commit();
+
+      if (authProvider.token != null) {
+        _apiService.sendChatNotification(
+          laravelToken: authProvider.token!,
+          recipientId: _recipientId,
+          messageText: lastMessageText,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -405,8 +412,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // --- PERBAIKAN UTAMA: Logika untuk AppBar ---
     String recipientName;
     String? recipientFotoUrl;
 
@@ -418,12 +423,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       recipientFotoUrl = null;
     } else if (widget.recipient is PuskesmasModel) {
       recipientName = (widget.recipient as PuskesmasModel).nama;
-      recipientFotoUrl = null; // Puskesmas tidak punya foto
+      recipientFotoUrl = null;
     } else {
       recipientName = 'Tidak Dikenal';
       recipientFotoUrl = null;
     }
-    // ---------------------------------------------
 
     final ScrollPhysics physics = _canScroll
         ? const BouncingScrollPhysics()
@@ -445,9 +449,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     )
                   : null,
               child: (recipientFotoUrl == null || recipientFotoUrl.isEmpty)
-                  // --- PERBAIKAN: Tampilkan ikon RS/Puskesmas ---
                   ? (widget.recipient is PuskesmasModel
-                        ? const Icon(Icons.local_hospital, color: Colors.red)
+                        ? const Icon(Icons.local_hospital)
                         : Text(
                             recipientName.isNotEmpty
                                 ? recipientName.substring(0, 1).toUpperCase()

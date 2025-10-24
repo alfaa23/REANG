@@ -32,7 +32,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://0b9729a78741.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://28e128e7bb5e.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -1424,5 +1424,42 @@ class ApiService {
       debugPrint("Gagal fetch dokter by admin id: $e");
     }
     return null;
+  }
+
+  // --- push notofikasi---
+  Future<void> sendFcmToken(String fcmToken, String laravelToken) async {
+    try {
+      await _dio.post(
+        '$_baseUrlBackend/save-fcm-token',
+        data: {'fcm_token': fcmToken},
+        options: Options(headers: {'Authorization': 'Bearer $laravelToken'}),
+      );
+    } on DioException catch (e) {
+      // Jika token sudah ada (422 Unprocessable), tidak apa-apa
+      if (e.response?.statusCode == 422) {
+        debugPrint("FCM token sudah terdaftar.");
+      } else {
+        debugPrint("API Error saat sendFcmToken: $e");
+      }
+    }
+  }
+
+  // --- TAMBAHKAN FUNGSI BARU INI ---
+  Future<void> sendChatNotification({
+    required String laravelToken,
+    required String recipientId,
+    required String messageText,
+  }) async {
+    try {
+      await _dio.post(
+        '$_baseUrlBackend/chat/send-notification',
+        data: {'recipient_id': recipientId, 'message_text': messageText},
+        options: Options(headers: {'Authorization': 'Bearer $laravelToken'}),
+      );
+      debugPrint("Permintaan notifikasi berhasil dikirim ke Laravel.");
+    } on DioException catch (e) {
+      debugPrint("Gagal mengirim permintaan notifikasi: ${e.response?.data}");
+      // Tidak perlu throw error, biarkan chat tetap berjalan
+    }
   }
 }

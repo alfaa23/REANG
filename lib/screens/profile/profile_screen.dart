@@ -4,12 +4,142 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-
-// --- TAMBAHAN: Import halaman LoginScreen untuk navigasi ---
 import 'package:reang_app/screens/auth/login_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+// --- IMPORT BARU UNTUK NOTIFIKASI ---
+import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:reang_app/services/api_service.dart';
+import 'package:app_settings/app_settings.dart';
+// ----------------------------------------
+
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _notificationEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cek status izin saat ini saat halaman dibuka
+    _checkNotificationStatus();
+  }
+
+  Future<void> _checkNotificationStatus() async {
+    // Hanya cek jika user sudah login
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn) return;
+
+    final status = await Permission.notification.status;
+    if (mounted) {
+      setState(() {
+        _notificationEnabled = status.isGranted;
+      });
+    }
+  }
+
+  // --- LOGIKA BARU SAAT TOGGLE DI-KLIK ---
+  Future<void> _handleNotificationToggle(bool value) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (!authProvider.isLoggedIn) {
+      showToast(
+        "Harap login terlebih dahulu untuk mengaktifkan notifikasi.",
+        context: context,
+        backgroundColor: Colors.orange,
+      );
+      return; // Jangan lakukan apa-apa jika belum login
+    }
+
+    if (value == true) {
+      // --- LOGIKA UNTUK MENGAKTIFKAN NOTIFIKASI ---
+      final status = await Permission.notification.request();
+
+      if (status.isGranted) {
+        // Izin diberikan, daftarkan token
+        await _registerFcmToken(authProvider.token!);
+        if (mounted) {
+          setState(() => _notificationEnabled = true);
+          showToast(
+            "Notifikasi berhasil diaktifkan.",
+            context: context,
+            backgroundColor: Colors.green,
+          );
+        }
+      } else if (status.isPermanentlyDenied) {
+        // Izin diblokir permanen, minta user buka pengaturan HP
+        _showOpenSettingsDialog();
+      } else {
+        // Izin ditolak (Don't Allow)
+        if (mounted) {
+          showToast(
+            "Anda menolak izin notifikasi.",
+            context: context,
+            backgroundColor: Colors.red,
+          );
+        }
+      }
+    } else {
+      // --- LOGIKA UNTUK MEMATIKAN NOTIFIKASI ---
+      // (Memerlukan API baru di Laravel untuk menghapus token)
+      // Untuk saat ini, kita hanya menonaktifkan toggle dan memberi tahu user
+      if (mounted) {
+        setState(() => _notificationEnabled = false);
+        showToast(
+          "Notifikasi dinonaktifkan dari aplikasi.",
+          context: context,
+          backgroundColor: Colors.grey,
+        );
+        // Buka pengaturan agar user bisa mematikan secara manual
+        AppSettings.openAppSettings(type: AppSettingsType.notification);
+      }
+    }
+  }
+
+  // Fungsi untuk mengirim token ke Laravel (dipindah dari AuthProvider)
+  Future<void> _registerFcmToken(String laravelToken) async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) return;
+      await ApiService().sendFcmToken(fcmToken, laravelToken);
+      debugPrint("FCM Token berhasil dikirim ke Laravel.");
+    } catch (e) {
+      debugPrint("Gagal mengirim FCM Token ke Laravel: $e");
+    }
+  }
+
+  // Dialog untuk membuka pengaturan HP
+  void _showOpenSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Izin Dibutuhkan'),
+        content: const Text(
+          'Anda telah memblokir notifikasi. Harap aktifkan izin notifikasi di Pengaturan HP Anda untuk melanjutkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              AppSettings.openAppSettings(
+                type: AppSettingsType.notification,
+              ); // Buka pengaturan notif HP
+            },
+            child: const Text('Buka Pengaturan'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showLogoutConfirmationDialog(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -46,6 +176,8 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 await authProvider.logout();
+
+                if (!context.mounted) return;
                 showToast(
                   "Anda telah keluar.",
                   context: context,
@@ -59,7 +191,6 @@ class ProfileScreen extends StatelessWidget {
                   curve: Curves.fastOutSlowIn,
                 );
 
-                // Cek mounted sebelum navigasi
                 if (!context.mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -87,11 +218,9 @@ class ProfileScreen extends StatelessWidget {
     const String avatarUrl =
         'https://i.pinimg.com/564x/eb/43/44/eb4344d5f4d31dadd4efa0cf12b70bf3.jpg';
 
-    // --- PERUBAHAN UTAMA: Membuat tombol dinamis berdasarkan status login ---
     final Widget actionButton;
 
     if (authProvider.isLoggedIn) {
-      // Tombol Keluar Akun (Merah) jika sudah login
       actionButton = ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red.shade700,
@@ -106,24 +235,21 @@ class ProfileScreen extends StatelessWidget {
         onPressed: () => _showLogoutConfirmationDialog(context),
       );
     } else {
-      // Tombol Masuk (Biru) jika belum login
       actionButton = ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.shade800, // Warna biru
+          backgroundColor: Colors.blue.shade800,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        icon: const Icon(Icons.login), // Ikon login
-        label: const Text('Masuk'), // Teks diubah
+        icon: const Icon(Icons.login),
+        label: const Text('Masuk'),
         onPressed: () {
-          // Arahkan ke halaman login
           Navigator.push(
             context,
             MaterialPageRoute(
-              // popOnSuccess true agar setelah login kembali ke halaman profil
               builder: (context) => const LoginScreen(popOnSuccess: true),
             ),
           );
@@ -134,7 +260,6 @@ class ProfileScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
-        // Profile Header (tidak berubah)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -183,7 +308,6 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Pengaturan Section (tidak berubah)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -200,35 +324,46 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    Icons.dark_mode_outlined,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Mode Gelap', style: theme.textTheme.bodyLarge),
-                  ),
-                  Switch(
-                    value: themeProvider.isDarkMode,
-                    onChanged: (value) {
-                      final provider = Provider.of<ThemeProvider>(
-                        context,
-                        listen: false,
-                      );
-                      provider.toggleTheme(value);
-                    },
-                    activeColor: theme.colorScheme.primary,
-                  ),
-                ],
+              SwitchListTile(
+                title: Text('Mode Gelap', style: theme.textTheme.bodyLarge),
+                value: themeProvider.isDarkMode,
+                onChanged: (value) {
+                  final provider = Provider.of<ThemeProvider>(
+                    context,
+                    listen: false,
+                  );
+                  provider.toggleTheme(value);
+                },
+                secondary: Icon(
+                  Icons.dark_mode_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                activeColor: theme.colorScheme.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              Divider(color: theme.dividerColor, height: 1),
+              // --- TOMBOL NOTIFIKASI BARU ---
+              SwitchListTile(
+                title: Text(
+                  'Notifikasi Chat',
+                  style: theme.textTheme.bodyLarge,
+                ),
+                value: _notificationEnabled,
+                onChanged: _handleNotificationToggle,
+                secondary: Icon(
+                  _notificationEnabled
+                      ? Icons.notifications_active
+                      : Icons.notifications_off_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                activeColor: theme.colorScheme.primary,
+                contentPadding: EdgeInsets.zero,
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
 
-        // Lainnya Section (tidak berubah)
         Container(
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           decoration: BoxDecoration(
@@ -260,7 +395,6 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 32),
 
-        // --- PERUBAHAN: Menggunakan tombol dinamis yang sudah dibuat ---
         SizedBox(width: double.infinity, child: actionButton),
         const SizedBox(height: 25),
       ],
@@ -269,7 +403,6 @@ class ProfileScreen extends StatelessWidget {
 }
 
 // Widget helper tidak berubah
-// ...
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;

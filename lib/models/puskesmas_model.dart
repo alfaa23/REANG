@@ -18,6 +18,16 @@ class PuskesmasModel {
     required this.dokterTersedia,
     this.dokter,
   });
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nama': nama,
+      'alamat': alamat,
+      'jam': jam,
+      'admin_id': adminId,
+      'dokter_tersedia': dokterTersedia,
+    };
+  }
 
   factory PuskesmasModel.fromJson(Map<String, dynamic> json) {
     // Helper untuk parsing integer/null dengan aman
