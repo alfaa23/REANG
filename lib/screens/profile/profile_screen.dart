@@ -52,6 +52,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         "Harap login terlebih dahulu untuk mengaktifkan notifikasi.",
         context: context,
         backgroundColor: Colors.orange,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale, // efek "pop"
+        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+        animDuration: const Duration(milliseconds: 150), // animasi cepat
+        duration: const Duration(seconds: 2), // tampil 2 detik
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       return; // Jangan lakukan apa-apa jika belum login
     }
@@ -69,6 +77,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             "Notifikasi berhasil diaktifkan.",
             context: context,
             backgroundColor: Colors.green,
+            position: StyledToastPosition.bottom,
+            animation: StyledToastAnimation.scale, // efek "pop"
+            reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+            animDuration: const Duration(milliseconds: 150), // animasi cepat
+            duration: const Duration(seconds: 2), // tampil 2 detik
+            borderRadius: BorderRadius.circular(25),
+            textStyle: const TextStyle(color: Colors.white),
+            curve: Curves.fastOutSlowIn,
           );
         }
       } else if (status.isPermanentlyDenied) {
@@ -81,6 +97,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             "Anda menolak izin notifikasi.",
             context: context,
             backgroundColor: Colors.red,
+            position: StyledToastPosition.bottom,
+            animation: StyledToastAnimation.scale, // efek "pop"
+            reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+            animDuration: const Duration(milliseconds: 150), // animasi cepat
+            duration: const Duration(seconds: 2), // tampil 2 detik
+            borderRadius: BorderRadius.circular(25),
+            textStyle: const TextStyle(color: Colors.white),
+            curve: Curves.fastOutSlowIn,
           );
         }
       }
@@ -94,6 +118,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           "Notifikasi dinonaktifkan dari aplikasi.",
           context: context,
           backgroundColor: Colors.grey,
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale, // efek "pop"
+          reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+          animDuration: const Duration(milliseconds: 150), // animasi cepat
+          duration: const Duration(seconds: 2), // tampil 2 detik
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
         );
         // Buka pengaturan agar user bisa mematikan secara manual
         AppSettings.openAppSettings(type: AppSettingsType.notification);
@@ -298,6 +330,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       showToast(
                         "Fitur ini akan segera tersedia.",
                         context: context,
+                        position: StyledToastPosition.bottom,
+                        animation: StyledToastAnimation.scale, // efek "pop"
+                        reverseAnimation:
+                            StyledToastAnimation.fade, // pas hilang fade out
+                        animDuration: const Duration(
+                          milliseconds: 150,
+                        ), // animasi cepat
+                        duration: const Duration(seconds: 2), // tampil 2 detik
+                        borderRadius: BorderRadius.circular(25),
+                        textStyle: const TextStyle(color: Colors.white),
+                        curve: Curves.fastOutSlowIn,
                       );
                     },
                   ),

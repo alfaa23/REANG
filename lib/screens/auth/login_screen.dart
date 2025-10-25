@@ -287,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   },
-                  child: const Text('Masuk sebagai Dokter/Admin'),
+                  child: const Text('Masuk sebagai Admin'),
                 ),
                 // ---------------------------------------------------
               ],

@@ -36,6 +36,14 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
         "Nama dan password tidak boleh kosong.",
         context: context,
         backgroundColor: Colors.red,
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale, // efek "pop"
+        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+        animDuration: const Duration(milliseconds: 150), // animasi cepat
+        duration: const Duration(seconds: 2), // tampil 2 detik
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
       return;
     }
@@ -71,6 +79,13 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
         context: context,
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 4),
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale, // efek "pop"
+        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+        animDuration: const Duration(milliseconds: 150), // animasi cepat
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
       );
     } finally {
       // Pastikan loading indicator selalu mati jika terjadi error
@@ -100,7 +115,7 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
                 Image.asset('assets/wongreang.webp', height: 75),
                 const SizedBox(height: 2),
                 const Text(
-                  'Portal Khusus Dokter',
+                  'Portal Khusus Admin',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 30,

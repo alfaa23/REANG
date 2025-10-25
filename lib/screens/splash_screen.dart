@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (mounted) {
       // --- PERUBAHAN UTAMA DI SINI ---
-      if (authProvider.isLoggedIn && authProvider.role == 'dokter') {
+      if (authProvider.isLoggedIn && authProvider.role == 'puskesmas') {
         // HANYA jika login sebagai Dokter, arahkan ke halaman khusus dokter
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
