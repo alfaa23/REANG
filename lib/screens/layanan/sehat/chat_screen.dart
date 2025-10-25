@@ -154,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 _isLoading = false;
                 _errorMessage = null;
               });
-              _ensureLastMessageVisibleImmediate(immediate: true);
+              _scrollToBottomAfterBuild(animated: false);
               _updateCanScroll();
             }
           },
@@ -260,6 +260,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     };
     await _sendFirestoreMessage(messageData, messageText);
 
+    _scrollToBottomAfterBuild(animated: true);
+
     if (_focusNode.canRequestFocus) {
       _focusNode.requestFocus();
     }
@@ -331,6 +333,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       final lastMessageText = caption.isNotEmpty ? caption : "🖼️ Gambar";
       await _sendFirestoreMessage(messageData, lastMessageText);
+      _scrollToBottomAfterBuild(animated: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -388,6 +391,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _scrollController.jumpTo(max);
         }
       } catch (e) {}
+    });
+  }
+
+  void _scrollToBottomAfterBuild({bool animated = false, int delayMs = 0}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // opsional delay kecil jika konten belum terukur (biasanya tidak perlu)
+      if (delayMs > 0) await Future.delayed(Duration(milliseconds: delayMs));
+      if (!_scrollController.hasClients) return;
+      try {
+        final max = _scrollController.position.maxScrollExtent;
+        if (animated) {
+          _scrollController.animateTo(
+            max,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(max);
+        }
+      } catch (e) {
+        // ignore; kadang posisi belum siap — aman diabaikan
+      }
     });
   }
 

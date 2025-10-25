@@ -21,13 +21,17 @@ class KonsultasiPasienScreen extends StatefulWidget {
 class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
   late Stream<QuerySnapshot> _chatsStream;
 
+  /// Menyimpan waktu (local) saat kita melakukan "clear" unread untuk sebuah chat.
+  /// Digunakan untuk menyembunyikan badge secara instan sampai Firestore mengonfirmasi.
+  final Map<String, DateTime> _localClearedAt = {};
+
   @override
   void initState() {
     super.initState();
     _initializeStream();
   }
 
-  // Fungsi ini HANYA menginisialisasi stream, tanpa setState.
+  // Inisialisasi stream chat sekali di initState agar tidak re-create tiap build.
   void _initializeStream() {
     final myId = FirebaseAuth.instance.currentUser?.uid;
     if (myId != null) {
@@ -41,17 +45,15 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
     }
   }
 
-  // Clear unread for a chat doc, tries update then falls back to set(merge)
+  // Clear unread untuk chat doc. Jika update gagal, fallback ke set(merge).
   Future<void> _clearUnreadForChat(String chatDocId, String myId) async {
     if (chatDocId.isEmpty || myId.isEmpty) return;
     final chatDocRef = FirebaseFirestore.instance
         .collection('chats')
         .doc(chatDocId);
     try {
-      // Gunakan dot notation untuk set key di map unreadCount
       await chatDocRef.update({'unreadCount.$myId': 0});
     } catch (e) {
-      // Kalau gagal (mis. dokumen belum ada atau field tidak ada), pakai set merge
       try {
         await chatDocRef.set({
           'unreadCount': {myId: 0},
@@ -60,9 +62,11 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
         debugPrint('Gagal membersihkan unread untuk $chatDocId: $e2');
       }
     }
+    // Tandai waktu clear lokal agar UI segera merespon (hide badge).
+    _localClearedAt[chatDocId] = DateTime.now();
+    if (mounted) setState(() {}); // paksa rebuild supaya badge hilang seketika
   }
 
-  // --- 2. BUAT WIDGET BARU UNTUK SHIMMER EFFECT ---
   Widget _buildShimmerEffect() {
     return Shimmer.fromColors(
       baseColor: Theme.of(context).brightness == Brightness.dark
@@ -72,7 +76,7 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
           ? Colors.grey[700]!
           : Colors.grey[100]!,
       child: ListView.separated(
-        itemCount: 8, // Tampilkan beberapa item shimmer
+        itemCount: 8,
         separatorBuilder: (context, index) =>
             const Divider(indent: 80, height: 1),
         itemBuilder: (context, index) {
@@ -127,13 +131,10 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                   "Anda telah keluar.",
                   context: context,
                   position: StyledToastPosition.bottom,
-                  animation: StyledToastAnimation.scale, // efek "pop"
-                  reverseAnimation:
-                      StyledToastAnimation.fade, // pas hilang fade out
-                  animDuration: const Duration(
-                    milliseconds: 150,
-                  ), // animasi cepat
-                  duration: const Duration(seconds: 2), // tampil 2 detik
+                  animation: StyledToastAnimation.scale,
+                  reverseAnimation: StyledToastAnimation.fade,
+                  animDuration: const Duration(milliseconds: 150),
+                  duration: const Duration(seconds: 2),
                   borderRadius: BorderRadius.circular(25),
                   textStyle: const TextStyle(color: Colors.white),
                   curve: Curves.fastOutSlowIn,
@@ -183,6 +184,7 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
     final myId = FirebaseAuth.instance.currentUser?.uid;
 
     if (myId == null) {
+      // Tetap gunakan indikator sederhana — namun Anda minta shimmer saja; di sini user belum login ke Firebase, jadi tampilkan shimmer singkat
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -271,7 +273,29 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                 unreadCount = 0;
               }
 
-              final hasUnread = unreadCount > 0;
+              // Ambil last message timestamp untuk logika hide badge lokal
+              final Timestamp? lastTs =
+                  chatData['lastMessageTimestamp'] as Timestamp?;
+              final DateTime? lastMsgDate = lastTs?.toDate();
+              final DateTime? clearedAt = _localClearedAt[chatDoc.id];
+
+              // Logika menampilkan badge:
+              // - Jika ada unread > 0 dan lastMsgDate lebih baru daripada clearedAt (atau clearedAt null) -> tampilkan badge
+              // - Jika unread > 0 tetapi clearedAt ada dan lastMsgDate tidak lebih baru (artinya clear lokal sudah lebih baru) -> sembunyikan badge
+              // - Jika unread == 0 -> sembunyikan badge
+              bool showBadge;
+              if (unreadCount > 0) {
+                if (clearedAt != null &&
+                    lastMsgDate != null &&
+                    !lastMsgDate.isAfter(clearedAt)) {
+                  // last message tidak lebih baru dari waktu kita clear -> anggap sudah terbaca
+                  showBadge = false;
+                } else {
+                  showBadge = true;
+                }
+              } else {
+                showBadge = false;
+              }
 
               final patientUser = app_user_model.UserModel(
                 id: int.tryParse(patientId) ?? 0,
@@ -300,7 +324,7 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                 title: Text(
                   patientName,
                   style: TextStyle(
-                    fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: showBadge ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 subtitle: Text(
@@ -313,18 +337,16 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _formatTimestamp(
-                        chatData['lastMessageTimestamp'] as Timestamp?,
-                      ),
+                      _formatTimestamp(lastTs),
                       style: TextStyle(
                         fontSize: 12,
-                        color: hasUnread
+                        color: showBadge
                             ? Colors.green
                             : Theme.of(context).hintColor,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    if (hasUnread)
+                    if (showBadge)
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: const BoxDecoration(
@@ -344,15 +366,14 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                   ],
                 ),
                 onTap: () async {
-                  // Cek apakah sudah login ke Firebase
+                  // Pastikan login ke Firebase, jika belum signInWithCustomToken dulu
                   if (FirebaseAuth.instance.currentUser == null) {
                     try {
                       final token = Provider.of<AuthProvider>(
                         context,
                         listen: false,
                       ).token;
-                      if (token == null) return;
-
+                      if (token == null) throw Exception('Token auth kosong');
                       final firebaseToken = await ApiService().getFirebaseToken(
                         token,
                       );
@@ -374,18 +395,34 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                     }
                   }
 
-                  if (mounted) {
-                    // Setelah dipastikan login, baru clear notif dan navigasi
-                    if (hasUnread) {
+                  if (!mounted) return;
+
+                  // 1) Clear unread sebelum membuka chat (agar backend tau dan UI lokal hide)
+                  try {
+                    if (unreadCount > 0) {
                       await _clearUnreadForChat(chatDoc.id, myId);
+                    } else {
+                      // set clearedAt agar bila unreadCount==0 tapi kita ingin sinkron, simpan clearedAt juga
+                      _localClearedAt[chatDoc.id] = DateTime.now();
+                      if (mounted) setState(() {});
                     }
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ChatScreen(recipient: patientUser),
-                      ),
-                    );
+                  } catch (e) {
+                    debugPrint('Error saat clear unread sebelum buka chat: $e');
+                  }
+
+                  // 2) Buka ChatScreen dan tunggu kembali (agar kita bisa memastikan clear lagi saat kembali)
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(recipient: patientUser),
+                    ),
+                  );
+
+                  // 3) Setelah kembali (pop), pastikan unread di-clear lagi (jika ada race condition)
+                  try {
+                    await _clearUnreadForChat(chatDoc.id, myId);
+                  } catch (e) {
+                    debugPrint('Error saat clear unread pas kembali: $e');
                   }
                 },
               );
@@ -394,6 +431,12 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _localClearedAt.clear();
+    super.dispose();
   }
 }
 
