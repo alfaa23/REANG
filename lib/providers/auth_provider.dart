@@ -3,9 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:reang_app/models/admin_model.dart';
-import 'package:reang_app/models/puskesmas_model.dart'; // <-- Pastikan import ini ada
+import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // <-- 1. IMPORT KEMBALI
 
 class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
@@ -14,7 +15,7 @@ class AuthProvider with ChangeNotifier {
   Object? _currentUser;
   String? _token;
   String? _role;
-  PuskesmasModel? _puskesmas; // <-- Properti untuk menyimpan data Puskesmas
+  PuskesmasModel? _puskesmas;
 
   bool get isLoggedIn => _token != null;
   String? get role => _role;
@@ -23,9 +24,32 @@ class AuthProvider with ChangeNotifier {
   AdminModel? get admin =>
       (_currentUser is AdminModel) ? _currentUser as AdminModel : null;
   String? get token => _token;
-  PuskesmasModel? get puskesmas => _puskesmas; // <-- Getter untuk Puskesmas
+  PuskesmasModel? get puskesmas => _puskesmas;
 
-  // --- FUNGSI LOGIN YANG SUDAH DIPERBAIKI ---
+  // --- 2. TAMBAHKAN KEMBALI FUNGSI INI ---
+  Future<void> _registerFcmToken() async {
+    // --- PERBAIKAN LOGIKA: HANYA JALANKAN JIKA 'PUSKESMAS' ---
+    // (User akan mendaftar via ProfileScreen)
+    if (_role != 'puskesmas') return;
+
+    try {
+      // Minta izin
+      await FirebaseMessaging.instance.requestPermission();
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken == null || _token == null) {
+        debugPrint("Gagal mendapatkan FCM Token untuk Admin.");
+        return;
+      }
+
+      // Kirim token ke API
+      await _apiService.sendFcmToken(fcmToken, _token!);
+      debugPrint("FCM Token Admin Puskesmas berhasil dikirim ke Laravel.");
+    } catch (e) {
+      debugPrint("Gagal mengirim FCM Token Admin: $e");
+    }
+  }
+
   Future<void> login(
     Object userObject,
     String laravelToken, {
@@ -33,7 +57,7 @@ class AuthProvider with ChangeNotifier {
   }) async {
     _currentUser = userObject;
     _token = laravelToken;
-    _puskesmas = null; // Reset
+    _puskesmas = null;
 
     if (userObject is UserModel) {
       _role = userObject.role;
@@ -43,13 +67,12 @@ class AuthProvider with ChangeNotifier {
       );
     } else if (userObject is AdminModel) {
       _role = userObject.role;
-      _puskesmas = puskesmas; // Simpan data puskesmas ke state
+      _puskesmas = puskesmas;
       await _storage.write(
         key: 'user_data',
         value: json.encode(userObject.toMap()),
       );
       if (puskesmas != null) {
-        // Simpan data puskesmas ke storage
         await _storage.write(
           key: 'puskesmas_data',
           value: json.encode(puskesmas.toJson()),
@@ -60,7 +83,6 @@ class AuthProvider with ChangeNotifier {
     await _storage.write(key: 'user_token', value: laravelToken);
     await _storage.write(key: 'user_role', value: _role);
 
-    // Login Firebase hanya untuk 'puskesmas'
     if (userObject is AdminModel && userObject.role == 'puskesmas') {
       try {
         final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
@@ -69,7 +91,6 @@ class AuthProvider with ChangeNotifier {
           "Login proaktif ke Firebase untuk Admin Puskesmas berhasil!",
         );
       } catch (e) {
-        debugPrint("Gagal login proaktif ke Firebase: $e");
         await logout();
         throw Exception("Gagal otentikasi dengan Firebase.");
       }
@@ -77,17 +98,15 @@ class AuthProvider with ChangeNotifier {
 
     notifyListeners();
 
-    // Daftarkan FCM token (hanya jika 'user')
+    // --- 3. PANGGIL FUNGSI REGISTRASI DI SINI ---
+    await _registerFcmToken(); // Ini akan mendaftarkan token jika rolenya 'puskesmas'
   }
 
-  // --- FUNGSI TRYAUTOLOGIN YANG SUDAH DIPERBAIKI ---
   Future<void> tryAutoLogin() async {
     final storedToken = await _storage.read(key: 'user_token');
     final storedRole = await _storage.read(key: 'user_role');
     final userDataString = await _storage.read(key: 'user_data');
-    final puskesmasDataString = await _storage.read(
-      key: 'puskesmas_data',
-    ); // Ambil data puskesmas
+    final puskesmasDataString = await _storage.read(key: 'puskesmas_data');
 
     if (storedToken == null || storedRole == null || userDataString == null) {
       await logout();
@@ -100,7 +119,6 @@ class AuthProvider with ChangeNotifier {
       final userDataMap = json.decode(userDataString);
       if (storedRole == 'puskesmas') {
         _currentUser = AdminModel.fromMap(userDataMap);
-        // Muat data puskesmas dari storage
         if (puskesmasDataString != null) {
           _puskesmas = PuskesmasModel.fromJson(
             json.decode(puskesmasDataString),
@@ -114,7 +132,6 @@ class AuthProvider with ChangeNotifier {
 
       if (storedRole == 'puskesmas' &&
           FirebaseAuth.instance.currentUser == null) {
-        debugPrint("Sesi Firebase tidak ada, mencoba login ulang...");
         try {
           final firebaseToken = await _apiService.getFirebaseToken(storedToken);
           await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
@@ -124,7 +141,9 @@ class AuthProvider with ChangeNotifier {
           await logout();
         }
       }
-      // Daftarkan FCM token setelah auto-login (jika user)
+
+      // --- 4. PANGGIL FUNGSI REGISTRASI DI SINI ---
+      await _registerFcmToken(); // Ini akan mendaftarkan token jika rolenya 'puskesmas'
     } else {
       await logout();
     }
@@ -143,7 +162,7 @@ class AuthProvider with ChangeNotifier {
       _currentUser = null;
       _token = null;
       _role = null;
-      _puskesmas = null; // Hapus data puskesmas dari state
+      _puskesmas = null;
       await _storage.deleteAll();
       notifyListeners();
       debugPrint("Sesi lokal (Laravel) berhasil dihapus.");

@@ -228,10 +228,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       await batch.commit();
 
+      // --- PERBAIKAN: PANGGIL API NOTIFIKASI SETELAH PESAN BERHASIL DISIMPAN ---
       if (authProvider.token != null) {
+        // 1. Tentukan role penerima (ini sudah benar)
+        String recipientRole = 'user'; // Default
+        if (widget.recipient is PuskesmasModel ||
+            widget.recipient is DokterModel) {
+          recipientRole = 'puskesmas';
+        }
+
+        // 2. Panggil API (di luar 'if' penentu role)
+        // Ini akan berjalan baik saat user mengirim atau admin mengirim
         _apiService.sendChatNotification(
           laravelToken: authProvider.token!,
           recipientId: _recipientId,
+          recipientRole: recipientRole,
           messageText: lastMessageText,
         );
       }

@@ -104,7 +104,6 @@ flutter:
 
   assets:
     - assets/google_icon.webp
-    - assets/logo.png
     - assets/wongreang.webp
     - assets/coba.jpg
     - assets/konsultasi.webp

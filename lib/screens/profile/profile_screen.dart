@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // <-- IMPORT BARU
 import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
@@ -6,9 +7,10 @@ import 'package:reang_app/screens/main_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/auth/login_screen.dart';
 
-// --- IMPORT BARU UNTUK NOTIFIKASI ---
+// --- IMPORT UNTUK NOTIFIKASI ---
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:reang_app/services/api_service.dart';
 import 'package:app_settings/app_settings.dart';
 // ----------------------------------------
@@ -20,120 +22,134 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with WidgetsBindingObserver {
+  // --- GUNAKAN SECURE STORAGE ---
+  final _storage = const FlutterSecureStorage();
+  // ------------------------------
+
   bool _notificationEnabled = false;
+  bool _isToggleLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Cek status izin saat ini saat halaman dibuka
-    _checkNotificationStatus();
+    WidgetsBinding.instance.addObserver(this);
+    _loadNotificationPreference(); // <-- Ganti nama fungsi
   }
 
-  Future<void> _checkNotificationStatus() async {
-    // Hanya cek jika user sudah login
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (!authProvider.isLoggedIn) return;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkOSPermissionAndUpdateState();
+    }
+  }
+
+  // --- PERBAIKAN: Memuat dari Secure Storage ---
+  Future<void> _loadNotificationPreference() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn || authProvider.user == null) return;
+
+    final userId = authProvider.user!.id;
+    // Baca sebagai String, defaultnya 'false' jika user belum pernah menyalakan
+    String isEnabledStr =
+        await _storage.read(key: 'notif_enabled_$userId') ?? 'false';
+    bool isEnabled = isEnabledStr == 'true';
+
+    // Sinkronkan dengan izin OS
     final status = await Permission.notification.status;
+    if (!status.isGranted) {
+      isEnabled = false; // Paksa false jika izin OS mati
+    }
+
     if (mounted) {
       setState(() {
-        _notificationEnabled = status.isGranted;
+        _notificationEnabled = isEnabled;
       });
     }
   }
 
-  // --- LOGIKA BARU SAAT TOGGLE DI-KLIK ---
-  Future<void> _handleNotificationToggle(bool value) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    if (!authProvider.isLoggedIn) {
-      showToast(
-        "Harap login terlebih dahulu untuk mengaktifkan notifikasi.",
-        context: context,
-        backgroundColor: Colors.orange,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale, // efek "pop"
-        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-        animDuration: const Duration(milliseconds: 150), // animasi cepat
-        duration: const Duration(seconds: 2), // tampil 2 detik
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
-      return; // Jangan lakukan apa-apa jika belum login
-    }
-
-    if (value == true) {
-      // --- LOGIKA UNTUK MENGAKTIFKAN NOTIFIKASI ---
-      final status = await Permission.notification.request();
-
-      if (status.isGranted) {
-        // Izin diberikan, daftarkan token
-        await _registerFcmToken(authProvider.token!);
-        if (mounted) {
-          setState(() => _notificationEnabled = true);
-          showToast(
-            "Notifikasi berhasil diaktifkan.",
-            context: context,
-            backgroundColor: Colors.green,
-            position: StyledToastPosition.bottom,
-            animation: StyledToastAnimation.scale, // efek "pop"
-            reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-            animDuration: const Duration(milliseconds: 150), // animasi cepat
-            duration: const Duration(seconds: 2), // tampil 2 detik
-            borderRadius: BorderRadius.circular(25),
-            textStyle: const TextStyle(color: Colors.white),
-            curve: Curves.fastOutSlowIn,
-          );
-        }
-      } else if (status.isPermanentlyDenied) {
-        // Izin diblokir permanen, minta user buka pengaturan HP
-        _showOpenSettingsDialog();
-      } else {
-        // Izin ditolak (Don't Allow)
-        if (mounted) {
-          showToast(
-            "Anda menolak izin notifikasi.",
-            context: context,
-            backgroundColor: Colors.red,
-            position: StyledToastPosition.bottom,
-            animation: StyledToastAnimation.scale, // efek "pop"
-            reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-            animDuration: const Duration(milliseconds: 150), // animasi cepat
-            duration: const Duration(seconds: 2), // tampil 2 detik
-            borderRadius: BorderRadius.circular(25),
-            textStyle: const TextStyle(color: Colors.white),
-            curve: Curves.fastOutSlowIn,
-          );
-        }
-      }
-    } else {
-      // --- LOGIKA UNTUK MEMATIKAN NOTIFIKASI ---
-      // (Memerlukan API baru di Laravel untuk menghapus token)
-      // Untuk saat ini, kita hanya menonaktifkan toggle dan memberi tahu user
-      if (mounted) {
-        setState(() => _notificationEnabled = false);
-        showToast(
-          "Notifikasi dinonaktifkan dari aplikasi.",
-          context: context,
-          backgroundColor: Colors.grey,
-          position: StyledToastPosition.bottom,
-          animation: StyledToastAnimation.scale, // efek "pop"
-          reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-          animDuration: const Duration(milliseconds: 150), // animasi cepat
-          duration: const Duration(seconds: 2), // tampil 2 detik
-          borderRadius: BorderRadius.circular(25),
-          textStyle: const TextStyle(color: Colors.white),
-          curve: Curves.fastOutSlowIn,
+  Future<void> _checkOSPermissionAndUpdateState() async {
+    final status = await Permission.notification.status;
+    if (mounted && !status.isGranted) {
+      setState(() {
+        _notificationEnabled = false;
+      });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        _storage.write(
+          key: 'notif_enabled_${authProvider.user!.id}',
+          value: 'false',
         );
-        // Buka pengaturan agar user bisa mematikan secara manual
-        AppSettings.openAppSettings(type: AppSettingsType.notification);
       }
     }
   }
 
-  // Fungsi untuk mengirim token ke Laravel (dipindah dari AuthProvider)
+  // --- PERBAIKAN: Menyimpan ke Secure Storage ---
+  Future<void> _handleNotificationToggle(bool value) async {
+    if (_isToggleLoading) return;
+    setState(() => _isToggleLoading = true);
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn || authProvider.user == null) {
+      _showCustomToast("Harap login terlebih dahulu.", Colors.orange);
+      setState(() => _isToggleLoading = false);
+      return;
+    }
+
+    final userId = authProvider.user!.id; // Dapatkan ID user
+
+    try {
+      if (value == true) {
+        // --- Logika MENGAKTIFKAN ---
+        final status = await Permission.notification.request();
+
+        if (status.isGranted) {
+          await _registerFcmToken(authProvider.token!);
+          if (mounted) {
+            setState(() => _notificationEnabled = true);
+            await _storage.write(
+              key: 'notif_enabled_$userId',
+              value: 'true',
+            ); // <-- SIMPAN 'true'
+            _showCustomToast("Notifikasi berhasil diaktifkan.", Colors.green);
+          }
+        } else if (status.isPermanentlyDenied) {
+          _showOpenSettingsDialog();
+          if (mounted) setState(() => _notificationEnabled = false);
+        } else {
+          if (mounted) {
+            _showCustomToast("Anda menolak izin notifikasi.", Colors.red);
+            setState(() => _notificationEnabled = false);
+          }
+        }
+      } else {
+        // --- Logika MEMATIKAN ---
+        await ApiService().deleteFcmToken(authProvider.token!);
+        if (mounted) {
+          setState(() => _notificationEnabled = false);
+          await _storage.write(
+            key: 'notif_enabled_$userId',
+            value: 'false',
+          ); // <-- SIMPAN 'false'
+          _showCustomToast("Notifikasi dinonaktifkan.", Colors.grey);
+        }
+      }
+    } catch (e) {
+      if (mounted) _showCustomToast("Terjadi kesalahan: $e", Colors.red);
+    } finally {
+      if (mounted) {
+        setState(() => _isToggleLoading = false);
+      }
+    }
+  }
+
   Future<void> _registerFcmToken(String laravelToken) async {
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -145,7 +161,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Dialog untuk membuka pengaturan HP
   void _showOpenSettingsDialog() {
     showDialog(
       context: context,
@@ -162,14 +177,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              AppSettings.openAppSettings(
-                type: AppSettingsType.notification,
-              ); // Buka pengaturan notif HP
+              AppSettings.openAppSettings(type: AppSettingsType.notification);
             },
             child: const Text('Buka Pengaturan'),
           ),
         ],
       ),
+    );
+  }
+
+  void _showCustomToast(String message, Color backgroundColor) {
+    showToast(
+      message,
+      context: context,
+      backgroundColor: backgroundColor,
+      position: StyledToastPosition.bottom,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 3),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
     );
   }
 
@@ -210,18 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await authProvider.logout();
 
                 if (!context.mounted) return;
-                showToast(
-                  "Anda telah keluar.",
-                  context: context,
-                  position: StyledToastPosition.bottom,
-                  animation: StyledToastAnimation.scale,
-                  reverseAnimation: StyledToastAnimation.fade,
-                  animDuration: const Duration(milliseconds: 150),
-                  duration: const Duration(seconds: 2),
-                  borderRadius: BorderRadius.circular(25),
-                  textStyle: const TextStyle(color: Colors.white),
-                  curve: Curves.fastOutSlowIn,
-                );
+                _showCustomToast("Anda telah keluar.", Colors.black87);
 
                 if (!context.mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
@@ -278,13 +296,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         icon: const Icon(Icons.login),
         label: const Text('Masuk'),
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const LoginScreen(popOnSuccess: true),
             ),
           );
+          _loadNotificationPreference(); // <-- Ganti ke fungsi baru
         },
       );
     }
@@ -327,20 +346,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.edit_outlined,
                     label: 'Ubah Profil',
                     onTap: () {
-                      showToast(
+                      _showCustomToast(
                         "Fitur ini akan segera tersedia.",
-                        context: context,
-                        position: StyledToastPosition.bottom,
-                        animation: StyledToastAnimation.scale, // efek "pop"
-                        reverseAnimation:
-                            StyledToastAnimation.fade, // pas hilang fade out
-                        animDuration: const Duration(
-                          milliseconds: 150,
-                        ), // animasi cepat
-                        duration: const Duration(seconds: 2), // tampil 2 detik
-                        borderRadius: BorderRadius.circular(25),
-                        textStyle: const TextStyle(color: Colors.white),
-                        curve: Curves.fastOutSlowIn,
+                        Colors.blue,
                       );
                     },
                   ),
@@ -385,14 +393,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               Divider(color: theme.dividerColor, height: 1),
-              // --- TOMBOL NOTIFIKASI BARU ---
               SwitchListTile(
                 title: Text(
                   'Notifikasi Chat',
                   style: theme.textTheme.bodyLarge,
                 ),
                 value: _notificationEnabled,
-                onChanged: _handleNotificationToggle,
+                onChanged: _isToggleLoading ? null : _handleNotificationToggle,
                 secondary: Icon(
                   _notificationEnabled
                       ? Icons.notifications_active
