@@ -10,7 +10,6 @@ import 'package:reang_app/screens/auth/login_screen.dart';
 // --- IMPORT UNTUK NOTIFIKASI ---
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:reang_app/services/api_service.dart';
 import 'package:app_settings/app_settings.dart';
 // ----------------------------------------
