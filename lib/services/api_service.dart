@@ -23,6 +23,8 @@ import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/dokter_model.dart';
 import 'package:reang_app/models/admin_model.dart';
 import 'package:flutter/foundation.dart';
+import 'package:reang_app/models/user_model.dart';
+import 'package:reang_app/models/panic_kontak_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -32,7 +34,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://0bebbbf1a547.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://9a57c8891f89.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -1478,6 +1480,71 @@ class ApiService {
       debugPrint("FCM Token berhasil dihapus dari Laravel.");
     } catch (e) {
       debugPrint("Gagal menghapus FCM Token: $e");
+    }
+  }
+
+  // =======================================================================
+  // API PROFIL PENGGUNA (BARU)
+  // =======================================================================
+
+  /// Mengambil data profil pengguna yang sedang login
+  Future<UserModel> fetchUserProfile(String token) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/auth/profile',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      // API mengembalikan data pengguna di dalam kunci 'user'
+      return UserModel.fromMap(response.data['user']);
+    } catch (e) {
+      throw Exception('Gagal memuat profil: $e');
+    }
+  }
+
+  /// Mengirim pembaruan data profil pengguna
+  Future<UserModel> updateUserProfile(
+    String token,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final response = await _dio.put(
+        '$_baseUrlBackend/auth/profile/edit',
+        data: data,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      // API mengembalikan data pengguna yang sudah diperbarui
+      return UserModel.fromMap(response.data['user']);
+    } on DioException catch (e) {
+      // Menangani error validasi dari server
+      if (e.response != null && e.response!.data is Map) {
+        final errors = e.response!.data['errors'] as Map<String, dynamic>?;
+        if (errors != null && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            throw Exception(firstError.first);
+          }
+        }
+        throw Exception(e.response!.data['message'] ?? 'Terjadi kesalahan.');
+      }
+      throw Exception('Gagal memperbarui profil: $e');
+    } catch (e) {
+      throw Exception('Gagal memperbarui profil: $e');
+    }
+  }
+
+  // --- api panic button---
+  Future<List<PanicKontakModel>> fetchPanicContacts() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/panik');
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => PanicKontakModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Gagal memuat data kontak darurat');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil kontak darurat: $e');
     }
   }
 }

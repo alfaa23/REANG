@@ -6,6 +6,7 @@ import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/auth/login_screen.dart';
+import 'package:reang_app/screens/profile/edit_profile_screen.dart';
 
 // --- IMPORT UNTUK NOTIFIKASI ---
 import 'package:permission_handler/permission_handler.dart';
@@ -47,6 +48,33 @@ class _ProfileScreenState extends State<ProfileScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkOSPermissionAndUpdateState();
+    }
+  }
+
+  // --- profile ---
+  String _getInitials(String name) {
+    // Bersihkan nama dari spasi berlebih di awal/akhir
+    String trimmedName = name.trim();
+    if (trimmedName.isEmpty) return 'G';
+
+    // Pisahkan nama berdasarkan spasi
+    List<String> names = trimmedName.split(' ');
+
+    // Penting: Hapus item kosong jika ada spasi ganda (misal: "Alfa  Rizi")
+    names.removeWhere((item) => item.isEmpty);
+
+    // KASUS 1: Jika ada 2 KATA ATAU LEBIH (misal: "Alfa Rizi" atau "Alfa Rizi Nugroho")
+    if (names.length > 1) {
+      return names[0][0].toUpperCase() +
+          names[1][0].toUpperCase(); // Hasil: "AR"
+    }
+    // KASUS 2: Jika HANYA ADA 1 KATA (misal: "Alfarizi")
+    else if (names.isNotEmpty) {
+      return names[0][0].toUpperCase(); // Hasil: "A"
+    }
+    // KASUS 3: Jika nama hanya berisi spasi (sudah difilter, tapi untuk keamanan)
+    else {
+      return 'G';
     }
   }
 
@@ -264,8 +292,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     final String role = authProvider.isLoggedIn && authProvider.user != null
         ? 'Warga'
         : 'Guest';
-    const String avatarUrl =
-        'https://i.pinimg.com/564x/eb/43/44/eb4344d5f4d31dadd4efa0cf12b70bf3.jpg';
 
     final Widget actionButton;
 
@@ -320,9 +346,17 @@ class _ProfileScreenState extends State<ProfileScreen>
             children: [
               CircleAvatar(
                 radius: 40,
-                backgroundImage: NetworkImage(avatarUrl),
-                onBackgroundImageError: (_, __) {},
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Text(
+                  _getInitials(name), // Panggil fungsi helper
+                  style: TextStyle(
+                    fontSize: 32, // Sesuaikan ukuran font
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
               ),
+              // -----------------------
               const SizedBox(height: 12),
               Text(
                 name,
@@ -345,10 +379,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon: Icons.edit_outlined,
                     label: 'Ubah Profil',
                     onTap: () {
-                      _showCustomToast(
-                        "Fitur ini akan segera tersedia.",
-                        Colors.blue,
-                      );
+                      if (authProvider.isLoggedIn) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                      } else {
+                        _showCustomToast(
+                          "Harap login terlebih dahulu.",
+                          Colors.orange,
+                        );
+                      }
                     },
                   ),
                 ],

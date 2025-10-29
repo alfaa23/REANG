@@ -168,4 +168,19 @@ class AuthProvider with ChangeNotifier {
       debugPrint("Sesi lokal (Laravel) berhasil dihapus.");
     }
   }
+
+  /// Memperbarui data pengguna secara lokal di provider dan storage
+  Future<void> updateLocalUser(UserModel updatedUser) async {
+    // 1. Perbarui data pengguna yang sedang aktif di state
+    _currentUser = updatedUser;
+
+    // 2. Simpan kembali data pengguna yang sudah baru ke secure storage
+    await _storage.write(
+      key: 'user_data',
+      value: json.encode(updatedUser.toMap()),
+    );
+
+    // 3. Beri tahu semua widget yang mendengarkan bahwa data telah berubah
+    notifyListeners();
+  }
 }

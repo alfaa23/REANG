@@ -1,9 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-import 'package:reang_app/screens/home/panic_hold_screen.dart'; // <-- PENAMBAHAN: Import layar baru
-// import 'package:reang_app/services/api_service.dart'; // Aktifkan jika sudah siap
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:reang_app/models/panic_kontak_model.dart';
+import 'package:reang_app/screens/home/panic_detail_screen.dart';
+import 'package:reang_app/screens/home/panic_list_screen.dart';
+import 'package:reang_app/services/api_service.dart';
+
+// Kelas helper untuk tombol menu (disederhanakan)
+class PanicMenuData {
+  final String label;
+  final String kategori; // Kunci untuk filtering
+  final IconData icon;
+
+  PanicMenuData({
+    required this.label,
+    required this.kategori,
+    required this.icon,
+  });
+}
 
 class PanicButtonWidget extends StatefulWidget {
   const PanicButtonWidget({super.key});
@@ -20,11 +34,15 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
   bool _isOpen = false;
   bool _isLoading = true;
 
-  String? _PMI;
-  String? _nomorAmbulans;
-  // --- PENAMBAHAN: Variabel untuk nomor baru ---
-  String? _nomorPolisi;
-  String? _nomorPemadam;
+  // --- DATA KONTROL ---
+  final ApiService _apiService = ApiService();
+  List<PanicKontakModel> _allContacts = []; // Menyimpan semua data dari API
+  List<PanicMenuData> _menuItems =
+      []; // Menyimpan daftar tombol yang akan dibuat
+
+  // --- Posisi Y dihitung otomatis ---
+  final double _yOffsetStart = -65.0; // Posisi tombol terdekat (paling bawah)
+  final double _yOffsetSpacing = -55.0; // Jarak antar tombol
 
   @override
   void initState() {
@@ -33,7 +51,6 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    // Menggunakan kurva easeOut untuk animasi yang lebih halus saat muncul
     _animation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOut,
@@ -43,18 +60,54 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
 
   Future<void> _fetchEmergencyNumbers() async {
     try {
-      // Ganti bagian ini dengan panggilan ApiService Anda
-      // final data = await ApiService().fetchEmergencyContacts();
-      // _nomorDarurat = data['darurat'];
-      // _nomorAmbulans = data['ambulans'];
-      await Future.delayed(const Duration(seconds: 2));
-      _PMI = "085133468780";
-      _nomorAmbulans = "119";
-      // --- PENAMBAHAN: Mengisi nomor untuk layanan baru ---
-      _nomorPolisi = "110";
-      _nomorPemadam = "113";
+      _allContacts = await _apiService.fetchPanicContacts();
+
+      final Map<String, PanicMenuData> categories = {};
+
+      // Ambil kategori unik dari API
+      for (var contact in _allContacts) {
+        if (!categories.containsKey(contact.kategori)) {
+          categories[contact.kategori] = PanicMenuData(
+            label: contact.kategori,
+            kategori: contact.kategori,
+            icon: contact.icon,
+          );
+        }
+      }
+
+      // --- PERBAIKAN: URUTKAN TOMBOL SECARA MANUAL ---
+
+      // 1. Tentukan urutan yang Anda inginkan (dari PALING BAWAH ke PALING ATAS)
+      //    Sesuaikan string ini agar sama persis dengan 'kategori' dari API
+      const desiredOrder = ['PMI', 'BPBD', 'Ambulans', 'Polisi', 'Pemadam'];
+
+      // 2. Ambil list dari map (ini yang urutannya masih acak)
+      List<PanicMenuData> menuItemsUnsorted = categories.values.toList();
+
+      // 3. Urutkan list tersebut berdasarkan 'desiredOrder'
+      menuItemsUnsorted.sort((a, b) {
+        int indexA = desiredOrder.indexOf(a.kategori);
+        int indexB = desiredOrder.indexOf(b.kategori);
+
+        // Jika kategori tidak ditemukan di desiredOrder, letakkan di akhir
+        if (indexA == -1) indexA = 999;
+        if (indexB == -1) indexB = 999;
+
+        // Bandingkan posisinya
+        return indexA.compareTo(indexB);
+      });
+
+      // 4. Simpan list yang SUDAH TERURUT ke state
+      _menuItems = menuItemsUnsorted;
     } catch (e) {
-      // Handle error jika gagal mengambil data
+      if (mounted) {
+        showToast(
+          'Gagal memuat kontak darurat: ${e.toString()}',
+          context: context,
+          backgroundColor: Colors.red,
+          position: StyledToastPosition.bottom,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -81,119 +134,93 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     });
   }
 
-  // --- PERUBAHAN: Fungsi panggilan langsung ini tidak lagi diperlukan di sini ---
-  // Fungsi ini sekarang ditangani oleh PanicHoldScreen
-  // Future<void> _makePhoneCall(String? phoneNumber) async { ... }
+  // --- FUNGSI PINTAR UNTUK NAVIGASI ---
+  void _onServiceTapped(String kategori) {
+    // 1. Filter daftar kontak berdasarkan kategori yang diklik
+    final filteredContacts = _allContacts
+        .where((contact) => contact.kategori == kategori)
+        .toList();
 
-  // --- PENAMBAHAN: Fungsi baru untuk menavigasi ke layar konfirmasi ---
-  void _navigateToHoldScreen(PanicService service) {
-    if (service.phoneNumber.isEmpty) {
-      showToast('Nomor tidak tersedia', context: context);
-
+    // 2. Tentukan tujuan navigasi
+    if (filteredContacts.isEmpty) {
+      showToast('Nomor untuk $kategori tidak tersedia', context: context);
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PanicHoldScreen(service: service),
-      ),
-    );
+
+    if (filteredContacts.length == 1) {
+      // --- KASUS 1: HANYA SATU NOMOR (Polisi, Ambulans, dll.) ---
+      final contact = filteredContacts.first;
+      final service = PanicService(
+        name: contact.name,
+        phoneNumber: contact.nomer,
+        info:
+            'Fitur ini akan menghubungkan Anda ke ${contact.name}. Gunakan dengan bijak.',
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PanicHoldScreen(service: service),
+        ),
+      );
+    } else {
+      // --- KASUS 2: LEBIH DARI SATU NOMOR (Pemadam) ---
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              PanicListScreen(contacts: filteredContacts, title: kategori),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Hitung tinggi yang dibutuhkan secara dinamis
+    final double requiredHeight = 65.0 + (_menuItems.length * 60.0);
+
     return SizedBox(
       width: 250,
-      height: 250,
+      height: requiredHeight > 250 ? requiredHeight : 250,
       child: Stack(
         alignment: Alignment.bottomRight,
         children: [
-          // --- PENAMBAHAN: Tombol Pemadam Kebakaran ---
-          _buildOption(
-            -285.0, // Posisi paling atas
-            'Pemadam',
-            Icons.local_fire_department_outlined,
-            () => _navigateToHoldScreen(
-              PanicService(
-                name: 'Panggilan Pemadam Kebakaran',
-                phoneNumber: _nomorPemadam ?? '113',
-                info:
-                    'Fitur ini akan menghubungkan Anda ke layanan Pemadam Kebakaran. Pastikan Anda gunakan dalam kondisi darurat saja.',
-              ),
-            ),
-          ),
-          // --- PENAMBAHAN: Tombol Polisi ---
-          _buildOption(
-            -230.0, // Posisi kedua
-            'Polisi',
-            Icons.local_police_outlined,
-            () => _navigateToHoldScreen(
-              PanicService(
-                name: 'Panggilan Polisi',
-                phoneNumber: _nomorPolisi ?? '110',
-                info:
-                    'Fitur ini akan menghubungkan Anda ke layanan Polisi. Gunakan dengan bijak.',
-              ),
-            ),
-          ),
-          _buildOption(
-            -175.0, // Jarak disesuaikan untuk tombol yang lebih kecil
-            'Ambulans',
-            FontAwesomeIcons.ambulance,
-            // --- PERUBAHAN: Panggil fungsi navigasi ---
-            () => _navigateToHoldScreen(
-              PanicService(
-                name: 'Panggilan Ambulans',
-                phoneNumber: _nomorAmbulans ?? '119',
-                info:
-                    'Fitur ini akan menghubungkan Anda ke layanan darurat Ambulans. Pastikan Anda gunakan dalam kondisi darurat saja.',
-              ),
-            ),
-          ),
-          _buildOption(
-            -120.0, // Jarak disesuaikan untuk tombol yang lebih kecil
-            'PMI',
-            Icons.local_hospital_outlined,
-            // --- PERUBAHAN: Panggil fungsi navigasi ---
-            () => _navigateToHoldScreen(
-              PanicService(
-                name: 'Panggilan Darurat',
-                phoneNumber: _PMI ?? '085133468780',
-                info:
-                    'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
-              ),
-            ),
-          ),
-          _buildOption(
-            -65.0, // Jarak disesuaikan untuk tombol yang lebih kecil
-            'BPBD',
-            Icons.report,
-            // --- PERUBAHAN: Panggil fungsi navigasi ---
-            () => _navigateToHoldScreen(
-              PanicService(
-                name: 'Panggilan Darurat',
-                phoneNumber: _PMI ?? '081911019911',
-                info:
-                    'Fitur ini akan menghubungkan Anda ke layanan darurat terpusat. Gunakan dengan bijak.',
-              ),
-            ),
-          ),
+          // --- Tombol Opsi yang Dibuat Otomatis ---
+          // Loop melalui list _menuItems yang sudah terurut
+          ..._menuItems.asMap().entries.map((entry) {
+            int index = entry.key; // 0, 1, 2, 3, 4
+            PanicMenuData item = entry.value; // PMI, BPBD, Ambulans, ...
+            return _buildOption(
+              // Hitung Y-Offset secara dinamis
+              // index 0 (PMI) -> -65.0
+              // index 4 (Pemadam) -> -285.0
+              _yOffsetStart + (_yOffsetSpacing * index),
+              item.label,
+              item.icon,
+              () => _onServiceTapped(item.kategori),
+            );
+          }).toList(),
+
+          // --- Tombol Utama (Panic Button) ---
           SizedBox(
-            width: 50, // PERUBAHAN: Ukuran tombol diubah menjadi 50
-            height: 50, // PERUBAHAN: Ukuran tombol diubah menjadi 50
+            width: 50,
+            height: 50,
             child: Material(
               shape: const CircleBorder(),
               clipBehavior: Clip.antiAlias,
               elevation: 4.0,
+              // Latar belakang kontras (sesuai logika Anda)
+              color: isDarkMode ? Colors.white : Colors.grey[850],
               child: InkWell(
                 onTap: _isLoading ? null : _toggleMenu,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  // --- PERUBAHAN: Dekorasi dibuat dinamis ---
                   decoration: BoxDecoration(
                     color: _isOpen ? Colors.red : Colors.transparent,
                     image: _isOpen
-                        ? null // Hilangkan gambar saat menu terbuka
+                        ? null
                         : const DecorationImage(
                             image: AssetImage('assets/icons/darurat.webp'),
                             fit: BoxFit.cover,
@@ -206,12 +233,14 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
                         return ScaleTransition(child: child, scale: animation);
                       },
                       child: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: Colors.white,
+                                // Teks di tombol utama (close) warnanya putih
+                                // jadi loading ini juga harus putih agar terlihat
+                                color: isDarkMode ? Colors.black : Colors.white,
                               ),
                             )
                           : _isOpen
@@ -233,27 +262,21 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     );
   }
 
+  // --- Tampilan Tombol Opsi (Tidak Berubah, sudah benar) ---
   Widget _buildOption(
     double yOffset,
     String label,
     IconData icon,
     VoidCallback onPressed,
   ) {
-    // --- PERUBAHAN DIMULAI DI SINI ---
-
-    // 1. Dapatkan tema saat ini di dalam fungsi
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    // 2. Tentukan warna latar belakang yang kontras
+    // Logika warna kontras yang Anda inginkan
     final contrastBackgroundColor = isDarkMode
         ? Colors.white
         : Colors.grey[850];
-
-    // 3. Tentukan warna teks yang kontras
-    final contrastTextColor = isDarkMode ? Colors.black : Colors.white;
-
-    // --- AKHIR PERUBAHAN ---
+    final contrastTextColor = isDarkMode ? Colors.black87 : Colors.white;
 
     return AnimatedBuilder(
       animation: _animation,
@@ -274,7 +297,6 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                // --- GUNAKAN WARNA KONTRAST DI SINI ---
                 color: contrastBackgroundColor,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
@@ -284,13 +306,11 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
                   ),
                 ],
               ),
-              // --- BERI WARNA PADA TEKS AGAR TERBACA ---
               child: Text(label, style: TextStyle(color: contrastTextColor)),
             ),
             const SizedBox(width: 12),
             CircleAvatar(
               radius: 22,
-              // --- GUNAKAN WARNA KONTRAST DI SINI JUGA ---
               backgroundColor: contrastBackgroundColor,
               child: Icon(icon, color: Colors.red),
             ),

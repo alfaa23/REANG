@@ -7,6 +7,7 @@ class UserModel {
   final String phone;
   final String noKtp;
   final String role; // <-- 1. TAMBAHKAN PROPERTI
+  final String? alamat;
 
   UserModel({
     required this.id,
@@ -15,6 +16,7 @@ class UserModel {
     required this.phone,
     required this.noKtp,
     required this.role, // <-- 2. TAMBAHKAN DI CONSTRUCTOR
+    this.alamat,
   });
 
   Map<String, dynamic> toMap() {
@@ -25,6 +27,7 @@ class UserModel {
       'phone': phone,
       'no_ktp': noKtp,
       'role': role, // <-- 3. TAMBAHKAN DI SINI
+      'alamat': alamat,
     };
   }
 
@@ -36,6 +39,7 @@ class UserModel {
       phone: map['phone'] ?? '',
       noKtp: map['no_ktp'] ?? '',
       role: map['role'] ?? 'user', // <-- 4. TAMBAHKAN DI SINI
+      alamat: map['alamat'],
     );
   }
 
