@@ -4,9 +4,15 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
-// --- TAMBAHAN: Import halaman tujuan dokter ---
+// --- Import Halaman Tujuan ---
+import 'package:reang_app/screens/main_screen.dart';
+import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 import 'package:reang_app/screens/dokter/konsultasi_pasien_screen.dart';
 
+// --- Import Model ---
+import 'package:reang_app/models/admin_model.dart';
+
+// Nama class disesuaikan dengan file Anda (bisa DokterLoginScreen atau AdminLoginScreen)
 class DokterLoginScreen extends StatefulWidget {
   const DokterLoginScreen({super.key});
 
@@ -32,19 +38,7 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
     if (_isLoading) return;
 
     if (_nameController.text.isEmpty || _passwordController.text.isEmpty) {
-      showToast(
-        "Nama dan password tidak boleh kosong.",
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale, // efek "pop"
-        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-        animDuration: const Duration(milliseconds: 150), // animasi cepat
-        duration: const Duration(seconds: 2), // tampil 2 detik
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+      _showErrorToast("Nama dan password tidak boleh kosong.");
       return;
     }
 
@@ -57,43 +51,86 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
         password: _passwordController.text,
       );
 
-      // Pastikan widget masih ada sebelum melanjutkan
       if (!mounted) return;
 
-      await Provider.of<AuthProvider>(
-        context,
-        listen: false,
-      ).login(response['user'], response['token']);
+      // --- PERBAIKAN 1: Membaca 'user' BUKAN 'admin' ---
+      // Ini memperbaiki error 'type null is not subtype'
+      final admin = response['user'] as AdminModel;
+      final token = response['token'] as String;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Pastikan widget masih ada sebelum navigasi
-      if (!mounted) return;
+      // --- PERBAIKAN 2: Logika Pengecekan Role ---
+      if (admin.role == 'puskesmas') {
+        // Panggil API KEDUA untuk mengambil data puskesmas
+        // Menggunakan .toString() seperti yang Anda minta
+        final puskesmasData = await apiService.getPuskesmasByAdminId(
+          admin.id.toString(),
+        );
 
-      // --- PERBAIKAN: Navigasi eksplisit setelah login sukses ---
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const KonsultasiPasienScreen()),
-        (route) => false, // Hapus semua halaman di belakangnya
-      );
+        if (puskesmasData == null) {
+          // Jika tidak ada data puskesmas, tampilkan error
+          throw Exception(
+            'Login gagal: Akun admin ini tidak terhubung ke data puskesmas.',
+          );
+        }
+
+        // Panggil provider dengan data puskesmas lengkap
+        await authProvider.login(admin, token, puskesmas: puskesmasData);
+
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const KonsultasiPasienScreen(),
+            ),
+            (route) => false,
+          );
+        }
+      } else if (admin.role == 'umkm') {
+        // Role 'umkm', panggil login TANPA data puskesmas
+        await authProvider.login(admin, token);
+
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const HomeAdminUmkmScreen(),
+            ),
+            (route) => false,
+          );
+        }
+      } else {
+        // Role admin lain (misal: superadmin)
+        await authProvider.login(admin, token);
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
+          );
+        }
+      }
     } catch (e) {
-      showToast(
-        e.toString(),
-        context: context,
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale, // efek "pop"
-        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-        animDuration: const Duration(milliseconds: 150), // animasi cepat
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+      _showErrorToast(e.toString().replaceFirst("Exception: ", ""));
     } finally {
-      // Pastikan loading indicator selalu mati jika terjadi error
-      // atau jika navigasi gagal karena suatu alasan.
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // Helper untuk toast error
+  void _showErrorToast(String message) {
+    showToast(
+      message,
+      context: context,
+      backgroundColor: Colors.red,
+      duration: const Duration(seconds: 4),
+      position: StyledToastPosition.bottom,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   @override

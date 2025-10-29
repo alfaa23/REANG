@@ -1,106 +1,9 @@
 import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'detail_produk_screen.dart';
+import 'package:reang_app/screens/ecomerce/proses_order_screen.dart';
+// import 'proses_order_screen.dart'; // Aktifkan jika sudah ada
 
-// Import untuk halaman dummy
-// import 'proses_order_screen.dart';
-
-// =============================================================================
-// WIDGET BARU: DRAGGABLE FLOATING ACTION BUTTON
-// =============================================================================
-class DraggableFab extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onPressed;
-
-  // Nilai awal posisi (akan disesuaikan di build agar default di kanan bawah)
-  final double initialX;
-  final double initialY;
-
-  const DraggableFab({
-    super.key,
-    required this.child,
-    required this.onPressed,
-    this.initialX = 0.0,
-    this.initialY = 0.0,
-  });
-
-  @override
-  State<DraggableFab> createState() => _DraggableFabState();
-}
-
-class _DraggableFabState extends State<DraggableFab> {
-  // Posisi saat ini
-  late double top;
-  late double left;
-
-  @override
-  void initState() {
-    super.initState();
-    // Inisialisasi awal. Posisi sesungguhnya dihitung di build.
-    top = widget.initialY;
-    left = widget.initialX;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Ambil ukuran layar dan padding
-    final screenSize = MediaQuery.of(context).size;
-    final appBarHeight = 60.0; // Sesuai dengan PreferredSize di UmkmScreen
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-
-    // Hitung posisi default (kanan bawah, di atas bottom padding)
-    if (top == widget.initialY && left == widget.initialX) {
-      // Mengasumsikan lebar FAB minimal 56x56
-      final fabSize = 56.0;
-      final padding = 16.0;
-
-      // Posisi default: Kanan bawah (16px dari kanan & bawah aman)
-      left = screenSize.width - fabSize - padding;
-      top =
-          screenSize.height -
-          fabSize -
-          padding * 4; // Beri ruang lebih dari bawah (misalnya 4x padding)
-    }
-
-    return Positioned(
-      top: top,
-      left: left,
-      child: Draggable(
-        // Opacity saat FAB sedang digeser
-        feedback: Opacity(opacity: 0.7, child: widget.child),
-        // Widget pengganti di posisi awal saat sedang digeser
-        childWhenDragging: const SizedBox(width: 56, height: 56),
-
-        onDragEnd: (details) {
-          double newTop = details.offset.dy;
-          double newLeft = details.offset.dx;
-
-          // Batas aman
-          final minLeft = 10.0;
-          final maxLeft =
-              screenSize.width - 66.0; // Lebar FAB + sedikit padding
-          final minTop =
-              statusBarHeight + appBarHeight + 10.0; // Di bawah App Bar
-          final maxTop =
-              screenSize.height -
-              76.0; // 76.0 = Tinggi FAB + Bottom Inset + Margin
-
-          setState(() {
-            // Batasi posisi agar tidak keluar dari layar
-            left = newLeft.clamp(minLeft, maxLeft);
-            top = newTop.clamp(minTop, maxTop);
-          });
-        },
-        // Widget yang benar-benar ditampilkan dan dapat berinteraksi (tapped/dragged)
-        child: GestureDetector(onTap: widget.onPressed, child: widget.child),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// WIDGET UTAMA: UMKMSCREEN (Modifikasi FAB)
-// =============================================================================
 class UmkmScreen extends StatefulWidget {
   const UmkmScreen({super.key});
 
@@ -109,7 +12,6 @@ class UmkmScreen extends StatefulWidget {
 }
 
 class _UmkmScreenState extends State<UmkmScreen> {
-  // ... (Data Dummy dan Logika Filter tetap sama) ...
   final List<Map<String, dynamic>> categories = const [
     {'name': 'Semua', 'icon': Icons.shopping_bag_outlined},
     {'name': 'Fashion', 'icon': Icons.checkroom_outlined},
@@ -117,6 +19,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
     {'name': 'Elektronik', 'icon': Icons.devices_other_outlined},
   ];
 
+  // Data produk dummy (Anda bisa ganti ini dengan data dari API nanti)
   final List<Map<String, dynamic>> products = const [
     {
       'image': 'assets/baju.webp',
@@ -136,26 +39,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'sold': 856,
       'price_final': 'Rp 249.000',
       'location': 'Surabaya',
-      'category': 'Fashion',
-    },
-    {
-      'image': 'assets/baju.webp',
-      'title': 'Kemeja Batik Slimfit Modern',
-      'subtitle': 'Kemeja batik slimfit, bahan adem, cocok acara formal',
-      'rating': 4.9,
-      'sold': 432,
-      'price_final': 'Rp 199.000',
-      'location': 'Bandung',
-      'category': 'Fashion',
-    },
-    {
-      'image': 'assets/baju.webp',
-      'title': 'Kemeja Pria Lengan Panjang',
-      'subtitle': 'Kemeja kantor polos, bahan katun premium',
-      'rating': 4.6,
-      'sold': 2341,
-      'price_final': 'Rp 179.000',
-      'location': 'Yogyakarta',
       'category': 'Fashion',
     },
     {
@@ -185,6 +68,10 @@ class _UmkmScreenState extends State<UmkmScreen> {
   final TextEditingController _searchController = TextEditingController();
   late List<Map<String, dynamic>> _filteredProducts;
 
+  // --- Variabel untuk FAB yang bisa digeser DIHAPUS ---
+  // Offset _fabPosition = const Offset(0, 0);
+  // double _fabSize = 56.0;
+
   @override
   void initState() {
     super.initState();
@@ -192,6 +79,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
     _searchController.addListener(() {
       _onSearchTextChanged(_searchController.text);
     });
+    // --- Logika untuk inisialisasi posisi FAB DIHAPUS ---
   }
 
   @override
@@ -250,36 +138,35 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   void _navigateToOrderProcess() {
-    // Navigasi ke halaman proses order atau keranjang
+    // Arahkan ke halaman keranjang atau proses pesanan
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const CartScreen(), // Ganti dengan ProsesOrderScreen() jika sudah ada
-      ),
+      MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
     );
   }
+
+  // --- Fungsi _onPanUpdate untuk menggeser FAB DIHAPUS ---
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // --- TAMBAHAN: Deteksi mode tema ---
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    // Hitung childAspectRatio dinamis (tetap sama)
     final screenWidth = MediaQuery.of(context).size.width;
     const horizontalPadding = 16.0 * 2;
     const crossAxisSpacing = 12.0;
     final itemWidth = (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const heightMultiplier = 1.8;
+    const heightMultiplier = 1.8; // Sesuaikan ini untuk tinggi kartu
     final childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
 
+    // Variabel untuk padding bawah (menghindari navigasi sistem/keyboard)
     final bottomInset =
         MediaQuery.of(context).padding.bottom +
         MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-
-      // AppBar tetap sama
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60.0),
         child: AppBar(
@@ -333,20 +220,15 @@ class _UmkmScreenState extends State<UmkmScreen> {
           foregroundColor: theme.colorScheme.onSurface,
         ),
       ),
-
-      // HAPUS floatingActionButton DARI SCAFOLD
-      // floatingActionButton: null,
-
-      // GANTI BODY menjadi STACK untuk menempatkan DraggableFab
+      // --- PERUBAHAN: Body diubah menjadi Stack ---
       body: Stack(
         children: [
-          // 1. Konten Utama (Kategori & Grid Produk)
+          // Konten Utama (Daftar Kategori dan Produk)
           SafeArea(
             bottom: true,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // --- Bagian Kategori (Horizontal Chips) ---
                 SizedBox(
                   height: 70,
                   child: ListView.builder(
@@ -393,8 +275,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                     },
                   ),
                 ),
-
-                // --- Bagian Header Produk ---
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16.0, 10.0, 16.0, 16.0),
                   child: Row(
@@ -415,8 +295,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                     ],
                   ),
                 ),
-
-                // --- Grid Produk (Product Card) ---
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -431,10 +309,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
                             ),
                           )
                         : GridView.builder(
-                            // Tambahkan bottom padding yang lebih besar agar tidak tertutup FAB
                             padding: EdgeInsets.only(
                               top: 0,
-                              bottom: bottomInset + 80,
+                              bottom: bottomInset + 80, // Beri ruang di bawah
                             ),
                             itemCount: _filteredProducts.length,
                             gridDelegate:
@@ -462,23 +339,28 @@ class _UmkmScreenState extends State<UmkmScreen> {
                           ),
                   ),
                 ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
 
-          // 2. Draggable Floating Action Button
-          DraggableFab(
-            onPressed: _navigateToOrderProcess,
-            // Tombol FAB Minimalis
-            child: FloatingActionButton(
-              onPressed: _navigateToOrderProcess,
-              heroTag: 'minimalOrderFab', // Penting untuk DraggableFab
-              backgroundColor:
-                  theme.colorScheme.primary, // Ganti warna agar lebih menonjol
-              foregroundColor: theme.colorScheme.onPrimary,
-              shape: const CircleBorder(),
-              elevation: 8, // Sedikit lebih menonjol
-              child: const Icon(Icons.receipt_long), // Ikon minimalis
+          // --- PERUBAHAN UTAMA: Tombol Melayang Statis ---
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: 16.0,
+                // Pastikan tombol ada di atas navigasi sistem/keyboard
+                bottom: (bottomInset == 0 ? 16.0 : bottomInset) + 16.0,
+              ),
+              child: FloatingActionButton(
+                onPressed: _navigateToOrderProcess,
+                // Logika warna kontras
+                backgroundColor: isDarkMode ? Colors.white : Colors.grey[850],
+                foregroundColor: isDarkMode ? Colors.black87 : Colors.white,
+                tooltip: 'Cek Pesanan Saya',
+                child: const Icon(Icons.receipt_long_outlined), // Ikon pesanan
+              ),
             ),
           ),
         ],
@@ -487,12 +369,8 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 }
 
-// =============================================================================
-// WIDGET KARTU PRODUK (TETAP SAMA)
-// =============================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
-
   const ProductCard({required this.product, super.key});
 
   @override
@@ -508,7 +386,6 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // --- GAMBAR PRODUK DAN TOMBOL TAMBAH ---
           Stack(
             children: [
               AspectRatio(
@@ -540,8 +417,6 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // tombol tambah tetap pakai Positioned seperti sebelumnya
               Positioned(
                 bottom: 8,
                 right: 8,
@@ -565,8 +440,6 @@ class ProductCard extends StatelessWidget {
               ),
             ],
           ),
-
-          // --- DETAIL PRODUK ---
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
@@ -574,7 +447,6 @@ class ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Judul Produk (subtitle dipakai sebagai deskripsi singkat)
                   Text(
                     product['subtitle']!,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -583,8 +455,6 @@ class ProductCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-
-                  // Harga
                   Text(
                     product['price_final']!,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -592,8 +462,6 @@ class ProductCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-
-                  // Rating dan Terjual
                   Row(
                     children: [
                       Icon(Icons.star, color: Colors.amber.shade700, size: 14),
@@ -618,8 +486,6 @@ class ProductCard extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Lokasi
                   Row(
                     children: [
                       Icon(

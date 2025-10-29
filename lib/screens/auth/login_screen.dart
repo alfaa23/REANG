@@ -8,7 +8,7 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
 // --- TAMBAHAN: Import halaman login dokter ---
-import 'package:reang_app/screens/auth/dokter_login_screen.dart';
+import 'package:reang_app/screens/auth/admin_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;

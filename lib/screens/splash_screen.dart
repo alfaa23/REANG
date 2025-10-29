@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/main_screen.dart';
 import 'package:reang_app/screens/dokter/konsultasi_pasien_screen.dart';
+import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 // Import LoginScreen tidak lagi dibutuhkan di sini
 // import 'package:reang_app/screens/auth/login_screen.dart';
 
@@ -32,17 +33,37 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (mounted) {
       // --- PERUBAHAN UTAMA DI SINI ---
-      if (authProvider.isLoggedIn && authProvider.role == 'puskesmas') {
-        // HANYA jika login sebagai Dokter, arahkan ke halaman khusus dokter
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const KonsultasiPasienScreen(),
-          ),
-          (route) => false,
-        );
+      if (authProvider.isLoggedIn) {
+        // Pengguna sudah login, sekarang cek rolenya
+        switch (authProvider.role) {
+          case 'puskesmas':
+            // Arahkan ke Halaman Admin Puskesmas
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const KonsultasiPasienScreen(),
+              ),
+              (route) => false,
+            );
+            break;
+          case 'umkm':
+            // Arahkan ke Halaman Admin UMKM
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const HomeAdminUmkmScreen(),
+              ),
+              (route) => false,
+            );
+            break;
+          case 'user':
+          default:
+            // Arahkan ke Halaman Utama untuk 'user' atau role lain
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+              (route) => false,
+            );
+        }
       } else {
-        // UNTUK SEMUA KONDISI LAIN (login sebagai user biasa ATAU belum login/tamu),
-        // arahkan ke halaman utama.
+        // Pengguna adalah tamu (belum login)
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),
           (route) => false,
