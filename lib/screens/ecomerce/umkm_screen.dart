@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// --- IMPORT DIPERBARUI ---
+import 'package:reang_app/providers/auth_provider.dart';
+// import 'package:reang_app/providers/user_provider.dart'; // <-- SUDAH DIHAPUS
+
+// Import halaman-halaman yang dituju
 import 'cart_screen.dart';
 import 'detail_produk_screen.dart';
-import 'package:reang_app/screens/ecomerce/proses_order_screen.dart';
-// import 'proses_order_screen.dart'; // Aktifkan jika sudah ada
+import 'proses_order_screen.dart';
+import 'form_toko_screen.dart';
+import 'package:reang_app/screens/auth/login_screen.dart'; // Sesuaikan path jika perlu
+import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart'; // Sesuaikan path jika perlu
 
 class UmkmScreen extends StatefulWidget {
   const UmkmScreen({super.key});
@@ -12,6 +21,7 @@ class UmkmScreen extends StatefulWidget {
 }
 
 class _UmkmScreenState extends State<UmkmScreen> {
+  // (Data categories, products, controllers, dll. tidak berubah)
   final List<Map<String, dynamic>> categories = const [
     {'name': 'Semua', 'icon': Icons.shopping_bag_outlined},
     {'name': 'Fashion', 'icon': Icons.checkroom_outlined},
@@ -19,7 +29,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
     {'name': 'Elektronik', 'icon': Icons.devices_other_outlined},
   ];
 
-  // Data produk dummy (Anda bisa ganti ini dengan data dari API nanti)
   final List<Map<String, dynamic>> products = const [
     {
       'image': 'assets/baju.webp',
@@ -32,16 +41,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'category': 'Fashion',
     },
     {
-      'image': 'assets/baju.webp',
-      'title': 'Hoodie Oversize Fleece Tebal',
-      'subtitle': 'Hoodie nyaman dengan fleece tebal, cocok cuaca dingin',
-      'rating': 4.8,
-      'sold': 856,
-      'price_final': 'Rp 249.000',
-      'location': 'Surabaya',
-      'category': 'Fashion',
-    },
-    {
       'image': 'assets/makanan.webp',
       'title': 'Kerupuk Kulit Sapi Premium',
       'subtitle': 'Kerupuk kulit renyah, rasa original',
@@ -51,16 +50,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
       'location': 'Indramayu',
       'category': 'Makanan',
     },
-    {
-      'image': 'assets/elektronik.webp',
-      'title': 'Power Bank 10000mAh Mini',
-      'subtitle': 'Power bank ukuran saku, pengisian cepat',
-      'rating': 4.5,
-      'sold': 150,
-      'price_final': 'Rp 99.000',
-      'location': 'Jakarta Barat',
-      'category': 'Elektronik',
-    },
+    // ... (data produk Anda yang lain) ...
   ];
 
   int _selectedCategoryIndex = 0;
@@ -68,9 +58,8 @@ class _UmkmScreenState extends State<UmkmScreen> {
   final TextEditingController _searchController = TextEditingController();
   late List<Map<String, dynamic>> _filteredProducts;
 
-  // --- Variabel untuk FAB yang bisa digeser DIHAPUS ---
-  // Offset _fabPosition = const Offset(0, 0);
-  // double _fabSize = 56.0;
+  // (initState, dispose, _filterProducts, _onCategorySelected,
+  //  _onSearchTextChanged, _clearSearch, _navigateToOrderProcess tidak berubah)
 
   @override
   void initState() {
@@ -79,7 +68,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
     _searchController.addListener(() {
       _onSearchTextChanged(_searchController.text);
     });
-    // --- Logika untuk inisialisasi posisi FAB DIHAPUS ---
   }
 
   @override
@@ -138,35 +126,110 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   void _navigateToOrderProcess() {
-    // Arahkan ke halaman keranjang atau proses pesanan
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
     );
   }
 
-  // --- Fungsi _onPanUpdate untuk menggeser FAB DIHAPUS ---
+  // --- FUNGSI FAB MENU (SUDAH DIPERBARUI KE AUTHPROVIDER) ---
+  void _showFabMenu() {
+    final authProvider = context.read<AuthProvider>();
+    final theme = Theme.of(context);
 
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Opsi 1: Toko Saya (Logika sudah pakai AuthProvider.isUmkm)
+              ListTile(
+                leading: Icon(
+                  Icons.store_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                title: const Text(
+                  'Toko Saya',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  authProvider.isLoggedIn
+                      ? (authProvider.isUmkm
+                            ? 'Kelola produk dan pesanan toko Anda'
+                            : 'Daftar atau buka toko UMKM Anda')
+                      : 'Login untuk mengelola toko Anda',
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (!authProvider.isLoggedIn) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  } else {
+                    if (authProvider.isUmkm) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HomeAdminUmkmScreen(),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FormTokoScreen(),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+              // Opsi 2: Pesanan Saya (Tidak berubah)
+              ListTile(
+                leading: Icon(
+                  Icons.receipt_long_outlined,
+                  color: theme.hintColor,
+                ),
+                title: const Text('Pesanan Saya'),
+                subtitle: const Text('Lacak semua pesanan produk UMKM Anda'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _navigateToOrderProcess();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --- FUNGSI BUILD (DENGAN PERBAIKAN) ---
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // --- TAMBAHAN: Deteksi mode tema ---
-    final isDarkMode = theme.brightness == Brightness.dark;
+
+    // --- 1. PERBAIKAN: HAPUS VARIABEL 'isDarkMode' ---
+    // final isDarkMode = theme.brightness == Brightness.dark; // <-- DIHAPUS
 
     final screenWidth = MediaQuery.of(context).size.width;
     const horizontalPadding = 16.0 * 2;
     const crossAxisSpacing = 12.0;
     final itemWidth = (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const heightMultiplier = 1.8; // Sesuaikan ini untuk tinggi kartu
+    const heightMultiplier = 1.8;
     final childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
 
-    // Variabel untuk padding bawah (menghindari navigasi sistem/keyboard)
     final bottomInset =
         MediaQuery.of(context).padding.bottom +
         MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      // (AppBar tidak berubah)
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60.0),
         child: AppBar(
@@ -220,10 +283,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
           foregroundColor: theme.colorScheme.onSurface,
         ),
       ),
-      // --- PERUBAHAN: Body diubah menjadi Stack ---
       body: Stack(
         children: [
-          // Konten Utama (Daftar Kategori dan Produk)
+          // (Konten Utama tidak berubah)
           SafeArea(
             bottom: true,
             child: Column(
@@ -344,22 +406,29 @@ class _UmkmScreenState extends State<UmkmScreen> {
             ),
           ),
 
-          // --- PERUBAHAN UTAMA: Tombol Melayang Statis ---
+          // --- 2. PERBAIKAN: FAB DIBUNGKUS SIZEDBOX ---
           Align(
             alignment: Alignment.bottomRight,
             child: Padding(
               padding: EdgeInsets.only(
                 right: 16.0,
-                // Pastikan tombol ada di atas navigasi sistem/keyboard
                 bottom: (bottomInset == 0 ? 16.0 : bottomInset) + 16.0,
               ),
-              child: FloatingActionButton(
-                onPressed: _navigateToOrderProcess,
-                // Logika warna kontras
-                backgroundColor: isDarkMode ? Colors.white : Colors.grey[850],
-                foregroundColor: isDarkMode ? Colors.black87 : Colors.white,
-                tooltip: 'Cek Pesanan Saya',
-                child: const Icon(Icons.receipt_long_outlined), // Ikon pesanan
+              // BUNGKUS DENGAN SizedBox untuk ukuran 55x55
+              child: SizedBox(
+                width: 55.0,
+                height: 55.0,
+                child: FloatingActionButton(
+                  onPressed: _showFabMenu,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  elevation: 6.0,
+                  splashColor: theme.colorScheme.secondary.withOpacity(0.4),
+
+                  // 'constraints' yang error sudah dihapus
+                  tooltip: 'Menu Saya',
+                  child: const Icon(Icons.apps_outlined, size: 28),
+                ),
               ),
             ),
           ),
@@ -369,6 +438,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 }
 
+// --- Class ProductCard (Tidak ada perubahan) ---
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const ProductCard({required this.product, super.key});

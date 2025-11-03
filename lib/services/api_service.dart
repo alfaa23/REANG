@@ -770,7 +770,7 @@ class ApiService {
   // API REGISTRASI (BARU)
   // =======================================================================
   Future<Map<String, dynamic>> registerUser({
-    required String fullName,
+    required String name,
     required String email,
     required String password,
     required String passwordConfirmation,
@@ -781,7 +781,7 @@ class ApiService {
       final response = await _dio.post(
         '$_baseUrlBackend/auth/signup',
         data: {
-          'fullName': fullName,
+          'name': name,
           'email': email,
           'password': password,
           'password_confirmation': passwordConfirmation,
@@ -1545,6 +1545,69 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil kontak darurat: $e');
+    }
+  }
+
+  // FUNGSI 'buatToko' YANG SEKARANG MENGIKUTI CARA ANDA
+  // ---
+  Future<Map<String, dynamic>> buatToko({
+    required String token,
+    required String nama,
+    required String deskripsi,
+    required String alamat,
+    required String noHp,
+  }) async {
+    // --- 3. URL DIBUAT MANUAL, SEPERTI CONTOH ANDA ---
+    // (Misal: 'https://...ngrok-free.app/api/toko/store')
+    final String url = '$_baseUrlBackend/toko/store';
+    print('Mencoba mengirim data toko ke: $url'); // Ini untuk debug Anda
+
+    try {
+      final response = await _dio.post(
+        url, // <-- Menggunakan URL lengkap yang sudah kita buat
+        data: {
+          'nama': nama,
+          'deskripsi': deskripsi,
+          'alamat': alamat,
+          'no_hp': noHp,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            // --- 4. HEADER PENTING UNTUK NGOK ---
+            'ngrok-skip-browser-warning': 'true',
+          },
+        ),
+      );
+
+      // (Logika respons tidak berubah, sudah benar)
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (response.data['status'] == true) {
+          return response.data['data'];
+        } else {
+          throw Exception(response.data['message'] ?? 'Gagal menambahkan toko');
+        }
+      } else {
+        throw Exception(
+          'Gagal terhubung ke server (Kode: ${response.statusCode})',
+        );
+      }
+
+      // (Logika error tidak berubah, sudah anti-null)
+    } on DioException catch (e) {
+      if (e.response != null) {
+        String errorMessage =
+            e.response?.data['message'] ??
+            'Error dari server, tapi pesan tidak ada.';
+        print('Error dari server: ${e.response?.data}');
+        throw Exception(errorMessage);
+      } else {
+        print('Dio connection error: ${e.message}');
+        throw Exception('GGL-CNCT: Gagal terhubung ke server. Periksa koneksi');
+      }
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: ${e.toString()}');
     }
   }
 }

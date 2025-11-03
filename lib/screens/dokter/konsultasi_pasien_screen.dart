@@ -297,13 +297,26 @@ class _KonsultasiPasienScreenState extends State<KonsultasiPasienScreen> {
                 showBadge = false;
               }
 
+              final dummyPivot = app_user_model.PivotModel(
+                userId: int.tryParse(patientId) ?? 0,
+                roleId: 1, // Asumsi ID untuk role 'user' adalah 1
+              );
+
+              // 2. Buat data 'role' dummy
+              final dummyRole = app_user_model.RoleModel(
+                id: 1, // Asumsi ID untuk role 'user' adalah 1
+                name: 'user',
+                pivot: dummyPivot,
+              );
+
+              // 3. Masukkan 'dummyRole' sebagai LIST (menggunakan [ ])
               final patientUser = app_user_model.UserModel(
                 id: int.tryParse(patientId) ?? 0,
                 name: patientName,
                 email: '',
                 phone: '',
                 noKtp: '',
-                role: 'user',
+                role: [dummyRole], // <--- SEKARANG MENJADI LIST
               );
 
               return ListTile(

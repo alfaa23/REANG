@@ -3,16 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-
-// --- Import Halaman Tujuan ---
-import 'package:reang_app/screens/main_screen.dart';
-import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 import 'package:reang_app/screens/dokter/konsultasi_pasien_screen.dart';
-
 // --- Import Model ---
 import 'package:reang_app/models/admin_model.dart';
 
-// Nama class disesuaikan dengan file Anda (bisa DokterLoginScreen atau AdminLoginScreen)
 class DokterLoginScreen extends StatefulWidget {
   const DokterLoginScreen({super.key});
 
@@ -34,6 +28,7 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
     super.dispose();
   }
 
+  // --- FUNGSI LOGIN YANG SUDAH DIBERSIHKAN ---
   Future<void> _performLogin() async {
     if (_isLoading) return;
 
@@ -44,6 +39,10 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
 
     setState(() => _isLoading = true);
 
+    // Ambil provider dan navigator sebelum async gap
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
+
     try {
       final apiService = ApiService();
       final response = await apiService.loginAdmin(
@@ -51,61 +50,39 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
         password: _passwordController.text,
       );
 
-      if (!mounted) return;
-
-      // --- PERBAIKAN 1: Membaca 'user' BUKAN 'admin' ---
-      // Ini memperbaiki error 'type null is not subtype'
       final admin = response['user'] as AdminModel;
       final token = response['token'] as String;
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // --- PERBAIKAN 2: Logika Pengecekan Role ---
+      // --- LOGIKA UTAMA: HANYA IZINKAN 'puskesmas' ---
       if (admin.role == 'puskesmas') {
         // Panggil API KEDUA untuk mengambil data puskesmas
-        // Menggunakan .toString() seperti yang Anda minta
         final puskesmasData = await apiService.getPuskesmasByAdminId(
           admin.id.toString(),
         );
 
         if (puskesmasData == null) {
-          // Jika tidak ada data puskesmas, tampilkan error
+          // Jika tidak ada data puskesmas, gagalkan login
           throw Exception(
             'Login gagal: Akun admin ini tidak terhubung ke data puskesmas.',
           );
         }
 
-        // Panggil provider dengan data puskesmas lengkap
+        // Sukses, panggil provider dengan data puskesmas lengkap
         await authProvider.login(admin, token, puskesmas: puskesmasData);
 
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => const KonsultasiPasienScreen(),
-            ),
-            (route) => false,
-          );
-        }
-      } else if (admin.role == 'umkm') {
-        // Role 'umkm', panggil login TANPA data puskesmas
-        await authProvider.login(admin, token);
-
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => const HomeAdminUmkmScreen(),
-            ),
-            (route) => false,
-          );
-        }
+        // Arahkan ke Halaman Admin Puskesmas
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const KonsultasiPasienScreen(),
+          ),
+          (route) => false,
+        );
       } else {
-        // Role admin lain (misal: superadmin)
-        await authProvider.login(admin, token);
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-            (route) => false,
-          );
-        }
+        // --- JIKA ROLE BUKAN 'puskesmas' (misal: 'umkm', 'superadmin') ---
+        // Tolak login karena ini adalah portal khusus dokter/puskesmas
+        throw Exception(
+          'Login gagal: Akun ini bukan akun admin Puskesmas/Dokter.',
+        );
       }
     } catch (e) {
       _showErrorToast(e.toString().replaceFirst("Exception: ", ""));
@@ -116,7 +93,7 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
     }
   }
 
-  // Helper untuk toast error
+  // Helper untuk toast error (Tidak berubah)
   void _showErrorToast(String message) {
     showToast(
       message,

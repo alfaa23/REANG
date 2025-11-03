@@ -115,7 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final apiService = ApiService();
       final response = await apiService.registerUser(
-        fullName: _nameController.text,
+        name: _nameController.text,
         noKtp: _ktpController.text,
         phone: _phoneController.text,
         email: _emailController.text,
