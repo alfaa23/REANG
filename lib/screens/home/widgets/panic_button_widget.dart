@@ -5,6 +5,7 @@ import 'package:reang_app/models/panic_kontak_model.dart';
 import 'package:reang_app/screens/home/panic_detail_screen.dart';
 import 'package:reang_app/screens/home/panic_list_screen.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:dio/dio.dart';
 
 // Kelas helper untuk tombol menu (disederhanakan)
 class PanicMenuData {
@@ -58,6 +59,39 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     _fetchEmergencyNumbers();
   }
 
+  // --- FUNGSI UNTUK MENERJEMAHKAN ERROR DIO ---
+  String _getHumanFriendlyError(DioException e) {
+    String message = "Terjadi kesalahan. Coba lagi nanti.";
+
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.unknown:
+        message = "Koneksi internet bermasalah. Silakan periksa jaringan Anda.";
+        break;
+      case DioExceptionType.badResponse:
+        // Cek apakah ini error dari server (5xx)
+        if (e.response?.statusCode != null && e.response!.statusCode! >= 500) {
+          message =
+              "Server sedang mengalami gangguan. Coba lagi beberapa saat.";
+        } else {
+          // Error lain seperti 404 (Not Found), 401 (Unauthorized)
+          message = "Gagal memuat data dari server.";
+        }
+        break;
+      case DioExceptionType.cancel:
+        message = "Permintaan dibatalkan.";
+        break;
+      default:
+        message = "Terjadi kesalahan tidak diketahui.";
+    }
+
+    return message;
+  }
+
+  // --- FUNGSI UNTUK MENGAMBIL DATA DENGAN ERROR HANDLING LENGKAP ---
   Future<void> _fetchEmergencyNumbers() async {
     try {
       _allContacts = await _apiService.fetchPanicContacts();
@@ -99,13 +133,63 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
 
       // 4. Simpan list yang SUDAH TERURUT ke state
       _menuItems = menuItemsUnsorted;
-    } catch (e) {
+
+      // --- PENANGANAN ERROR SPESIFIK UNTUK DIO / JARINGAN ---
+    } on DioException catch (e) {
       if (mounted) {
+        // Baris ini sekarang akan valid karena 'e' adalah DioException
+        String errorMessage = _getHumanFriendlyError(e);
         showToast(
-          'Gagal memuat kontak darurat: ${e.toString()}',
+          errorMessage,
           context: context,
           backgroundColor: Colors.red,
           position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale, // efek "pop"
+          reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
+          animDuration: const Duration(milliseconds: 150), // animasi cepat
+          duration: const Duration(seconds: 2), // tampil 2 detik
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
+        );
+      }
+
+      // --- PENANGANAN ERROR UMUM (LAINNYA) ---
+    } catch (e) {
+      // Ini untuk menangkap error LAIN (misal: error sorting, data null, dll)
+      if (mounted) {
+        // --- PERUBAHAN DI SINI ---
+        // Kita buat lebih pintar untuk menangani error yang "dibungkus ulang"
+        String errorMessage;
+        String errorString = e.toString().toLowerCase();
+
+        // Cek apakah ini error jaringan yang "dibungkus ulang"
+        // Kita cek kata kuncinya
+        if (errorString.contains('dio') ||
+            errorString.contains('socketexception') ||
+            errorString.contains('handshakeexception') ||
+            errorString.contains('connection') ||
+            errorString.contains('koneksi')) {
+          errorMessage = "Koneksi internet bermasalah. Periksa jaringan Anda.";
+        } else {
+          // Jika bukan, ini error internal sungguhan, tapi kita sembunyikan detailnya
+          errorMessage = 'Terjadi kesalahan internal. Coba lagi nanti.';
+        }
+        // --- AKHIR PERUBAHAN ---
+
+        showToast(
+          errorMessage, // Tampilkan pesan yang sudah difilter
+          context: context,
+          // Kita bedakan warnanya agar tahu ini error umum, bukan error Dio
+          backgroundColor: Colors.orange[800],
+          position: StyledToastPosition.bottom,
+          animation: StyledToastAnimation.scale,
+          reverseAnimation: StyledToastAnimation.fade,
+          animDuration: const Duration(milliseconds: 150),
+          duration: const Duration(seconds: 2),
+          borderRadius: BorderRadius.circular(25),
+          textStyle: const TextStyle(color: Colors.white),
+          curve: Curves.fastOutSlowIn,
         );
       }
     } finally {
@@ -123,7 +207,30 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
     super.dispose();
   }
 
+  // --- FUNGSI _toggleMenu YANG LEBIH PINTAR ---
   void _toggleMenu() {
+    // --- PERUBAHAN DIMULAI DI SINI ---
+    // Cek PENTING: Jika tidak loading DAN tidak ada menu item (karena API gagal)
+    if (!_isLoading && _menuItems.isEmpty) {
+      // Tampilkan pesan error lagi, jangan coba buka menu kosong
+      showToast(
+        'Gagal memuat layanan darurat. Periksa koneksi Anda.',
+        context: context,
+        backgroundColor: Colors.orange[800],
+        position: StyledToastPosition.bottom,
+        animation: StyledToastAnimation.scale,
+        reverseAnimation: StyledToastAnimation.fade,
+        animDuration: const Duration(milliseconds: 150),
+        duration: const Duration(seconds: 2),
+        borderRadius: BorderRadius.circular(25),
+        textStyle: const TextStyle(color: Colors.white),
+        curve: Curves.fastOutSlowIn,
+      );
+      return; // Hentikan fungsi di sini, jangan buka menu
+    }
+    // --- AKHIR PERUBAHAN ---
+
+    // Logika lama Anda untuk membuka/menutup menu (hanya berjalan jika _menuItems ada)
     if (_isOpen) {
       _animationController.reverse();
     } else {
@@ -143,6 +250,7 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
 
     // 2. Tentukan tujuan navigasi
     if (filteredContacts.isEmpty) {
+      // (Ini juga termasuk "error manusiawi" jika data tidak ada)
       showToast('Nomor untuk $kategori tidak tersedia', context: context);
       return;
     }
@@ -303,10 +411,17 @@ class _PanicButtonWidgetState extends State<PanicButtonWidget>
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
                     blurRadius: 5,
+                    offset: const Offset(0, 2), // Sedikit bayangan
                   ),
                 ],
               ),
-              child: Text(label, style: TextStyle(color: contrastTextColor)),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: contrastTextColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             CircleAvatar(

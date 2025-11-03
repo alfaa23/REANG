@@ -51,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Key _infoBannerKey = UniqueKey();
   Key _rekomendasiBeritaKey = UniqueKey();
   Key _rekomendasiPlesirKey = UniqueKey();
+  Key _panicButtonKey = UniqueKey();
 
   @override
   void initState() {
@@ -113,6 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _infoBannerKey = UniqueKey();
       _rekomendasiBeritaKey = UniqueKey();
       _rekomendasiPlesirKey = UniqueKey();
+      _panicButtonKey = UniqueKey();
     });
     await _sliderFuture;
   }
@@ -165,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         // --- PERUBAHAN: Menambahkan tombol panik melayang ---
-        floatingActionButton: const PanicButtonWidget(),
+        floatingActionButton: PanicButtonWidget(key: _panicButtonKey),
         // ----------------------------------------------------
         body: SafeArea(
           top: false,

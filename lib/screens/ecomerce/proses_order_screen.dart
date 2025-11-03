@@ -95,8 +95,8 @@ class ProsesOrderScreen extends StatelessWidget {
             ),
           ],
           bottom: TabBar(
+            tabAlignment: TabAlignment.start,
             isScrollable: true,
-            // Warna disesuaikan dengan tema aplikasi Anda
             indicatorColor: theme.colorScheme.primary,
             labelColor: theme.colorScheme.primary,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant
