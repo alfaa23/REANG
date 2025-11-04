@@ -1,17 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
-// --- IMPORT DIPERBARUI ---
+import 'package:reang_app/models/pagination_response_model.dart';
+import 'package:reang_app/models/produk_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
-// import 'package:reang_app/providers/user_provider.dart'; // <-- SUDAH DIHAPUS
-
-// Import halaman-halaman yang dituju
+import 'package:reang_app/services/api_service.dart';
 import 'cart_screen.dart';
 import 'detail_produk_screen.dart';
 import 'proses_order_screen.dart';
 import 'form_toko_screen.dart';
-import 'package:reang_app/screens/auth/login_screen.dart'; // Sesuaikan path jika perlu
-import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart'; // Sesuaikan path jika perlu
+import 'package:reang_app/screens/auth/login_screen.dart';
+import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
+import 'package:reang_app/screens/ecomerce/search_page.dart';
 
 class UmkmScreen extends StatefulWidget {
   const UmkmScreen({super.key});
@@ -21,108 +22,160 @@ class UmkmScreen extends StatefulWidget {
 }
 
 class _UmkmScreenState extends State<UmkmScreen> {
-  // (Data categories, products, controllers, dll. tidak berubah)
+  // --- STATE ---
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<ProdukModel> _masterProductList = [];
+  List<Map<String, dynamic>> _filteredProducts = [];
+
+  // State Paginasi & Error
+  int _currentPage = 1;
+  bool _hasMorePages = true;
+  bool _isLoadingInitial = true;
+  bool _isLoadingMore = false;
+  String? _apiError;
+
+  // State Kategori
   final List<Map<String, dynamic>> categories = const [
     {'name': 'Semua', 'icon': Icons.shopping_bag_outlined},
     {'name': 'Fashion', 'icon': Icons.checkroom_outlined},
-    {'name': 'Makanan', 'icon': Icons.lunch_dining_outlined},
+    {'name': 'Kuliner', 'icon': Icons.lunch_dining_outlined},
     {'name': 'Elektronik', 'icon': Icons.devices_other_outlined},
   ];
-
-  final List<Map<String, dynamic>> products = const [
-    {
-      'image': 'assets/baju.webp',
-      'title': 'Kaos Polos Unisex Katun Combed 30s',
-      'subtitle': 'Kaos polos nyaman, bahan combed, cocok sehari-hari',
-      'rating': 4.9,
-      'sold': 1234,
-      'price_final': 'Rp 149.000',
-      'location': 'Jakarta Pusat',
-      'category': 'Fashion',
-    },
-    {
-      'image': 'assets/makanan.webp',
-      'title': 'Kerupuk Kulit Sapi Premium',
-      'subtitle': 'Kerupuk kulit renyah, rasa original',
-      'rating': 4.7,
-      'sold': 500,
-      'price_final': 'Rp 35.000',
-      'location': 'Indramayu',
-      'category': 'Makanan',
-    },
-    // ... (data produk Anda yang lain) ...
-  ];
-
   int _selectedCategoryIndex = 0;
-  String _searchText = '';
-  final TextEditingController _searchController = TextEditingController();
-  late List<Map<String, dynamic>> _filteredProducts;
-
-  // (initState, dispose, _filterProducts, _onCategorySelected,
-  //  _onSearchTextChanged, _clearSearch, _navigateToOrderProcess tidak berubah)
 
   @override
   void initState() {
     super.initState();
-    _filterProducts();
-    _searchController.addListener(() {
-      _onSearchTextChanged(_searchController.text);
-    });
+    _fetchInitialProducts();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _filterProducts() {
-    final selectedCategoryName = categories[_selectedCategoryIndex]['name'];
-    final lowerCaseSearchText = _searchText.toLowerCase();
+  // =========================================================================
+  // --- FUNGSI DATA & API ---
+  // =========================================================================
 
-    List<Map<String, dynamic>> categoryFiltered;
-    if (selectedCategoryName == 'Semua') {
-      categoryFiltered = products;
-    } else {
-      categoryFiltered = products
-          .where((product) => product['category'] == selectedCategoryName)
-          .toList();
+  /// [PERBAIKAN 1] Fungsi ini sekarang adalah target untuk RefreshIndicator
+  Future<void> _fetchInitialProducts() async {
+    // Hanya set state loading jika BUKAN refresh (tarik)
+    if (!_isLoadingInitial) {
+      setState(() {
+        _isLoadingInitial = true;
+      });
     }
 
-    _filteredProducts = categoryFiltered
-        .where(
-          (product) =>
-              product['title'].toLowerCase().contains(lowerCaseSearchText) ||
-              product['subtitle'].toLowerCase().contains(lowerCaseSearchText),
-        )
-        .toList();
+    _currentPage = 1;
+    _hasMorePages = true;
+    _apiError = null;
 
+    try {
+      final response = await _apiService.fetchProdukPaginated(
+        page: _currentPage,
+        fitur: categories[_selectedCategoryIndex]['name'],
+      );
+      _masterProductList = response.data;
+      _currentPage = response.currentPage;
+      _hasMorePages = response.hasMorePages;
+    } catch (e) {
+      _apiError = e.toString();
+      _masterProductList = [];
+    }
+
+    // Panggil setState setelah delay singkat agar RefreshIndicator
+    // tidak hilang terlalu cepat
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      setState(() {
+        _isLoadingInitial = false;
+        _filterProducts();
+      });
+    }
+  }
+
+  Future<void> _fetchMoreProducts() async {
+    if (_isLoadingMore || !_hasMorePages) return;
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final response = await _apiService.fetchProdukPaginated(
+        page: _currentPage + 1,
+        fitur: categories[_selectedCategoryIndex]['name'],
+      );
+      _masterProductList.addAll(response.data);
+      _currentPage = response.currentPage;
+      _hasMorePages = response.hasMorePages;
+    } catch (e) {
+      _apiError = e.toString();
+      _hasMorePages = false;
+    }
+
+    setState(() {
+      _isLoadingMore = false;
+      _filterProducts();
+    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.9) {
+      _fetchMoreProducts();
+    }
+  }
+
+  /// (Fungsi mapping ini tidak berubah, sudah benar)
+  Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
+    return {
+      'id': produk.id,
+      'image': (produk.foto != null && !produk.foto!.startsWith('http'))
+          ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
+          : produk.foto,
+      'title': produk.nama,
+      'subtitle': produk.deskripsi ?? produk.nama,
+      'rating': 4.5,
+      'sold': produk.stok,
+      'price_final': NumberFormat.currency(
+        locale: 'id_ID',
+        symbol: 'Rp ',
+        decimalDigits: 0,
+      ).format(produk.harga),
+      'location': produk.lokasi ?? 'Indramayu',
+      'category': produk.fitur ?? 'Lainnya',
+      'stock': produk.stok,
+      'description': produk.deskripsi,
+      'specifications': produk.spesifikasi,
+      'variasi': produk.variasi,
+    };
+  }
+
+  void _filterProducts() {
+    _filteredProducts = _masterProductList
+        .map((p) => _mapProdukModelToCardData(p))
+        .toList();
     if (mounted) {
       setState(() {});
     }
   }
 
+  // =========================================================================
+  // --- FUNGSI EVENT HANDLER ---
+  // =========================================================================
+
   void _onCategorySelected(int index) {
     setState(() {
       _selectedCategoryIndex = index;
-      _filterProducts();
     });
-  }
-
-  void _onSearchTextChanged(String value) {
-    if (_searchText != value) {
-      _searchText = value;
-      _filterProducts();
-    }
-  }
-
-  void _clearSearch() {
-    setState(() {
-      _searchText = '';
-      _searchController.clear();
-      _filterProducts();
-      FocusScope.of(context).unfocus();
-    });
+    _fetchInitialProducts();
   }
 
   void _navigateToOrderProcess() {
@@ -132,11 +185,10 @@ class _UmkmScreenState extends State<UmkmScreen> {
     );
   }
 
-  // --- FUNGSI FAB MENU (SUDAH DIPERBARUI KE AUTHPROVIDER) ---
   void _showFabMenu() {
+    // ... (Logika _showFabMenu tidak berubah) ...
     final authProvider = context.read<AuthProvider>();
     final theme = Theme.of(context);
-
     showModalBottomSheet(
       context: context,
       builder: (ctx) {
@@ -145,7 +197,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Opsi 1: Toko Saya (Logika sudah pakai AuthProvider.isUmkm)
               ListTile(
                 leading: Icon(
                   Icons.store_outlined,
@@ -188,7 +239,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   }
                 },
               ),
-              // Opsi 2: Pesanan Saya (Tidak berubah)
               ListTile(
                 leading: Icon(
                   Icons.receipt_long_outlined,
@@ -208,20 +258,23 @@ class _UmkmScreenState extends State<UmkmScreen> {
     );
   }
 
-  // --- FUNGSI BUILD (DENGAN PERBAIKAN) ---
+  // =========================================================================
+  // --- FUNGSI BUILD ---
+  // =========================================================================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // --- 1. PERBAIKAN: HAPUS VARIABEL 'isDarkMode' ---
-    // final isDarkMode = theme.brightness == Brightness.dark; // <-- DIHAPUS
-
     final screenWidth = MediaQuery.of(context).size.width;
-    const horizontalPadding = 16.0 * 2;
-    const crossAxisSpacing = 12.0;
-    final itemWidth = (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const heightMultiplier = 1.8;
-    final childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
+
+    // --- [PERBAIKAN 4] Kalkulasi Grid "Rapat" (ala Shopee) ---
+    const double horizontalPadding = 12.0 * 2;
+    const double crossAxisSpacing = 8.0;
+    final double itemWidth =
+        (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
+    // Card lebih tinggi agar judul 2 baris muat
+    const double heightMultiplier = 1.7; // <-- Disesuaikan
+    final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
+    // --- [PERBAIKAN 4 SELESAI] ---
 
     final bottomInset =
         MediaQuery.of(context).padding.bottom +
@@ -229,53 +282,101 @@ class _UmkmScreenState extends State<UmkmScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      // (AppBar tidak berubah)
+      // --- [PERBAIKAN 3] AppBar Dibesarkan ---
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60.0),
+        preferredSize: const Size.fromHeight(65.0), // <-- Dibesarkan
         child: AppBar(
           automaticallyImplyLeading: false,
-          title: Container(
-            padding: const EdgeInsets.only(left: 0.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Cari produk UMKM...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchText.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: _clearSearch,
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: theme.cardColor,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 0,
-                        horizontal: 10,
+          title: SafeArea(
+            child: Container(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    const SearchPage(),
+                            transitionsBuilder:
+                                (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) {
+                                  const begin = Offset(1.0, 0.0);
+                                  const end = Offset.zero;
+                                  const curve = Curves.ease;
+                                  final tween = Tween(
+                                    begin: begin,
+                                    end: end,
+                                  ).chain(CurveTween(curve: curve));
+                                  return SlideTransition(
+                                    position: animation.drive(tween),
+                                    child: child,
+                                  );
+                                },
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12, // <-- Dibesarkan
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: BorderRadius.circular(10.0),
+                          border: Border.all(
+                            color: theme.dividerColor.withOpacity(0.5),
+                            width: 0.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.shadowColor.withOpacity(0.08),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.search,
+                              color: theme.hintColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Cari produk UMKM...',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.hintColor,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart_outlined),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CartScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    iconSize: 28.0, // <-- Dibesarkan
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CartScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
           backgroundColor: theme.scaffoldBackgroundColor,
@@ -283,130 +384,106 @@ class _UmkmScreenState extends State<UmkmScreen> {
           foregroundColor: theme.colorScheme.onSurface,
         ),
       ),
+      // --- [PERBAIKAN 5 & 7] Body di-refactor ---
       body: Stack(
         children: [
-          // (Konten Utama tidak berubah)
-          SafeArea(
-            bottom: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                SizedBox(
-                  height: 70,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: categories.length,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: ChoiceChip(
-                          label: Text(category['name']),
-                          avatar: Icon(
-                            category['icon'],
-                            size: 18,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // --- WIDGET 1: Category Chips (Sticky) ---
+              SizedBox(
+                height: 70,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: categories.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: ChoiceChip(
+                        label: Text(category['name']),
+                        avatar: Icon(
+                          category['icon'],
+                          size: 18,
+                          color: _selectedCategoryIndex == index
+                              ? theme.colorScheme.onPrimary
+                              : theme.colorScheme.primary,
+                        ),
+                        selected: _selectedCategoryIndex == index,
+                        showCheckmark: false,
+                        onSelected: (bool selected) {
+                          if (selected) {
+                            _onCategorySelected(index);
+                          }
+                        },
+                        selectedColor: theme.colorScheme.primary,
+                        backgroundColor: theme.cardColor,
+                        labelStyle: TextStyle(
+                          color: _selectedCategoryIndex == index
+                              ? theme.colorScheme.onPrimary
+                              : theme.colorScheme.onSurface,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
                             color: _selectedCategoryIndex == index
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.primary,
-                          ),
-                          selected: _selectedCategoryIndex == index,
-                          showCheckmark: false,
-                          onSelected: (bool selected) {
-                            if (selected) {
-                              _onCategorySelected(index);
-                            }
-                          },
-                          selectedColor: theme.colorScheme.primary,
-                          backgroundColor: theme.cardColor,
-                          labelStyle: TextStyle(
-                            color: _selectedCategoryIndex == index
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.onSurface,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(
-                              color: _selectedCategoryIndex == index
-                                  ? Colors.transparent
-                                  : theme.dividerColor,
-                            ),
+                                ? Colors.transparent
+                                : theme.dividerColor,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 10.0, 16.0, 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Hasil Produk (${categories[_selectedCategoryIndex]['name']})',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+              ),
+
+              // --- WIDGET 2: Bagian Scrollable (Refresh + Header + Grid) ---
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _fetchInitialProducts, // <-- [PERBAIKAN 1]
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      // --- SLIVER 1: Header "Hasil Produk" (Scrollable) ---
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            16.0,
+                            10.0,
+                            16.0,
+                            16.0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Hasil Produk (${categories[_selectedCategoryIndex]['name']})',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              // (Tampilkan jumlah hanya jika tidak loading)
+                              if (!_isLoadingInitial && _apiError == null)
+                                Text(
+                                  '${_masterProductList.length} produk',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.hintColor,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                      Text(
-                        '${_filteredProducts.length} produk',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.hintColor,
-                        ),
-                      ),
+                      // --- SLIVER 2: Grid Produk (Loading/Error/Grid) ---
+                      _buildProductGrid(childAspectRatio, bottomInset),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _filteredProducts.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Tidak ada produk ditemukan untuk kriteria ini.',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.hintColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : GridView.builder(
-                            padding: EdgeInsets.only(
-                              top: 0,
-                              bottom: bottomInset + 80, // Beri ruang di bawah
-                            ),
-                            itemCount: _filteredProducts.length,
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 12.0,
-                                  mainAxisSpacing: 12.0,
-                                  childAspectRatio: childAspectRatio,
-                                ),
-                            itemBuilder: (context, index) {
-                              final product = _filteredProducts[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          DetailProdukScreen(product: product),
-                                    ),
-                                  );
-                                },
-                                child: ProductCard(product: product),
-                              );
-                            },
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+              ),
+            ],
           ),
-
-          // --- 2. PERBAIKAN: FAB DIBUNGKUS SIZEDBOX ---
+          // --- FAB (Tidak berubah) ---
           Align(
             alignment: Alignment.bottomRight,
             child: Padding(
@@ -414,7 +491,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                 right: 16.0,
                 bottom: (bottomInset == 0 ? 16.0 : bottomInset) + 16.0,
               ),
-              // BUNGKUS DENGAN SizedBox untuk ukuran 55x55
               child: SizedBox(
                 width: 55.0,
                 height: 55.0,
@@ -423,9 +499,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
                   elevation: 6.0,
-                  splashColor: theme.colorScheme.secondary.withOpacity(0.4),
-
-                  // 'constraints' yang error sudah dihapus
                   tooltip: 'Menu Saya',
                   child: const Icon(Icons.apps_outlined, size: 28),
                 ),
@@ -436,12 +509,148 @@ class _UmkmScreenState extends State<UmkmScreen> {
       ),
     );
   }
+
+  /// [PERBAIKAN 1, 2, 5]
+  /// Widget helper ini di-refactor untuk mengembalikan Sliver
+  Widget _buildProductGrid(double childAspectRatio, double bottomInset) {
+    if (_isLoadingInitial) {
+      // Tampilkan loading di sisa layar
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_apiError != null) {
+      // [PERBAIKAN 2] Tampilkan error di sisa layar, bisa di-refresh
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                color: Theme.of(context).hintColor,
+                size: 50,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Gagal terhubung',
+                style: Theme.of(context).textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                'Tarik untuk mencoba lagi.',
+                style: TextStyle(color: Theme.of(context).hintColor),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_masterProductList.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Text(
+            'Belum ada produk yang tersedia.',
+            style: TextStyle(color: Theme.of(context).hintColor),
+          ),
+        ),
+      );
+    }
+
+    // [PERBAIKAN 5] Kembalikan SliverPadding + SliverGrid
+    return SliverPadding(
+      // [PERBAIKAN 4] Padding grid "rapat"
+      padding: EdgeInsets.fromLTRB(12.0, 0, 12.0, bottomInset + 80),
+      sliver: SliverGrid.builder(
+        itemCount: _filteredProducts.length + (_hasMorePages ? 1 : 0),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          // [PERBAIKAN 4] Spasi grid "rapat"
+          crossAxisSpacing: 8.0,
+          mainAxisSpacing: 8.0,
+          childAspectRatio: childAspectRatio,
+        ),
+        itemBuilder: (context, index) {
+          if (index == _filteredProducts.length) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final product = _filteredProducts[index];
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DetailProdukScreen(product: product),
+                ),
+              );
+            },
+            child: ProductCard(product: product),
+          );
+        },
+      ),
+    );
+  }
 }
 
-// --- Class ProductCard (Tidak ada perubahan) ---
+// =========================================================================
+// --- ProductCard (DIMODIFIKASI UNTUK PERBAIKAN 1 & 4) ---
+// =========================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const ProductCard({required this.product, super.key});
+
+  /// (Helper _buildProductImage tidak berubah)
+  Widget _buildProductImage(String? imageUrl, BuildContext context) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        child: Center(
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            color: Theme.of(context).hintColor.withOpacity(0.7),
+            size: 36,
+          ),
+        ),
+      );
+    }
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                : null,
+            strokeWidth: 2,
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          child: Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: Theme.of(context).hintColor.withOpacity(0.7),
+              size: 36,
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -449,133 +658,114 @@ class ProductCard extends StatelessWidget {
     final Color priceColor = theme.colorScheme.primary;
 
     return Card(
-      elevation: 2,
-      shadowColor: theme.shadowColor.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+      // [PERBAIKAN 4] Desain "Rapat" (ala Shopee)
+      elevation: 1.0,
+      shadowColor: theme.shadowColor.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6.0), // <-- Ujung tidak melengkung
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          // --- FOTO PRODUK (TETAP) ---
           Stack(
             children: [
               AspectRatio(
                 aspectRatio: 1,
                 child: Hero(
-                  tag:
-                      product['title'] ??
-                      product['image'] ??
-                      'produk-${product.hashCode}',
-                  child: Image.asset(
-                    product['image'] ?? 'assets/placeholder.png',
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: double.infinity,
-                        height: double.infinity,
-                        color: Theme.of(context).colorScheme.surfaceContainer,
-                        child: Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            color: Theme.of(context).hintColor.withOpacity(0.7),
-                            size: 36,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: priceColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: priceColor.withOpacity(0.3),
-                        blurRadius: 3,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.all(5.0),
-                    child: Icon(Icons.add, color: Colors.white, size: 16),
-                  ),
+                  tag: 'produk-${product['id']}',
+                  child: _buildProductImage(product['image'], context),
                 ),
               ),
             ],
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    product['subtitle']!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+
+          // --- [PERBAIKAN 1 & 4] ---
+          // Bagian teks "rapat", tidak "renggang", dan tidak "panjang"
+          Padding(
+            padding: const EdgeInsets.all(6.0), // <-- Padding dikurangi
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              // mainAxisAlignment: MainAxisAlignment.spaceBetween (DIHAPUS)
+              children: [
+                // [PERBAIKAN 1] Judul lebih besar, max 2 baris
+                Text(
+                  product['title'] ?? '', // <-- DULU 'subtitle'
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    // <-- LEBIH BESAR
+                    fontWeight: FontWeight.w500,
                   ),
-                  Text(
-                    product['price_final']!,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: priceColor,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4), // <-- Spasi rapat
+                Text(
+                  product['price_final']!,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: priceColor,
+                    fontWeight: FontWeight.w800,
                   ),
-                  Row(
-                    children: [
-                      Icon(Icons.star, color: Colors.amber.shade700, size: 14),
-                      const SizedBox(width: 2),
-                      Text(
-                        product['rating'].toString(),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '|',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                ),
+                const SizedBox(height: 6), // <-- Spasi rapat
+                // Baris Rating & Stok
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          color: Colors.amber.shade700,
+                          size: 14,
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${product['sold']} terjual',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                        const SizedBox(width: 2),
+                        Text(
+                          product['rating'].toString(),
+                          style: theme.textTheme.bodySmall,
                         ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
+                      ],
+                    ),
+                    Text(
+                      'Stok: ${product['sold']}',
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.hintColor,
-                        size: 12,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        product['location']!,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4), // <-- Spasi rapat
+                // Baris Lokasi
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      color: theme.hintColor,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+
+                    // [PERBAIKAN] Bungkus Text dengan Expanded
+                    Expanded(
+                      child: Text(
+                        product['location'] ??
+                            'Lokasi tidak diketahui', // <-- Tambah ??
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
+
+                        // [PERBAIKAN] Tambahkan properti ini
+                        maxLines: 1, // <-- Hanya 1 baris
+                        overflow: TextOverflow.ellipsis, // <-- Tampilkan '...'
+                        softWrap: false, // <-- Jangan coba-coba wrap
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+          // --- [PERBAIKAN SELESAI] ---
         ],
       ),
     );

@@ -25,6 +25,7 @@ import 'package:reang_app/models/admin_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/models/panic_kontak_model.dart';
+import 'package:reang_app/models/produk_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -34,7 +35,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://92021ca9d48a.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://dc2e277753ea.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -1608,6 +1609,91 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi kesalahan: ${e.toString()}');
+    }
+  }
+
+  // =======================================================================
+  // API PRODUK UMKM (FUNGSI INI DIUBAH)
+  // =======================================================================
+  Future<PaginationResponseModel<ProdukModel>> fetchProdukPaginated({
+    required int page,
+    String? fitur, // Ini adalah 'baju', 'elektronik', atau 'Semua'
+    String? query,
+  }) async {
+    try {
+      // --- LOGIKA BARU UNTUK MEMILIH ENDPOINT ---
+      String endpoint;
+      final Map<String, dynamic> queryParams = {'page': page};
+
+      // 1. Tentukan Endpoint
+      if (fitur != null && fitur != 'Semua') {
+        // Jika ada filter (dan bukan "Semua"), gunakan rute baru
+        // Meng-encode 'fitur' untuk keamanan jika ada spasi, dll.
+        final kategoriEncoded = Uri.encodeComponent(fitur);
+        endpoint = '$_baseUrlBackend/produk/kategori/$kategoriEncoded';
+      } else {
+        // Jika "Semua", gunakan rute 'index'
+        endpoint = '$_baseUrlBackend/produk/show';
+      }
+
+      // 2. Tentukan Parameter Pencarian (q)
+      if (query != null && query.isNotEmpty) {
+        queryParams['q'] = query;
+      }
+      // 'fitur' TIDAK lagi dimasukkan ke queryParams
+      // --- AKHIR LOGIKA BARU ---
+
+      // Panggilan Dio sekarang dinamis
+      final response = await _dio.get(
+        endpoint, // <-- Menggunakan endpoint yang dinamis
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        return PaginationResponseModel<ProdukModel>(
+          currentPage: responseData['current_page'] ?? 1,
+          lastPage: responseData['last_page'] ?? 1,
+          data: (responseData['data'] as List)
+              .map((item) => ProdukModel.fromJson(item))
+              .toList(),
+        );
+      } else {
+        throw Exception('Gagal memuat data produk');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil data produk: $e');
+    }
+  }
+
+  /// Mengambil daftar string sugesti pencarian dari API.
+  /// Contoh: /api/produk/suggestions?q=baju
+  Future<List<String>> getSearchSuggestions(String query) async {
+    // Jangan panggil API jika query kosong
+    if (query.isEmpty) {
+      return [];
+    }
+
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/produk/suggestions',
+        queryParameters: {'q': query},
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        // API mengembalikan List<dynamic> (karena JSON),
+        // kita ubah menjadi List<String>
+        final List<String> suggestions = List<String>.from(response.data);
+        return suggestions;
+      } else {
+        // Gagal mengambil atau format tidak sesuai
+        return [];
+      }
+    } catch (e) {
+      // Jika terjadi error (misal: network error),
+      // kembalikan list kosong agar aplikasi tidak crash
+      debugPrint('Error fetching suggestions: $e');
+      return [];
     }
   }
 }
