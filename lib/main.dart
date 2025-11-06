@@ -7,6 +7,8 @@ import 'package:reang_app/providers/theme_provider.dart';
 import 'package:reang_app/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:reang_app/providers/cart_provider.dart';
+import 'package:reang_app/services/api_service.dart';
 
 Future<void> main() async {
   // Pastikan Flutter sudah siap
@@ -23,6 +25,13 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
+          create: (ctx) => CartProvider(ApiService(), ctx.read<AuthProvider>()),
+          update: (ctx, auth, previousCart) {
+            // Ini memastikan CartProvider selalu dapat AuthProvider terbaru
+            return CartProvider(ApiService(), auth);
+          },
+        ),
       ],
       child: const MyApp(),
     ),

@@ -61,7 +61,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
     try {
       final results = await Future.wait([
         _apiService.fetchLokasiPeta('hospital'),
-        _apiService.fetchLokasiPeta('sehat-olahraga'),
+        _apiService.fetchLokasiPeta('olahraga'),
       ]);
       return results.map((list) => list.length).toList();
     } catch (e) {
@@ -87,7 +87,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
       icon = Icons.local_hospital_outlined;
       color = Colors.blue;
     } else {
-      apiUrl = 'sehat-olahraga';
+      apiUrl = 'olahraga';
       judulHalaman = 'Peta Tempat Olahraga';
       icon = Icons.sports_soccer_outlined;
       color = Colors.orange;
@@ -359,7 +359,7 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
                         title: 'Tempat Olahraga',
                         subtitle: '$olahragaCount tersedia',
                         color: Colors.orange,
-                        onTap: () => _openMap(context, 'sehat-olahraga'),
+                        onTap: () => _openMap(context, 'olahraga'),
                       ),
                     ),
                   ],

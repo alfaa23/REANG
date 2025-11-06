@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:reang_app/models/pagination_response_model.dart';
 import 'package:reang_app/models/produk_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'cart_screen.dart';
@@ -168,6 +167,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
     return {
       'id': produk.id,
+      'id_toko': produk.idToko,
       'image': (produk.foto != null && !produk.foto!.startsWith('http'))
           ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
           : produk.foto,
@@ -211,7 +211,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     const double crossAxisSpacing = 8.0;
     final double itemWidth =
         (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const double heightMultiplier = 1.7;
+    const double heightMultiplier = 1.8;
     final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
     // --- [PERBAIKAN 4 SELESAI] ---
 

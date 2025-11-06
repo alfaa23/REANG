@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'checkout_screen.dart'; // Import layar checkout yang baru
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:reang_app/models/cart_item_model.dart';
+import 'package:reang_app/providers/cart_provider.dart';
+import 'checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -9,127 +14,214 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  // Data dummy (dijadikan state agar bisa diubah)
-  late List<Map<String, dynamic>> cartItems;
-
   @override
   void initState() {
     super.initState();
-    cartItems = [
-      {
-        'name': 'iPhone 15 Pro Max 256GB',
-        'location': 'Jakarta Pusat',
-        'discount_text': '14% OFF',
-        'price_final': '18.999.000',
-        'price_original': '21.999.000',
-        'quantity': 1,
-        'isSelected': true,
-      },
-      {
-        'name': 'Samsung Galaxy S24 Ultra',
-        'location': 'Surabaya',
-        'discount_text': '15% OFF',
-        'price_final': '16.999.000',
-        'price_original': '19.999.000',
-        'quantity': 2,
-        'isSelected': true,
-      },
-      {
-        'name': 'MacBook Air M3 13 inch',
-        'location': 'Bandung',
-        'discount_text': '16% OFF',
-        'price_final': '15.999.000',
-        'price_original': '18.999.000',
-        'quantity': 1,
-        'isSelected': true,
-      },
-    ];
-  }
-
-  void _updateQuantity(int index, int newQuantity) {
-    if (newQuantity > 0) {
-      setState(() {
-        cartItems[index]['quantity'] = newQuantity;
-      });
-    }
-  }
-
-  void _toggleItemSelection(int index, bool isSelected) {
-    setState(() {
-      cartItems[index]['isSelected'] = isSelected;
-    });
-  }
-
-  void _toggleSelectAll(bool isSelected) {
-    setState(() {
-      for (var item in cartItems) {
-        item['isSelected'] = isSelected;
-      }
-    });
+    Future.microtask(
+      () => Provider.of<CartProvider>(context, listen: false).fetchCart(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool isSelectAll = cartItems.every((item) => item['isSelected']);
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        title: Text(
-          'Keranjang Belanja',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 1,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  _buildSelectAllHeader(cartItems.length, isSelectAll, theme),
-                  ...cartItems.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    Map<String, dynamic> item = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: CartProductCard(
-                        product: item,
-                        onQuantityChanged: (newQuantity) {
-                          _updateQuantity(index, newQuantity);
-                        },
-                        onSelected: (isSelected) {
-                          _toggleItemSelection(index, isSelected);
-                        },
-                      ),
-                    );
-                  }).toList(),
-                  const SizedBox(height: 10),
-                ],
+    return Consumer<CartProvider>(
+      builder: (context, cart, child) {
+        final String totalProdukText = '${cart.totalSelectedItems} item';
+        final String totalHargaText = cart.totalPriceString;
+
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surfaceContainerLowest,
+          appBar: AppBar(
+            title: Text(
+              'Keranjang Belanja',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
               ),
             ),
+            backgroundColor: theme.scaffoldBackgroundColor,
+            elevation: 1,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
-          _buildSummaryFooter(context, theme),
+          body: Column(
+            children: [
+              Expanded(child: _buildBody(context, cart, theme)),
+              if (!cart.isLoading &&
+                  cart.apiError == null &&
+                  cart.items.isNotEmpty)
+                _buildSummaryFooter(
+                  context,
+                  theme,
+                  cart, // Kirim provider-nya
+                  totalProdukText,
+                  totalHargaText,
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// [PERBAIKAN] Widget body diubah untuk multi-toko
+  Widget _buildBody(BuildContext context, CartProvider cart, ThemeData theme) {
+    if (cart.isLoading && cart.items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (cart.apiError != null && cart.items.isEmpty) {
+      return Center(
+        child: Text(
+          cart.apiError!,
+          style: TextStyle(color: theme.hintColor),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    if (cart.items.isEmpty) {
+      return _buildEmptyCart(theme);
+    }
+
+    // Ambil data yang sudah dikelompokkan
+    final Map<int, List<CartItemModel>> groupedItems = cart.groupedItems;
+
+    return RefreshIndicator(
+      onRefresh: () => cart.fetchCart(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            // Header "Pilih Semua" (Global)
+            _buildSelectAllHeader(
+              cart.isSelectAll,
+              theme,
+              (value) => cart.toggleSelectAll(value),
+            ),
+
+            // Loop berdasarkan TOKO
+            ...groupedItems.entries.map((entry) {
+              int tokoId = entry.key;
+              List<CartItemModel> items = entry.value;
+              // Ambil data toko dari item pertama (semua sama)
+              String namaToko =
+                  items.first.namaToko; // <-- [PERBAIKAN] Pakai namaToko
+
+              return _buildTokoGroupCard(
+                context,
+                theme,
+                cart,
+                tokoId,
+                namaToko,
+                items,
+              );
+            }).toList(),
+
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// [BARU] Widget untuk satu grup toko
+  Widget _buildTokoGroupCard(
+    BuildContext context,
+    ThemeData theme,
+    CartProvider cart,
+    int tokoId,
+    String namaToko,
+    List<CartItemModel> items,
+  ) {
+    final bool isTokoSelected = cart.areAllItemsInTokoSelected(tokoId);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8.0),
+      color: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          // Header Toko
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
+            child: Row(
+              children: [
+                _buildCheckIndicator(
+                  isSelected: isTokoSelected,
+                  theme: theme,
+                  onToggle: (value) => cart.toggleTokoSelection(tokoId, value),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.storefront_outlined,
+                  color: theme.hintColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  namaToko, // <-- [PERBAIKAN] Pakai namaToko
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          const SizedBox(height: 16.0),
+          // Daftar Produk di Toko Ini
+          ...items.map((item) {
+            return CartProductCard(
+              product: item,
+              onQuantityChanged: (newQuantity) async {
+                try {
+                  if (newQuantity < 1) {
+                    bool? confirm = await _showDeleteConfirmation(context);
+                    if (confirm == true) {
+                      await cart.removeItem(item.id);
+                    }
+                  } else {
+                    await cart.updateQuantity(item.id, newQuantity);
+                  }
+                } catch (e) {
+                  _showErrorToast(
+                    e.toString().replaceAll('Exception: ', ''),
+                    theme,
+                  );
+                }
+              },
+              onSelected: (isSelected) {
+                cart.toggleItemSelection(item.id, isSelected);
+              },
+              onDelete: () async {
+                try {
+                  await cart.removeItem(item.id);
+                } catch (e) {
+                  _showErrorToast(
+                    e.toString().replaceAll('Exception: ', ''),
+                    theme,
+                  );
+                }
+              },
+            );
+          }).toList(),
         ],
       ),
     );
   }
 
+  /// [PERBAIKAN] Helper "Pilih Semua" (Global)
   Widget _buildSelectAllHeader(
-    int itemCount,
     bool isSelected,
     ThemeData theme,
+    ValueChanged<bool> onToggleAll,
   ) {
     return Container(
       color: theme.scaffoldBackgroundColor,
@@ -139,27 +231,26 @@ class _CartScreenState extends State<CartScreen> {
           _buildCheckIndicator(
             isSelected: isSelected,
             theme: theme,
-            onToggle: (value) => _toggleSelectAll(value),
+            onToggle: onToggleAll,
           ),
           const SizedBox(width: 8),
           const Text(
             'Pilih Semua',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
-          const Spacer(),
-          Text(
-            '$itemCount produk',
-            style: TextStyle(color: theme.hintColor, fontSize: 13),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryFooter(BuildContext context, ThemeData theme) {
-    const String totalProdukText = '4 item';
-    const String totalHargaText = 'Rp 68.996.000';
-
+  /// [PERBAIKAN] Tombol Beli Sekarang
+  Widget _buildSummaryFooter(
+    BuildContext context,
+    ThemeData theme,
+    CartProvider cart, // Terima provider
+    String totalProdukText,
+    String totalHargaText,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -185,9 +276,9 @@ class _CartScreenState extends State<CartScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Total Produk', style: TextStyle(color: theme.hintColor)),
-              const Text(
+              Text(
                 totalProdukText,
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -196,9 +287,9 @@ class _CartScreenState extends State<CartScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Total Harga', style: TextStyle(color: theme.hintColor)),
-              const Text(
+              Text(
                 totalHargaText,
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -236,10 +327,27 @@ class _CartScreenState extends State<CartScreen> {
                 elevation: 0,
               ),
               onPressed: () {
+                // 1. Ambil HANYA item yang dicentang (sudah terkelompok)
+                final Map<int, List<CartItemModel>> itemsToCheckout =
+                    cart.selectedGroupedItems;
+
+                // 2. Validasi
+                if (itemsToCheckout.isEmpty) {
+                  _showErrorToast(
+                    "Centang setidaknya satu produk untuk checkout.",
+                    theme,
+                  );
+                  return;
+                }
+
+                // 3. Kirim MAP ke CheckoutScreen
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CheckoutScreen(),
+                    builder: (context) => CheckoutScreen(
+                      // [PERBAIKAN] Ganti nama parameter agar cocok
+                      itemsByToko: itemsToCheckout,
+                    ),
                   ),
                 );
               },
@@ -251,6 +359,76 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // --- Helper Lainnya (Tidak Berubah) ---
+  Widget _buildEmptyCart(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: 100,
+            color: theme.hintColor.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Keranjang Anda Kosong',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ayo, jelajahi produk dan tambahkan ke sini!',
+            style: TextStyle(color: theme.hintColor),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showDeleteConfirmation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Produk?'),
+        content: const Text(
+          'Anda yakin ingin menghapus produk ini dari keranjang?',
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Batal'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          TextButton(
+            child: Text(
+              'Hapus',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorToast(String message, ThemeData theme) {
+    showToast(
+      message,
+      context: context,
+      position: StyledToastPosition.top,
+      backgroundColor: theme.colorScheme.error,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 3),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
     );
   }
 
@@ -286,58 +464,73 @@ class _CartScreenState extends State<CartScreen> {
 // =========================================================================
 
 class CartProductCard extends StatelessWidget {
-  final Map<String, dynamic> product;
+  final CartItemModel product;
   final ValueChanged<int> onQuantityChanged;
   final ValueChanged<bool> onSelected;
+  final VoidCallback onDelete;
 
   const CartProductCard({
     required this.product,
     required this.onQuantityChanged,
     required this.onSelected,
+    required this.onDelete,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isSelected = product['isSelected'] ?? false;
-    final quantity = product['quantity'] ?? 1;
+    final isSelected = product.isSelected;
+    final quantity = product.jumlah;
+    final stok = product.stok;
 
     return Container(
       color: theme.scaffoldBackgroundColor,
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildCheckIndicator(
             isSelected: isSelected,
             theme: theme,
-            onToggle: onSelected,
+            onToggle: (value) => onSelected(value),
           ),
           const SizedBox(width: 12),
           Container(
             width: 80,
             height: 80,
             margin: const EdgeInsets.only(right: 12),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              Icons.image,
-              color: theme.hintColor.withOpacity(0.5),
-              size: 40,
-            ),
+            child: (product.foto == null || product.foto!.isEmpty)
+                ? Icon(
+                    Icons.image,
+                    color: theme.hintColor.withOpacity(0.5),
+                    size: 40,
+                  )
+                : Image.network(
+                    product.foto!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => Icon(
+                      Icons.broken_image,
+                      color: theme.hintColor.withOpacity(0.5),
+                      size: 40,
+                    ),
+                  ),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
-                        product['name']!,
+                        product.namaProduk, // <-- [PERBAIKAN] Pakai namaProduk
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -346,74 +539,53 @@ class CartProductCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Icon(
-                      Icons.delete_outline,
-                      color: theme.hintColor,
-                      size: 20,
+                    InkWell(
+                      onTap: onDelete,
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: theme.hintColor,
+                        size: 20,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
+                // [PERBAIKAN] Tampilkan Lokasi
+                if (product.lokasiToko != null &&
+                    product.lokasiToko!.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: theme.hintColor,
+                        size: 14,
                       ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(4),
+                      const SizedBox(width: 2),
+                      Text(
+                        product.lokasiToko!, // <-- [PERBAIKAN] Pakai lokasiToko
+                        style: TextStyle(fontSize: 11, color: theme.hintColor),
                       ),
-                      child: Text(
-                        product['discount_text']!,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.location_on_outlined,
-                      color: theme.hintColor,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      product['location']!,
-                      style: TextStyle(fontSize: 11, color: theme.hintColor),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Rp ${product['price_final']!}',
-                          style: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          'Rp ${product['price_original']!}',
-                          style: TextStyle(
-                            color: theme.hintColor,
-                            fontSize: 11,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      NumberFormat.currency(
+                        locale: 'id_ID',
+                        symbol: 'Rp ',
+                        decimalDigits: 0,
+                      ).format(product.harga),
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
                     ),
-                    _buildQuantityControl(theme, quantity),
+                    _buildQuantityControl(context, theme, quantity, stok),
                   ],
                 ),
               ],
@@ -450,7 +622,13 @@ class CartProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildQuantityControl(ThemeData theme, int quantity) {
+  Widget _buildQuantityControl(
+    BuildContext context,
+    ThemeData theme,
+    int quantity,
+    int stok,
+  ) {
+    bool canIncrease = quantity < stok;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
@@ -459,7 +637,9 @@ class CartProductCard extends StatelessWidget {
       child: Row(
         children: [
           InkWell(
-            onTap: () => onQuantityChanged(quantity - 1),
+            onTap: () {
+              onQuantityChanged(quantity - 1);
+            },
             child: Padding(
               padding: const EdgeInsets.all(4.0),
               child: Icon(Icons.remove, size: 18, color: theme.hintColor),
@@ -473,13 +653,33 @@ class CartProductCard extends StatelessWidget {
             ),
           ),
           InkWell(
-            onTap: () => onQuantityChanged(quantity + 1),
+            onTap: () {
+              if (canIncrease) {
+                onQuantityChanged(quantity + 1);
+              } else {
+                showToast(
+                  'Jumlah melebihi stok (Stok: $stok)',
+                  context: context,
+                  position: StyledToastPosition.top,
+                  backgroundColor: theme.colorScheme.error,
+                  animation: StyledToastAnimation.scale,
+                  reverseAnimation: StyledToastAnimation.fade,
+                  animDuration: const Duration(milliseconds: 150),
+                  duration: const Duration(seconds: 3),
+                  borderRadius: BorderRadius.circular(25),
+                  textStyle: const TextStyle(color: Colors.white),
+                  curve: Curves.fastOutSlowIn,
+                );
+              }
+            },
             child: Padding(
               padding: const EdgeInsets.all(4.0),
               child: Icon(
                 Icons.add,
                 size: 18,
-                color: theme.colorScheme.primary,
+                color: canIncrease
+                    ? theme.colorScheme.primary
+                    : theme.hintColor,
               ),
             ),
           ),

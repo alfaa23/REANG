@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:reang_app/models/pagination_response_model.dart';
 import 'package:reang_app/models/produk_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
@@ -137,6 +136,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
     return {
       'id': produk.id,
+      'id_toko': produk.idToko,
       'image': (produk.foto != null && !produk.foto!.startsWith('http'))
           ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
           : produk.foto,
@@ -272,7 +272,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
     final double itemWidth =
         (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
     // Card lebih tinggi agar judul 2 baris muat
-    const double heightMultiplier = 1.7; // <-- Disesuaikan
+    const double heightMultiplier = 1.8; // <-- Disesuaikan
     final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
     // --- [PERBAIKAN 4 SELESAI] ---
 
@@ -765,7 +765,6 @@ class ProductCard extends StatelessWidget {
               ],
             ),
           ),
-          // --- [PERBAIKAN SELESAI] ---
         ],
       ),
     );
