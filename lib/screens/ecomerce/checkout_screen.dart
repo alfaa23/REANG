@@ -1,3 +1,5 @@
+// Lokasi: lib/screens/ecomerce/checkout_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -7,13 +9,13 @@ import 'package:reang_app/models/payment_method_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-import 'dart:collection';
 import 'package:reang_app/providers/cart_provider.dart';
-import 'package:reang_app/models/user_model.dart';
-// [PERBAIKAN] Import halaman edit profile
 import 'package:reang_app/screens/profile/edit_profile_screen.dart';
+import 'payment_instruction_screen.dart';
 
-// (Helper class _CheckoutTokoState tidak berubah)
+// =========================================================================
+// --- [PERBAIKAN] Helper class untuk menyimpan state per toko ---
+// =========================================================================
 class _CheckoutTokoState {
   final int tokoId;
   final String namaToko;
@@ -48,29 +50,38 @@ class _CheckoutTokoState {
   String get selectedMetodePembayaran =>
       selectedPaymentOption?.namaMetode ?? "Belum dipilih";
   String get selectedNomorTujuan => selectedPaymentOption?.nomorTujuan ?? "";
+  // --- [BARU] Getter untuk Data Pembayaran ---
+  String get selectedNamaPenerima => selectedPaymentOption?.namaPenerima ?? "";
+  String? get selectedFotoQris => selectedPaymentOption?.fotoQris;
+  // --- [BARU SELESAI] ---
 }
+// =========================================================================
 
 class CheckoutScreen extends StatefulWidget {
+  // ... (Constructor tidak berubah) ...
   final Map<int, List<CartItemModel>>? itemsByToko;
   final Map<String, dynamic>? directBuyItem;
+  final String? directBuyNamaToko;
   final int? directBuyQty;
-
   const CheckoutScreen({
     super.key,
     this.itemsByToko,
     this.directBuyItem,
     this.directBuyQty,
+    this.directBuyNamaToko,
   }) : assert(
          (itemsByToko != null && directBuyItem == null) ||
-             (itemsByToko == null && directBuyItem != null),
-         "Harus menyediakan 'itemsByToko' ATAU 'directBuyItem'",
+             (itemsByToko == null &&
+                 directBuyItem != null &&
+                 directBuyNamaToko != null),
+         "Harus menyediakan 'itemsByToko' ATAU ('directBuyItem' + 'directBuyNamaToko')",
        );
-
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  // ... (State tidak berubah) ...
   late Map<int, _CheckoutTokoState> _tokoStates;
   double _subtotalProduk = 0;
   double _subtotalOngkir = 0;
@@ -95,13 +106,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _buildDisplayItemsAndFetchData() {
+    // ... (Fungsi ini tidak berubah) ...
     final String? token = context.read<AuthProvider>().token;
     if (token == null) {
       return;
     }
-
     if (widget.itemsByToko != null) {
-      // Skenario A: Dari Keranjang
       widget.itemsByToko!.forEach((tokoId, items) {
         final state = _CheckoutTokoState(
           tokoId: tokoId,
@@ -113,7 +123,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _fetchPaymentMethodsForToko(state, token);
       });
     } else {
-      // Skenario B: Beli Langsung
       final itemMap = widget.directBuyItem!;
       final qty = widget.directBuyQty!;
       final int harga =
@@ -125,7 +134,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ) ??
                 0
           : 0;
-
       final fakeCartItem = CartItemModel(
         id: 0,
         idToko: itemMap['id_toko'],
@@ -137,12 +145,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         subtotal: (harga * qty),
         namaProduk: itemMap['title'],
         foto: itemMap['image'],
-        // [PERBAIKAN] Ambil nama toko dari data produk jika ada
-        namaToko: itemMap['nama_toko'] ?? "Pesanan Anda",
+        namaToko: widget.directBuyNamaToko!,
         lokasiToko: itemMap['location'],
         variasi: itemMap['variasi'],
       );
-
       final state = _CheckoutTokoState(
         tokoId: fakeCartItem.idToko,
         namaToko: fakeCartItem.namaToko,
@@ -230,7 +236,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ).format(value);
   }
 
-  /// [PERBAIKAN] Fungsi "Bayar Sekarang" dengan Validasi Alamat
+  /// [PERBAIKAN] Fungsi "Bayar Sekarang"
   Future<void> _handlePayment() async {
     final auth = context.read<AuthProvider>();
     if (auth.token == null || auth.user == null) {
@@ -238,21 +244,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // --- [PERBAIKAN 1: Validasi Alamat] ---
     final String? alamat = auth.user?.alamat;
     if (alamat == null || alamat.isEmpty) {
       setState(() {
         _validationFailed = true;
-      }); // <-- Aktifkan UI Merah
+      });
       _showErrorToast(
         "Harap atur alamat pengiriman Anda terlebih dahulu.",
         Theme.of(context),
       );
-      return; // Stop
+      return;
     }
-    // --- [PERBAIKAN 1 SELESAI] ---
 
-    // Validasi Ongkir & Pembayaran
     bool allSelected = true;
     _tokoStates.forEach((tokoId, state) {
       if (state.selectedOngkirOption == null &&
@@ -273,7 +276,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         "Harap pilih ongkir DAN metode bayar untuk semua toko.",
         Theme.of(context),
       );
-      return; // Stop
+      return;
     }
 
     setState(() {
@@ -299,6 +302,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : null,
             "metode_pembayaran": state.selectedMetodePembayaran,
             "nomor_tujuan": state.selectedNomorTujuan,
+            "nama_penerima": state.selectedNamaPenerima, // <-- [PERBAIKAN]
+            "foto_qris": state.selectedFotoQris,
           });
         });
       } else {
@@ -317,13 +322,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               : null,
           "metode_pembayaran": state.selectedMetodePembayaran,
           "nomor_tujuan": state.selectedNomorTujuan,
+          "nama_penerima": state.selectedNamaPenerima, // <-- [PERBAIKAN]
+          "foto_qris": state.selectedFotoQris,
         };
       }
 
       final response = await _apiService.createOrder(
         token: auth.token!,
         userId: auth.user!.id,
-        alamat: alamat, // <-- [PERBAIKAN] Menggunakan alamat asli
+        alamat: alamat,
         pesananPerToko: pesananPerToko,
         directItem: directItem,
       );
@@ -331,24 +338,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _isLoading = false;
       });
-      final List<dynamic> daftarTransaksi = response['data_pembayaran'];
 
-      showToast(
-        "Checkout Berhasil! ${daftarTransaksi.length} pesanan dibuat.",
-        context: context,
-        backgroundColor: Colors.green,
-        position: StyledToastPosition.top,
-      );
+      final List<dynamic> dataPembayaran = response['data_pembayaran'];
 
       if (widget.itemsByToko != null) {
         context.read<CartProvider>().fetchCart();
       }
 
-      // TODO: Arahkan ke halaman "Belum Dibayar"
-      Navigator.pop(context); // Kembali dari Checkout
-      if (widget.itemsByToko != null) {
-        Navigator.pop(context); // Kembali dari Cart
-      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentInstructionScreen(
+            paymentData: List<Map<String, dynamic>>.from(dataPembayaran),
+          ),
+        ),
+        (route) => route.isFirst,
+      );
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -382,11 +387,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     BuildContext context,
     _CheckoutTokoState tokoState,
   ) {
-    // ... (Seluruh logika _showOngkirModal tidak berubah) ...
+    // ... (Logika tidak berubah) ...
     final theme = Theme.of(context);
     OngkirModel? tempSelected = tokoState.selectedOngkirOption;
     return showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -395,7 +401,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return StatefulBuilder(
           builder: (modalContext, modalSetState) {
             return Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,11 +499,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     BuildContext context,
     _CheckoutTokoState tokoState,
   ) {
-    // ... (Seluruh logika _showPaymentModal tidak berubah) ...
     final theme = Theme.of(context);
     PaymentMethodModel? tempSelected = tokoState.selectedPaymentOption;
     return showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -501,7 +512,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return StatefulBuilder(
           builder: (modalContext, modalSetState) {
             return Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,13 +610,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (UI Build tidak berubah) ...
     final theme = Theme.of(context);
     const double bottomBarHeight = 72.0;
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        // ... (AppBar tidak berubah) ...
         elevation: 1,
         backgroundColor: theme.cardColor,
         centerTitle: true,
@@ -630,13 +645,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- [PERBAIKAN] AddressCard sekarang dinamis ---
                     AddressCard(
                       theme: theme,
                       validationFailed: _validationFailed,
                     ),
                     const SizedBox(height: 18),
-
                     ..._tokoStates.values.map((tokoState) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 18.0),
@@ -653,7 +666,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       );
                     }).toList(),
-
                     CostBreakdownCard(
                       theme: theme,
                       subtotal: _subtotalProduk,
@@ -745,7 +757,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 // --- WIDGET-WIDGET CARD (DIMODIFIKASI) ---
 // =========================================================================
 
-// --- [PERBAIKAN] WIDGET KARTU ALAMAT ---
 class AddressCard extends StatelessWidget {
   final ThemeData theme;
   final bool validationFailed;
@@ -756,7 +767,6 @@ class AddressCard extends StatelessWidget {
     required this.validationFailed,
   });
 
-  // Fungsi navigasi
   void _navigateToEditProfile(BuildContext context) {
     Navigator.push(
       context,
@@ -766,21 +776,16 @@ class AddressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Gunakan Consumer untuk membaca AuthProvider
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
-        // [PERBAIKAN] Cek user & alamat dengan aman
         final user = auth.user;
         final bool hasAddress =
             user != null && user.alamat != null && user.alamat!.isNotEmpty;
-
-        // Cek apakah HARUS error (Gagal validasi DAN tidak punya alamat)
         final bool hasError = validationFailed && !hasAddress;
 
         return Card(
           elevation: 4,
           shadowColor: theme.shadowColor.withOpacity(0.1),
-          // [PERBAIKAN 1] Tampilkan border merah jika error
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: hasError
@@ -790,16 +795,14 @@ class AddressCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: hasAddress
-                // --- TAMPILAN JIKA ALAMAT ADA ---
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // [PERBAIKAN 3] Hapus nomor telepon
                           Text(
-                            user?.name ?? 'Nama Pengguna',
+                            user.name, // [FIX] Linter warning
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -818,8 +821,7 @@ class AddressCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        // [PERBAIKAN] Ini sekarang aman karena ada di 'if (hasAddress)'
-                        user!.alamat!,
+                        user.alamat!, // [FIX] Linter warning
                         style: theme.textTheme.bodyMedium?.copyWith(
                           height: 1.4,
                           color: theme.hintColor,
@@ -827,7 +829,6 @@ class AddressCard extends StatelessWidget {
                       ),
                     ],
                   )
-                // --- TAMPILAN JIKA ALAMAT KOSONG ---
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -841,7 +842,6 @@ class AddressCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // [PERBAIKAN 2] Tombol "Atur"
                       OutlinedButton(
                         onPressed: () => _navigateToEditProfile(context),
                         style: OutlinedButton.styleFrom(
@@ -862,9 +862,7 @@ class AddressCard extends StatelessWidget {
     );
   }
 }
-// --- [PERBAIKAN SELESAI] ---
 
-// --- WIDGET KARTU TOKO ---
 class StoreCard extends StatelessWidget {
   final ThemeData theme;
   final _CheckoutTokoState tokoState;
@@ -883,7 +881,6 @@ class StoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Logika Error tidak berubah) ...
     final bool hasOngkirError =
         validationFailed &&
         tokoState.selectedOngkirOption == null &&
@@ -924,8 +921,6 @@ class StoreCard extends StatelessWidget {
                 )
                 .toList(),
             const Divider(height: 16),
-
-            // Pilihan Ongkir
             Container(
               decoration: BoxDecoration(
                 border: hasOngkirError
@@ -980,8 +975,6 @@ class StoreCard extends StatelessWidget {
                 onTap: tokoState.isLoadingOngkir ? null : onOngkirPressed,
               ),
             ),
-
-            // Pilihan Metode Pembayaran
             const Divider(height: 16),
             Container(
               decoration: BoxDecoration(
@@ -1020,7 +1013,6 @@ class StoreCard extends StatelessWidget {
                 onTap: tokoState.isLoadingPayment ? null : onPaymentPressed,
               ),
             ),
-
             const Divider(height: 16),
             NoteCard(theme: theme, controller: tokoState.noteController),
           ],
@@ -1038,7 +1030,6 @@ class StoreCard extends StatelessWidget {
   }
 }
 
-// --- WIDGET SATU BARIS PRODUK ---
 class ProductRow extends StatelessWidget {
   final ThemeData theme;
   final CartItemModel product;
@@ -1133,7 +1124,6 @@ class ProductRow extends StatelessWidget {
   }
 }
 
-// --- WIDGET KARTU CATATAN ---
 class NoteCard extends StatelessWidget {
   final ThemeData theme;
   final TextEditingController controller;
@@ -1172,14 +1162,13 @@ class NoteCard extends StatelessWidget {
   }
 }
 
-// --- WIDGET KARTU RINCIAN BIAYA ---
 class CostBreakdownCard extends StatelessWidget {
   final ThemeData theme;
   final double subtotal;
   final double ongkir;
   final double biayaLayanan;
   final double total;
-  final int itemCount; // Ini sekarang adalah jumlah TOKO
+  final int itemCount;
   final String Function(double) formatCurrency;
 
   const CostBreakdownCard({

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'dart:io';
 import 'package:intl/intl.dart'; // Diperlukan untuk format tanggal
+import 'package:image_picker/image_picker.dart';
 import 'package:reang_app/models/berita_model.dart';
 import 'package:reang_app/models/jdih_model.dart';
 import 'package:reang_app/models/artikel_sehat_model.dart';
@@ -1869,7 +1870,7 @@ class ApiService {
       }
 
       final response = await _dio.post(
-        '$_baseUrlBackend/transaksi/create', // Endpoint yang benar
+        '$_baseUrlBackend/transaksi/create', // <-- Endpoint yang benar
         data: data,
         options: Options(
           headers: {
@@ -1890,6 +1891,59 @@ class ApiService {
             e.response?.data['error'] ??
             'Gagal terhubung',
       );
+    }
+  }
+  // =======================================================================
+  // --- [FUNGSI BARU] API PAYMENT ---
+  // =======================================================================
+
+  /// Meng-upload bukti pembayaran untuk sebuah transaksi
+  Future<Map<String, dynamic>> uploadBuktiPembayaran({
+    required String token,
+    required String noTransaksi,
+    required XFile imageFile, // File dari image_picker
+  }) async {
+    try {
+      // 1. Dapatkan nama file
+      String fileName = imageFile.path.split('/').last;
+
+      // 2. Buat FormData
+      // Ini adalah cara Dio untuk mengirim file (multipart/form-data)
+      FormData formData = FormData.fromMap({
+        'bukti_pembayaran': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+        // Catatan: Backend Anda (PaymentController) mengharapkan nama field
+        // 'bukti_pembayaran', jadi ini harus cocok.
+      });
+
+      // 3. Kirim data
+      final response = await _dio.post(
+        '$_baseUrlBackend/payment/upload/$noTransaksi', // Endpoint dari PaymentController
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data', // Penting untuk file
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data; // Mengembalikan {'message': 'Upload berhasil...'}
+      } else {
+        throw Exception('Gagal meng-upload bukti');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Gagal terhubung',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
     }
   }
 }

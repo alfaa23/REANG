@@ -383,7 +383,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        // 'ctx' adalah context dari Modal
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             void _incrementModalQuantity() {
@@ -393,7 +392,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                   modalQuantity++;
                 });
               } else {
-                // [PERBAIKAN] Tampilkan toast stok habis di modal
                 _showErrorToast("Jumlah melebihi stok (Stok: $stok)", theme);
               }
             }
@@ -413,7 +411,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
             }
 
             // =================================================================
-            // --- [PERBAIKAN LOGIKA DELAY & NULL CHECK] ---
+            // --- [PERBAIKAN] INI ADALAH FUNGSI _confirmAction YANG BENAR ---
             // =================================================================
             void _confirmAction() async {
               // 1. Validasi Ukuran
@@ -435,17 +433,22 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 listen: false,
               );
 
-              // 3. [PERBAIKAN] Cek Login untuk KEDUA skenario
+              // 3. Cek Login untuk KEDUA skenario
               if (authProvider.token == null || authProvider.user == null) {
                 _showErrorToast("Anda harus login untuk melanjutkan.", theme);
                 return;
               }
 
               if (isBuyNow) {
-                // --- SKENARIO B: BELI LANGSUNG ---
+                // --- SKENARIO B: BELI LANGSUNG (PERBAIKAN ALUR) ---
 
                 // 4a. Tutup Modal
                 if (mounted) Navigator.pop(ctx);
+
+                // [PERBAIKAN] Cek apakah 'nama_toko' ada di map produk
+                // Jika tidak ada, kirim fallback.
+                final String namaToko =
+                    widget.product['nama_toko'] ?? "Toko Penjual";
 
                 // 5a. Navigasi ke Halaman Checkout
                 Navigator.push(
@@ -454,20 +457,22 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                     builder: (context) => CheckoutScreen(
                       directBuyItem: widget.product,
                       directBuyQty: modalQuantity,
+                      directBuyNamaToko:
+                          namaToko, // <-- [PERBAIKAN] Kirim nama toko
                     ),
                   ),
                 );
               } else {
                 // --- SKENARIO A: TAMBAH KE KERANJANG ---
                 try {
-                  // 4b. Panggil 'addToCart' (Ini sekarang CEPAT)
+                  // 4b. Panggil 'addToCart'
                   await cartProvider.addToCart(
                     product: widget.product,
                     quantity: modalQuantity,
                     selectedSize: modalSelectedSize ?? '',
                   );
 
-                  // 5b. Sukses (Toast Cepat)
+                  // 5b. Sukses
                   if (mounted) Navigator.pop(ctx); // Tutup modal
                   showToast(
                     "Produk ditambahkan ke keranjang!",
@@ -478,8 +483,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                     borderRadius: BorderRadius.circular(25),
                   );
 
-                  // 6b. [PERBAIKAN] Refresh keranjang di background
-                  // Panggil fetchCart TANPA await agar tidak delay
+                  // 6b. Refresh keranjang di background
                   cartProvider.fetchCart();
                 } catch (e) {
                   // 7b. Gagal
@@ -495,7 +499,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
             // =================================================================
 
             return ConstrainedBox(
-              // ... (UI Modal tidak berubah) ...
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.8,
               ),
@@ -635,7 +638,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     required bool isSelected,
     required Function(String) onSelect,
   }) {
-    // ... (Tidak berubah) ...
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
     final Color selectedContentColor = isDarkMode ? Colors.black : Colors.white;
@@ -669,7 +671,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     required VoidCallback onDecrement,
     required VoidCallback onIncrement,
   }) {
-    // ... (Tidak berubah) ...
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
@@ -698,7 +699,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     ThemeData theme,
     List<String> specifications,
   ) {
-    // ... (Tidak berubah) ...
     if (specifications.isEmpty) return Container();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -727,7 +727,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
   }
 
   Widget _buildDescriptionSection(ThemeData theme, String description) {
-    // ... (Tidak berubah) ...
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -750,7 +749,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
   }
 
   Widget _buildSimilarProductList(ThemeData theme) {
-    // ... (Tidak berubah) ...
     if (_similarProducts.isEmpty) {
       return Container(
         height: 220,
@@ -773,6 +771,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
           final item = {
             'id': produk.id,
             'id_toko': produk.idToko,
+            'nama_toko': produk.namaToko, // <-- [PENTING] Kirim nama_toko
             'title': produk.nama,
             'subtitle': produk.deskripsi ?? produk.nama,
             'price_final': NumberFormat.currency(
@@ -802,7 +801,6 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
   }
 
   Widget _buildSimilarProductCard(ThemeData theme, Map<String, dynamic> item) {
-    // ... (Tidak berubah) ...
     return SizedBox(
       width: 140,
       child: Card(

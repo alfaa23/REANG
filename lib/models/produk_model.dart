@@ -10,6 +10,7 @@ class ProdukModel {
   final String? lokasi; // Bisa null
   final String? fitur; // Bisa null
   final int stok;
+  final String? namaToko;
 
   ProdukModel({
     required this.id,
@@ -23,6 +24,7 @@ class ProdukModel {
     this.lokasi,
     this.fitur,
     required this.stok,
+    this.namaToko,
   });
 
   // Factory constructor untuk membuat instance dari JSON (Map)
@@ -41,6 +43,7 @@ class ProdukModel {
       lokasi: json['lokasi'],
       fitur: json['fitur'],
       stok: (json['stok'] as num).toInt(),
+      namaToko: json['nama_toko'],
     );
   }
 
