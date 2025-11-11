@@ -1,8 +1,12 @@
+// lib/screens/ecomerce/umkm_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/produk_model.dart';
+// [BARU] Impor model riwayat
+import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'cart_screen.dart';
@@ -28,6 +32,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
   List<ProdukModel> _masterProductList = [];
   List<Map<String, dynamic>> _filteredProducts = [];
 
+  // [BARU] State untuk notifikasi "Belum Dibayar"
+  int _unpaidOrderCount = 0;
+
   // State Paginasi & Error
   int _currentPage = 1;
   bool _hasMorePages = true;
@@ -49,6 +56,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
     super.initState();
     _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
+
+    // [BARU] Panggil hitung notifikasi saat layar dimuat
+    _fetchUnpaidCount();
   }
 
   @override
@@ -62,9 +72,39 @@ class _UmkmScreenState extends State<UmkmScreen> {
   // --- FUNGSI DATA & API ---
   // =========================================================================
 
-  /// [PERBAIKAN 1] Fungsi ini sekarang adalah target untuk RefreshIndicator
+  // [BARU] Fungsi untuk mengambil & menghitung pesanan "Belum Dibayar"
+  Future<void> _fetchUnpaidCount() async {
+    // Cek auth provider
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
+      if (mounted) setState(() => _unpaidOrderCount = 0);
+      return;
+    }
+
+    try {
+      // Panggil API riwayat yang sudah ada
+      final List<RiwayatTransaksiModel> allOrders = await _apiService
+          .fetchRiwayatTransaksi(token: auth.token!, userId: auth.user!.id);
+
+      // Filter HANYA untuk "Belum Dibayar"
+      final count = allOrders
+          .where((order) => order.getTabKategori == 'Belum Dibayar')
+          .length;
+
+      // Update state
+      if (mounted) {
+        setState(() {
+          _unpaidOrderCount = count;
+        });
+      }
+    } catch (e) {
+      // Jika gagal, anggap 0, jangan tampilkan error
+      if (mounted) setState(() => _unpaidOrderCount = 0);
+    }
+  }
+
   Future<void> _fetchInitialProducts() async {
-    // Hanya set state loading jika BUKAN refresh (tarik)
+    // ... (Fungsi ini tidak berubah) ...
     if (!_isLoadingInitial) {
       setState(() {
         _isLoadingInitial = true;
@@ -88,8 +128,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
       _masterProductList = [];
     }
 
-    // Panggil setState setelah delay singkat agar RefreshIndicator
-    // tidak hilang terlalu cepat
     await Future.delayed(const Duration(milliseconds: 300));
 
     if (mounted) {
@@ -101,6 +139,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   Future<void> _fetchMoreProducts() async {
+    // ... (Fungsi ini tidak berubah) ...
     if (_isLoadingMore || !_hasMorePages) return;
     setState(() {
       _isLoadingMore = true;
@@ -126,20 +165,30 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   void _onScroll() {
+    // ... (Fungsi ini tidak berubah) ...
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.9) {
       _fetchMoreProducts();
     }
   }
 
-  /// (Fungsi mapping ini tidak berubah, sudah benar)
   Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
+    // ... (Fungsi ini tidak berubah, pastikan URL ngrok benar) ...
+    String baseUrl = "https://zara-gruffiest-silas.ngrok-free.dev";
+
+    String? fotoUrl = produk.foto;
+    if (fotoUrl != null && !fotoUrl.startsWith('http')) {
+      if (fotoUrl.startsWith('storage/')) {
+        fotoUrl = '$baseUrl/$fotoUrl';
+      } else {
+        fotoUrl = '$baseUrl/storage/$fotoUrl';
+      }
+    }
+
     return {
       'id': produk.id,
       'id_toko': produk.idToko,
-      'image': (produk.foto != null && !produk.foto!.startsWith('http'))
-          ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
-          : produk.foto,
+      'image': fotoUrl,
       'title': produk.nama,
       'subtitle': produk.deskripsi ?? produk.nama,
       'rating': 4.5,
@@ -159,6 +208,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   void _filterProducts() {
+    // ... (Fungsi ini tidak berubah) ...
     _filteredProducts = _masterProductList
         .map((p) => _mapProdukModelToCardData(p))
         .toList();
@@ -172,6 +222,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   // =========================================================================
 
   void _onCategorySelected(int index) {
+    // ... (Fungsi ini tidak berubah) ...
     setState(() {
       _selectedCategoryIndex = index;
     });
@@ -179,16 +230,25 @@ class _UmkmScreenState extends State<UmkmScreen> {
   }
 
   void _navigateToOrderProcess() {
+    // [DIPERBARUI] Tambahkan .then() untuk me-refresh notif saat kembali
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
-    );
+    ).then((_) {
+      // Saat pengguna kembali dari ProsesOrderScreen,
+      // panggil lagi _fetchUnpaidCount() untuk refresh notif
+      _fetchUnpaidCount();
+    });
   }
 
+  // [DIPERBARUI] Ubah menjadi async untuk me-refresh notif
   void _showFabMenu() {
-    // ... (Logika _showFabMenu tidak berubah) ...
+    // 1. Tampilkan modal SECEPAT MUNGKIN.
+    //    Modal ini akan menggunakan angka '_unpaidOrderCount'
+    //    yang sudah ada di state (dari 'initState').
     final authProvider = context.read<AuthProvider>();
     final theme = Theme.of(context);
+
     showModalBottomSheet(
       context: context,
       builder: (ctx) {
@@ -219,7 +279,10 @@ class _UmkmScreenState extends State<UmkmScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
+                    ).then((_) {
+                      // [BARU] Refresh notif setelah login
+                      _fetchUnpaidCount();
+                    });
                   } else {
                     if (authProvider.isUmkm) {
                       Navigator.push(
@@ -244,7 +307,15 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   Icons.receipt_long_outlined,
                   color: theme.hintColor,
                 ),
-                title: const Text('Pesanan Saya'),
+                // [DIPERBARUI] Bungkus title dengan _buildNotificationBadge
+                title: _buildNotificationBadge(
+                  _unpaidOrderCount,
+                  const Text('Pesanan Saya'),
+                  // Set 'showBadge' ke false agar hanya 'Titik' merah
+                  // atau atur styling badge kustom di sini.
+                  // Mari kita buat badge kustom sederhana untuk ListTile
+                  isDense: true, // true berarti badge lebih kecil untuk list
+                ),
                 subtitle: const Text('Lacak semua pesanan produk UMKM Anda'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -258,23 +329,69 @@ class _UmkmScreenState extends State<UmkmScreen> {
     );
   }
 
+  // [BARU] Widget helper untuk membuat badge notifikasi
+  Widget _buildNotificationBadge(
+    int count,
+    Widget child, {
+    bool isDense = false,
+  }) {
+    if (count == 0) {
+      return child; // Jika tidak ada notif, kembalikan widget aslinya
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child, // Widget utama (Tombol FAB atau Teks ListTile)
+        Positioned(
+          // Sesuaikan posisi badge
+          top: isDense ? -4 : 0,
+          right: isDense ? -4 : 0,
+          child: Container(
+            padding: EdgeInsets.all(isDense ? 4 : 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.error, // Warna merah
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                width: 2,
+              ),
+            ),
+            constraints: BoxConstraints(
+              minWidth: isDense ? 18 : 22,
+              minHeight: isDense ? 18 : 22,
+            ),
+            child: Center(
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isDense ? 10 : 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // =========================================================================
   // --- FUNGSI BUILD ---
   // =========================================================================
   @override
   Widget build(BuildContext context) {
+    // ... (Logika kalkulasi grid tidak berubah) ...
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // --- [PERBAIKAN 4] Kalkulasi Grid "Rapat" (ala Shopee) ---
     const double horizontalPadding = 12.0 * 2;
     const double crossAxisSpacing = 8.0;
     final double itemWidth =
         (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    // Card lebih tinggi agar judul 2 baris muat
-    const double heightMultiplier = 1.8; // <-- Disesuaikan
+    const double heightMultiplier = 1.8;
     final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
-    // --- [PERBAIKAN 4 SELESAI] ---
 
     final bottomInset =
         MediaQuery.of(context).padding.bottom +
@@ -282,9 +399,9 @@ class _UmkmScreenState extends State<UmkmScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      // --- [PERBAIKAN 3] AppBar Dibesarkan ---
+      // ... (AppBar tidak berubah) ...
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(65.0), // <-- Dibesarkan
+        preferredSize: const Size.fromHeight(65.0),
         child: AppBar(
           automaticallyImplyLeading: false,
           title: SafeArea(
@@ -326,7 +443,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 12, // <-- Dibesarkan
+                          vertical: 12,
                         ),
                         decoration: BoxDecoration(
                           color: theme.cardColor,
@@ -365,7 +482,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.shopping_cart_outlined),
-                    iconSize: 28.0, // <-- Dibesarkan
+                    iconSize: 28.0,
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -384,13 +501,12 @@ class _UmkmScreenState extends State<UmkmScreen> {
           foregroundColor: theme.colorScheme.onSurface,
         ),
       ),
-      // --- [PERBAIKAN 5 & 7] Body di-refactor ---
       body: Stack(
         children: [
+          // ... (Column dan Kategori tidak berubah) ...
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // --- WIDGET 1: Category Chips (Sticky) ---
               SizedBox(
                 height: 70,
                 child: ListView.builder(
@@ -438,14 +554,13 @@ class _UmkmScreenState extends State<UmkmScreen> {
                 ),
               ),
 
-              // --- WIDGET 2: Bagian Scrollable (Refresh + Header + Grid) ---
+              // ... (Expanded, RefreshIndicator, CustomScrollView tidak berubah) ...
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: _fetchInitialProducts, // <-- [PERBAIKAN 1]
+                  onRefresh: _fetchInitialProducts,
                   child: CustomScrollView(
                     controller: _scrollController,
                     slivers: [
-                      // --- SLIVER 1: Header "Hasil Produk" (Scrollable) ---
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(
@@ -463,7 +578,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              // (Tampilkan jumlah hanya jika tidak loading)
                               if (!_isLoadingInitial && _apiError == null)
                                 Text(
                                   '${_masterProductList.length} produk',
@@ -475,7 +589,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                           ),
                         ),
                       ),
-                      // --- SLIVER 2: Grid Produk (Loading/Error/Grid) ---
                       _buildProductGrid(childAspectRatio, bottomInset),
                     ],
                   ),
@@ -483,7 +596,8 @@ class _UmkmScreenState extends State<UmkmScreen> {
               ),
             ],
           ),
-          // --- FAB (Tidak berubah) ---
+
+          // --- [DIPERBARUI] FAB (Floating Action Button) ---
           Align(
             alignment: Alignment.bottomRight,
             child: Padding(
@@ -494,13 +608,17 @@ class _UmkmScreenState extends State<UmkmScreen> {
               child: SizedBox(
                 width: 55.0,
                 height: 55.0,
-                child: FloatingActionButton(
-                  onPressed: _showFabMenu,
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  elevation: 6.0,
-                  tooltip: 'Menu Saya',
-                  child: const Icon(Icons.apps_outlined, size: 28),
+                // [DIPERBARUI] Bungkus FAB dengan Badge
+                child: _buildNotificationBadge(
+                  _unpaidOrderCount, // Gunakan state count
+                  FloatingActionButton(
+                    onPressed: _showFabMenu,
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    elevation: 6.0,
+                    tooltip: 'Menu Saya',
+                    child: const Icon(Icons.apps_outlined, size: 28),
+                  ),
                 ),
               ),
             ),
@@ -510,18 +628,15 @@ class _UmkmScreenState extends State<UmkmScreen> {
     );
   }
 
-  /// [PERBAIKAN 1, 2, 5]
-  /// Widget helper ini di-refactor untuk mengembalikan Sliver
+  // ... (Fungsi _buildProductGrid tidak berubah) ...
   Widget _buildProductGrid(double childAspectRatio, double bottomInset) {
     if (_isLoadingInitial) {
-      // Tampilkan loading di sisa layar
       return const SliverFillRemaining(
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_apiError != null) {
-      // [PERBAIKAN 2] Tampilkan error di sisa layar, bisa di-refresh
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -560,15 +675,12 @@ class _UmkmScreenState extends State<UmkmScreen> {
       );
     }
 
-    // [PERBAIKAN 5] Kembalikan SliverPadding + SliverGrid
     return SliverPadding(
-      // [PERBAIKAN 4] Padding grid "rapat"
       padding: EdgeInsets.fromLTRB(12.0, 0, 12.0, bottomInset + 80),
       sliver: SliverGrid.builder(
         itemCount: _filteredProducts.length + (_hasMorePages ? 1 : 0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          // [PERBAIKAN 4] Spasi grid "rapat"
           crossAxisSpacing: 8.0,
           mainAxisSpacing: 8.0,
           childAspectRatio: childAspectRatio,
@@ -596,14 +708,14 @@ class _UmkmScreenState extends State<UmkmScreen> {
 }
 
 // =========================================================================
-// --- ProductCard (DIMODIFIKASI UNTUK PERBAIKAN 1 & 4) ---
+// --- ProductCard (Tidak Berubah) ---
 // =========================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const ProductCard({required this.product, super.key});
 
-  /// (Helper _buildProductImage tidak berubah)
   Widget _buildProductImage(String? imageUrl, BuildContext context) {
+    // ... (Fungsi ini tidak berubah) ...
     if (imageUrl == null || imageUrl.isEmpty) {
       return Container(
         width: double.infinity,
@@ -654,115 +766,101 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ... (Fungsi ini tidak berubah) ...
     final theme = Theme.of(context);
     final Color priceColor = theme.colorScheme.primary;
 
     return Card(
-      // [PERBAIKAN 4] Desain "Rapat" (ala Shopee)
       elevation: 1.0,
       shadowColor: theme.shadowColor.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6.0), // <-- Ujung tidak melengkung
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.0)),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // --- FOTO PRODUK (TETAP) ---
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: Hero(
-                  tag: 'produk-${product['id']}',
-                  child: _buildProductImage(product['image'], context),
-                ),
-              ),
-            ],
+          AspectRatio(
+            aspectRatio: 1,
+            child: Hero(
+              tag: 'produk-${product['id']}',
+              child: _buildProductImage(product['image'], context),
+            ),
           ),
-
-          // --- [PERBAIKAN 1 & 4] ---
-          // Bagian teks "rapat", tidak "renggang", dan tidak "panjang"
-          Padding(
-            padding: const EdgeInsets.all(6.0), // <-- Padding dikurangi
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              // mainAxisAlignment: MainAxisAlignment.spaceBetween (DIHAPUS)
-              children: [
-                // [PERBAIKAN 1] Judul lebih besar, max 2 baris
-                Text(
-                  product['title'] ?? '', // <-- DULU 'subtitle'
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    // <-- LEBIH BESAR
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4), // <-- Spasi rapat
-                Text(
-                  product['price_final']!,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: priceColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6), // <-- Spasi rapat
-                // Baris Rating & Stok
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: Colors.amber.shade700,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          product['rating'].toString(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['title'] ?? 'Nama Produk',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
                     ),
-                    Text(
-                      'Stok: ${product['sold']}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product['price_final']!,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: priceColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber.shade700,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            product['rating'].toString(),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4), // <-- Spasi rapat
-                // Baris Lokasi
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      color: theme.hintColor,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-
-                    // [PERBAIKAN] Bungkus Text dengan Expanded
-                    Expanded(
-                      child: Text(
-                        product['location'] ??
-                            'Lokasi tidak diketahui', // <-- Tambah ??
+                      Text(
+                        'Stok: ${product['sold']}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
-
-                        // [PERBAIKAN] Tambahkan properti ini
-                        maxLines: 1, // <-- Hanya 1 baris
-                        overflow: TextOverflow.ellipsis, // <-- Tampilkan '...'
-                        softWrap: false, // <-- Jangan coba-coba wrap
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: theme.hintColor,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          product['location'] ?? 'Lokasi tidak diketahui',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],

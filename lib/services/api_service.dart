@@ -30,6 +30,8 @@ import 'package:reang_app/models/produk_model.dart';
 import 'package:reang_app/models/cart_item_model.dart';
 import 'package:reang_app/models/ongkir_model.dart';
 import 'package:reang_app/models/payment_method_model.dart';
+import 'package:reang_app/models/riwayat_transaksi_model.dart';
+import 'package:reang_app/models/detail_transaksi_response.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -1935,6 +1937,116 @@ class ApiService {
         return response.data; // Mengembalikan {'message': 'Upload berhasil...'}
       } else {
         throw Exception('Gagal meng-upload bukti');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Gagal terhubung',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+  // =======================================================================
+  // --- [FUNGSI BARU] API RIWAYAT TRANSAKSI ---
+  // =======================================================================
+
+  /// Mengambil daftar semua riwayat transaksi pengguna
+  Future<List<RiwayatTransaksiModel>> fetchRiwayatTransaksi({
+    required String token,
+    required int userId,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/transaksi/riwayat/$userId', // Endpoint dari TransaksiController
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        // Ubah List<dynamic> menjadi List<RiwayatTransaksiModel>
+        final List<dynamic> responseData = response.data;
+        return responseData
+            .map((json) => RiwayatTransaksiModel.fromJson(json))
+            .toList();
+      } else {
+        throw Exception('Gagal memuat riwayat transaksi');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Gagal terhubung',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  /// Mengambil detail satu transaksi
+  Future<DetailTransaksiResponse> fetchDetailTransaksi({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/transaksi/detail/$noTransaksi', // Endpoint dari TransaksiController
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        // Backend Anda mengembalikan { "transaksi": {...}, "items": [...] }
+        // Kita gunakan model DetailTransaksiResponse
+        return DetailTransaksiResponse.fromJson(response.data);
+      } else {
+        throw Exception('Gagal memuat detail transaksi');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Gagal terhubung',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  // =======================================================================
+  // --- [FUNGSI BARU] API BATALKAN PESANAN ---
+  // =======================================================================
+
+  /// Mengirim permintaan untuk membatalkan pesanan
+  Future<Map<String, dynamic>> batalkanPesanan({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      // Asumsi endpoint Anda adalah 'POST'
+      final response = await _dio.post(
+        '$_baseUrlBackend/transaksi/batalkan/$noTransaksi',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data; // Mengembalikan {'message': 'Pesanan dibatalkan'}
+      } else {
+        throw Exception('Gagal membatalkan pesanan');
       }
     } on DioException catch (e) {
       throw Exception(
