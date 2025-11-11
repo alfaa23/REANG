@@ -27,7 +27,8 @@ import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/models/panic_kontak_model.dart';
 import 'package:reang_app/models/produk_model.dart';
 import 'package:reang_app/models/cart_item_model.dart';
-import 'package:reang_app/models/OngkirModel.dart';
+import 'package:reang_app/models/ongkir_model.dart';
+import 'package:reang_app/models/payment_method_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -1616,42 +1617,29 @@ class ApiService {
   }
 
   // =======================================================================
-  // API PRODUK UMKM (FUNGSI INI DIUBAH)
+  // --- API PRODUK ---
   // =======================================================================
   Future<PaginationResponseModel<ProdukModel>> fetchProdukPaginated({
     required int page,
-    String? fitur, // Ini adalah 'baju', 'elektronik', atau 'Semua'
+    String? fitur,
     String? query,
   }) async {
     try {
-      // --- LOGIKA BARU UNTUK MEMILIH ENDPOINT ---
       String endpoint;
       final Map<String, dynamic> queryParams = {'page': page};
-
-      // 1. Tentukan Endpoint
-      if (fitur != null && fitur != 'Semua') {
-        // Jika ada filter (dan bukan "Semua"), gunakan rute baru
-        // Meng-encode 'fitur' untuk keamanan jika ada spasi, dll.
+      if (query != null && query.isNotEmpty) {
+        endpoint = '$_baseUrlBackend/produk/show';
+        queryParams['q'] = query;
+      } else if (fitur != null && fitur != 'Semua') {
         final kategoriEncoded = Uri.encodeComponent(fitur);
         endpoint = '$_baseUrlBackend/produk/kategori/$kategoriEncoded';
       } else {
-        // Jika "Semua", gunakan rute 'index'
         endpoint = '$_baseUrlBackend/produk/show';
       }
-
-      // 2. Tentukan Parameter Pencarian (q)
       if (query != null && query.isNotEmpty) {
         queryParams['q'] = query;
       }
-      // 'fitur' TIDAK lagi dimasukkan ke queryParams
-      // --- AKHIR LOGIKA BARU ---
-
-      // Panggilan Dio sekarang dinamis
-      final response = await _dio.get(
-        endpoint, // <-- Menggunakan endpoint yang dinamis
-        queryParameters: queryParams,
-      );
-
+      final response = await _dio.get(endpoint, queryParameters: queryParams);
       if (response.statusCode == 200) {
         final responseData = response.data;
         return PaginationResponseModel<ProdukModel>(
@@ -1669,42 +1657,27 @@ class ApiService {
     }
   }
 
-  /// Mengambil daftar string sugesti pencarian dari API.
-  /// Contoh: /api/produk/suggestions?q=baju
   Future<List<String>> getSearchSuggestions(String query) async {
-    // Jangan panggil API jika query kosong
-    if (query.isEmpty) {
-      return [];
-    }
-
+    if (query.isEmpty) return [];
     try {
       final response = await _dio.get(
         '$_baseUrlBackend/produk/suggestions',
         queryParameters: {'q': query},
       );
-
       if (response.statusCode == 200 && response.data is List) {
-        // API mengembalikan List<dynamic> (karena JSON),
-        // kita ubah menjadi List<String>
-        final List<String> suggestions = List<String>.from(response.data);
-        return suggestions;
+        return List<String>.from(response.data);
       } else {
-        // Gagal mengambil atau format tidak sesuai
         return [];
       }
     } catch (e) {
-      // Jika terjadi error (misal: network error),
-      // kembalikan list kosong agar aplikasi tidak crash
       debugPrint('Error fetching suggestions: $e');
       return [];
     }
   }
 
   // =======================================================================
-  // API KERANJANG (BARU)
+  // --- API KERANJANG ---
   // =======================================================================
-
-  /// Mengirim data produk ke keranjang di server
   Future<Map<String, dynamic>> addToCart({
     required String token,
     required int userId,
@@ -1715,7 +1688,7 @@ class ApiService {
   }) async {
     try {
       final response = await _dio.post(
-        '$_baseUrlBackend/keranjang/create', // Endpoint Anda
+        '$_baseUrlBackend/keranjang/create',
         data: {
           'id_user': userId,
           'id_toko': tokoId,
@@ -1730,22 +1703,14 @@ class ApiService {
           },
         ),
       );
-
-      // API Anda mengembalikan { "message": "..." }
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data;
-      } else {
-        throw Exception('Gagal menambahkan ke keranjang');
-      }
+      return response.data;
     } on DioException catch (e) {
-      // Menangani error jika produk sudah ada, dll.
       throw Exception(
         e.response?.data['message'] ?? 'Gagal terhubung ke server',
       );
     }
   }
 
-  /// Mengambil semua item keranjang milik user
   Future<List<CartItemModel>> getCart({
     required String token,
     required int userId,
@@ -1760,9 +1725,7 @@ class ApiService {
           },
         ),
       );
-
       if (response.statusCode == 200 && response.data is List) {
-        // API Anda mengembalikan List<Map>
         final List<CartItemModel> items = (response.data as List)
             .map((json) => CartItemModel.fromJson(json))
             .toList();
@@ -1776,10 +1739,9 @@ class ApiService {
     }
   }
 
-  /// Update jumlah item di keranjang
   Future<Map<String, dynamic>> updateCartQuantity({
     required String token,
-    required int cartItemId, // <-- ID baris keranjang
+    required int cartItemId,
     required int newQuantity,
   }) async {
     try {
@@ -1793,16 +1755,15 @@ class ApiService {
           },
         ),
       );
-      return response.data; // Mengembalikan { "message": "..." }
+      return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Gagal update jumlah');
     }
   }
 
-  /// Menghapus item dari keranjang
   Future<Map<String, dynamic>> removeFromCart({
     required String token,
-    required int cartItemId, // <-- ID baris keranjang
+    required int cartItemId,
   }) async {
     try {
       final response = await _dio.delete(
@@ -1814,13 +1775,72 @@ class ApiService {
           },
         ),
       );
-      return response.data; // Mengembalikan { "message": "..." }
+      return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Gagal menghapus item');
     }
   }
+
   // =======================================================================
-  // --- API CHECKOUT / TRANSAKSI (PEROMBAKAN TOTAL) ---
+  // --- API ONGKIR & PAYMENT METHODS ---
+  // =======================================================================
+
+  Future<List<OngkirModel>> getOngkirOptions({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/ongkir/$idToko', // (Asumsi ini endpoint Anda)
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode == 200 && response.data['status'] == true) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => OngkirModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Gagal memuat data ongkir');
+      }
+    } on DioException catch (e) {
+      debugPrint("Error getOngkirOptions: $e");
+      throw Exception(e.response?.data['message'] ?? 'Gagal mengambil ongkir');
+    }
+  }
+
+  Future<List<PaymentMethodModel>> getPaymentMethodsForToko({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/metode/show/$idToko',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      if (response.statusCode == 200 && response.data['status'] == true) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => PaymentMethodModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Gagal memuat metode pembayaran');
+      }
+    } on DioException catch (e) {
+      debugPrint("Error getPaymentMethodsForToko: $e");
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal mengambil metode bayar',
+      );
+    }
+  }
+
+  // =======================================================================
+  // --- API CHECKOUT / TRANSAKSI (PERBAIKAN FINAL) ---
   // =======================================================================
 
   /// Mengirim data checkout ke server untuk membuat transaksi
@@ -1828,34 +1848,29 @@ class ApiService {
     required String token,
     required int userId,
     required String alamat,
-    required String metodePembayaran,
 
-    // --- [PERBAIKAN] Mengirim data per toko atau Beli Langsung ---
+    // --- [PERBAIKAN] 'metodePembayaran' global DIHAPUS ---
+    // required String metodePembayaran,
+    // --- [PERBAIKAN SELESAI] ---
     List<Map<String, dynamic>>? pesananPerToko, // Skenario A (Multi-toko)
     Map<String, dynamic>? directItem, // Skenario B (Beli Langsung)
   }) async {
     try {
       // Siapkan data dasar
-      Map<String, dynamic> data = {
-        'id_user': userId,
-        'alamat': alamat,
-        'metode_pembayaran': metodePembayaran,
-      };
+      Map<String, dynamic> data = {'id_user': userId, 'alamat': alamat};
 
       // Tambahkan data berdasarkan skenario
       if (pesananPerToko != null && pesananPerToko.isNotEmpty) {
-        // Skenario A: Checkout Keranjang Multi-Toko
         data['pesanan_per_toko'] = pesananPerToko;
       } else if (directItem != null) {
-        // Skenario B: Beli Langsung
         data['direct_item'] = directItem;
       } else {
         throw Exception("Tidak ada item yang di-checkout.");
       }
 
       final response = await _dio.post(
-        '$_baseUrlBackend/transaksi/create', // <-- Endpoint yang benar
-        data: data, // Kirim data yang sudah disiapkan
+        '$_baseUrlBackend/transaksi/create', // Endpoint yang benar
+        data: data,
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1865,7 +1880,6 @@ class ApiService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Mengembalikan { message, no_pembayaran, ... }
         return response.data;
       } else {
         throw Exception('Gagal membuat pesanan');
@@ -1876,41 +1890,6 @@ class ApiService {
             e.response?.data['error'] ??
             'Gagal terhubung',
       );
-    }
-  }
-  // =======================================================================
-  // --- API ONGKIR (BARU) ---
-  // =======================================================================
-
-  /// Mengambil opsi ongkir untuk satu toko
-  Future<List<OngkirModel>> getOngkirOptions({
-    required String token,
-    required int idToko,
-    // TODO: Anda mungkin perlu 'id_kota_tujuan' di sini
-    // required String idKotaTujuan,
-  }) async {
-    try {
-      // Kita asumsikan endpoint ini butuh token
-      final response = await _dio.get(
-        '$_baseUrlBackend/ongkir/$idToko',
-        // queryParameters: {'tujuan': idKotaTujuan}, // Contoh jika perlu
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      if (response.statusCode == 200 && response.data['status'] == true) {
-        final List<dynamic> data = response.data['data'];
-        return data.map((json) => OngkirModel.fromJson(json)).toList();
-      } else {
-        throw Exception('Gagal memuat data ongkir');
-      }
-    } on DioException catch (e) {
-      debugPrint("Error getOngkirOptions: $e");
-      throw Exception(e.response?.data['message'] ?? 'Gagal mengambil ongkir');
     }
   }
 }

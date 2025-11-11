@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
 
 // --- DUMMY DATA ---
-// (Kita asumsikan path gambar sudah benar di 'assets/images/nama_file.webp')
+// [PERBAIKAN] Menambahkan 2 item baru untuk 'Belum Dibayar'
 final List<Map<String, dynamic>> dummyOrders = [
   {
     'store': 'Apple Store Official',
-    'status': 'Sedang Dikemas',
+    'status': 'Belum Dibayar',
     'product_name': 'iPhone 15 Pro Max 256GB',
     'price': 'Rp 18.999.000',
     'quantity': 1,
-    'date': '25 Okt 2025',
-    'eta': '28-30 Okt 2025',
-    'image': 'assets/images/elektronik.webp', // Ganti dengan path gambar Anda
-    'tab': 'Dikemas',
+    'date': '05 Nov 2025',
+    'eta': 'Bayar sebelum 06 Nov, 12:00', // ETA diubah jadi batas bayar
+    'image': 'assets/images/elektronik.webp',
+    'tab': 'Belum Dibayar', // Tab baru
+  },
+  {
+    'store': 'Garmen Lokal',
+    'status': 'Belum Dibayar',
+    'product_name': 'Jaket Kulit Asli',
+    'price': 'Rp 750.000',
+    'quantity': 1,
+    'date': '05 Nov 2025',
+    'eta': 'Bayar sebelum 06 Nov, 12:00',
+    'image': 'assets/images/baju.webp',
+    'tab': 'Belum Dibayar', // Tab baru
   },
   {
     'store': 'Samsung Official Store',
@@ -22,7 +33,7 @@ final List<Map<String, dynamic>> dummyOrders = [
     'quantity': 1,
     'date': '24 Okt 2025',
     'eta': '27-29 Okt 2025',
-    'image': 'assets/images/elektronik.webp', // Ganti dengan path gambar Anda
+    'image': 'assets/images/elektronik.webp',
     'tab': 'Dikemas',
   },
   {
@@ -33,18 +44,18 @@ final List<Map<String, dynamic>> dummyOrders = [
     'quantity': 2,
     'date': '20 Okt 2025',
     'eta': '23-25 Okt 2025',
-    'image': 'assets/images/elektronik.webp', // Ganti dengan path gambar Anda
+    'image': 'assets/images/elektronik.webp',
     'tab': 'Dikirim',
   },
   {
-    'store': 'Garmen Lokal',
+    'store': 'Toko Lain',
     'status': 'Dibatalkan',
     'product_name': 'Kaos Polo Premium',
     'price': 'Rp 199.000',
     'quantity': 3,
     'date': '15 Okt 2025',
     'eta': 'Dibatalkan',
-    'image': 'assets/images/baju.webp', // Ganti dengan path gambar Anda
+    'image': 'assets/images/baju.webp',
     'tab': 'Dibatalkan',
   },
   {
@@ -55,14 +66,21 @@ final List<Map<String, dynamic>> dummyOrders = [
     'quantity': 1,
     'date': '11 Okt 2025',
     'eta': 'Selesai',
-    'image': 'assets/images/elektronik.webp', // Ganti dengan path gambar Anda
+    'image': 'assets/images/elektronik.webp',
     'tab': 'Selesai',
   },
 ];
 
 // Menghitung jumlah pesanan untuk badge tab
 Map<String, int> getTabCounts(List<Map<String, dynamic>> orders) {
-  final counts = {'Dikemas': 0, 'Dikirim': 0, 'Selesai': 0, 'Dibatalkan': 0};
+  // [PERBAIKAN] Tambahkan 'Belum Dibayar' ke penghitungan
+  final counts = {
+    'Belum Dibayar': 0,
+    'Dikemas': 0,
+    'Dikirim': 0,
+    'Selesai': 0,
+    'Dibatalkan': 0,
+  };
   for (var order in orders) {
     if (counts.containsKey(order['tab'])) {
       counts[order['tab']] = counts[order['tab']]! + 1;
@@ -77,12 +95,22 @@ class ProsesOrderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tabCounts = getTabCounts(dummyOrders);
-    // Tentukan urutan tab secara manual
-    final tabs = ['Dikemas', 'Dikirim', 'Selesai', 'Dibatalkan'];
+
+    // [PERBAIKAN] Tambahkan 'Belum Dibayar' di urutan PERTAMA
+    final tabs = [
+      'Belum Dibayar',
+      'Dikemas',
+      'Dikirim',
+      'Selesai',
+      'Dibatalkan',
+    ];
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: tabs.length,
+      length: tabs.length, // <-- Otomatis jadi 5
+      // [PERBAIKAN] Kita bisa set 'initialIndex' jika mau,
+      // tapi 0 (Belum Dibayar) sudah default.
+      // initialIndex: 0,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Pesanan Saya'),
@@ -112,33 +140,33 @@ class ProsesOrderScreen extends StatelessWidget {
                   children: [
                     Text(tab),
                     const SizedBox(width: 8),
-                    // Badge Merah untuk jumlah pesanan
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: count > 0
+                        // [PERBAIKAN] 'Belum Dibayar' juga pakai warna merah
+                        color:
+                            count > 0 &&
+                                (tab == 'Belum Dibayar' || tab == 'Dikemas')
                             ? theme
                                   .colorScheme
                                   .error // Warna merah
-                            : theme
-                                  .colorScheme
-                                  .surfaceContainerHighest, // Warna abu-abu
+                            : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         count.toString(),
                         style: TextStyle(
                           fontSize: 12,
-                          color: count > 0
+                          color:
+                              count > 0 &&
+                                  (tab == 'Belum Dibayar' || tab == 'Dikemas')
                               ? theme
                                     .colorScheme
                                     .onError // Putih
-                              : theme
-                                    .colorScheme
-                                    .onSurfaceVariant, // Abu-abu gelap
+                              : theme.colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -205,11 +233,10 @@ class OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Menggunakan warna dari theme data
     final Color primaryColor = theme.colorScheme.primary;
     final Color onPrimaryColor = theme.colorScheme.onPrimary;
 
-    // Tentukan warna status berdasarkan tab
+    // [PERBAIKAN] Logika warna status
     Color statusColor;
     switch (order['tab']) {
       case 'Selesai':
@@ -218,9 +245,15 @@ class OrderCard extends StatelessWidget {
       case 'Dibatalkan':
         statusColor = theme.colorScheme.error;
         break;
-      default:
+      case 'Belum Dibayar': // <-- Tambahkan case baru
+        statusColor = theme.colorScheme.error; // Pakai warna merah
+        break;
+      default: // 'Dikemas' dan 'Dikirim'
         statusColor = primaryColor;
     }
+
+    // [PERBAIKAN] Cek apakah ini tab "Belum Dibayar"
+    final bool isUnpaid = order['tab'] == 'Belum Dibayar';
 
     return Card(
       elevation: 1,
@@ -236,7 +269,7 @@ class OrderCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.store_outlined, // Ikon toko
+                  Icons.store_outlined,
                   size: 18,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -265,7 +298,6 @@ class OrderCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Gambar Produk (80x80)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.asset(
@@ -273,7 +305,6 @@ class OrderCard extends StatelessWidget {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    // Error builder jika gambar tidak ditemukan
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         width: 80,
@@ -366,13 +397,17 @@ class OrderCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        Icons.local_shipping_outlined,
+                        // [PERBAIKAN] Ganti ikon jika belum dibayar
+                        isUnpaid
+                            ? Icons.access_time_filled_outlined
+                            : Icons.local_shipping_outlined,
                         size: 14,
                         color: theme.hintColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Estimasi Tiba:',
+                        // [PERBAIKAN] Ganti label jika belum dibayar
+                        isUnpaid ? 'Batas Pembayaran:' : 'Estimasi Tiba:',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
@@ -392,7 +427,9 @@ class OrderCard extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // TOMBOL AKSI
+            // --- [PERBAIKAN] TOMBOL AKSI ---
+            // Tampilkan tombol "Bayar" jika 'isUnpaid',
+            // atau tombol "Lihat Detail" jika tidak.
             Row(
               children: [
                 Expanded(
@@ -413,21 +450,44 @@ class OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Aksi Hubungi Penjual
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: onPrimaryColor,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 1,
-                    ),
-                    child: const Text('Hubungi Penjual'),
-                  ),
+                  child: isUnpaid
+                      // --- TAMPILKAN TOMBOL "BAYAR" ---
+                      ? ElevatedButton(
+                          onPressed: () {
+                            // TODO: Nanti panggil halaman instruksi bayar
+                            // Navigator.push(context, MaterialPageRoute(
+                            //   builder: (context) => PaymentInstructionScreen(
+                            //     noTransaksi: order['no_transaksi'], // Kirim No Transaksi
+                            //   )
+                            // ));
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.colorScheme.error, // Merah
+                            foregroundColor: theme.colorScheme.onError, // Putih
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 1,
+                          ),
+                          child: const Text('Bayar Sekarang'),
+                        )
+                      // --- ATAU TAMPILKAN TOMBOL "HUBUNGI" ---
+                      : ElevatedButton(
+                          onPressed: () {
+                            // TODO: Aksi Hubungi Penjual
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: onPrimaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 1,
+                          ),
+                          child: const Text('Hubungi Penjual'),
+                        ),
                 ),
               ],
             ),

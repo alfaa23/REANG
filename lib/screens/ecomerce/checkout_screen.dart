@@ -2,25 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/cart_item_model.dart';
-import 'package:reang_app/models/OngkirModel.dart';
+import 'package:reang_app/models/ongkir_model.dart';
+import 'package:reang_app/models/payment_method_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
+import 'dart:collection';
 import 'package:reang_app/providers/cart_provider.dart';
+import 'package:reang_app/models/user_model.dart';
+// [PERBAIKAN] Import halaman edit profile
+import 'package:reang_app/screens/profile/edit_profile_screen.dart';
 
-// Helper class untuk menyimpan state per toko
+// (Helper class _CheckoutTokoState tidak berubah)
 class _CheckoutTokoState {
   final int tokoId;
   final String namaToko;
   final List<CartItemModel> items;
   final TextEditingController noteController;
-
   List<OngkirModel> ongkirOptions = [];
   bool isLoadingOngkir = true;
   String? ongkirError;
-
-  // [PERBAIKAN 1] Dibuat nullable, tidak ada nilai default
   OngkirModel? selectedOngkirOption;
+  List<PaymentMethodModel> paymentOptions = [];
+  bool isLoadingPayment = true;
+  String? paymentError;
+  PaymentMethodModel? selectedPaymentOption;
 
   _CheckoutTokoState({
     required this.tokoId,
@@ -36,12 +42,13 @@ class _CheckoutTokoState {
     return items.fold(0.0, (sum, item) => sum + item.subtotal);
   }
 
-  // Getter dinamis (otomatis 0.0 jika selectedOngkirOption null)
   double get selectedOngkir => selectedOngkirOption?.harga ?? 0.0;
   String get selectedJasaPengiriman =>
       selectedOngkirOption?.daerah ?? "Belum dipilih";
+  String get selectedMetodePembayaran =>
+      selectedPaymentOption?.namaMetode ?? "Belum dipilih";
+  String get selectedNomorTujuan => selectedPaymentOption?.nomorTujuan ?? "";
 }
-// =========================================================================
 
 class CheckoutScreen extends StatefulWidget {
   final Map<int, List<CartItemModel>>? itemsByToko;
@@ -65,24 +72,19 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Map<int, _CheckoutTokoState> _tokoStates;
-
   double _subtotalProduk = 0;
   double _subtotalOngkir = 0;
   double _biayaLayanan = 5000;
   double _totalPembayaran = 0;
-
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
-
-  // --- [PERBAIKAN 3] State untuk UI Error ---
   bool _validationFailed = false;
-  // --- [PERBAIKAN 3 SELESAI] ---
 
   @override
   void initState() {
     super.initState();
     _tokoStates = {};
-    _buildDisplayItemsAndFetchOngkir();
+    _buildDisplayItemsAndFetchData();
     _calculateTotals();
   }
 
@@ -92,7 +94,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  void _buildDisplayItemsAndFetchOngkir() {
+  void _buildDisplayItemsAndFetchData() {
     final String? token = context.read<AuthProvider>().token;
     if (token == null) {
       return;
@@ -108,6 +110,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
         _tokoStates[tokoId] = state;
         _fetchOngkirForToko(state, token);
+        _fetchPaymentMethodsForToko(state, token);
       });
     } else {
       // Skenario B: Beli Langsung
@@ -134,8 +137,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         subtotal: (harga * qty),
         namaProduk: itemMap['title'],
         foto: itemMap['image'],
-        namaToko:
-            "Nama Toko (dari API Produk)", // TODO: API Produk perlu kirim nama_toko
+        // [PERBAIKAN] Ambil nama toko dari data produk jika ada
+        namaToko: itemMap['nama_toko'] ?? "Pesanan Anda",
         lokasiToko: itemMap['location'],
         variasi: itemMap['variasi'],
       );
@@ -147,31 +150,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       _tokoStates[fakeCartItem.idToko] = state;
       _fetchOngkirForToko(state, token);
+      _fetchPaymentMethodsForToko(state, token);
     }
   }
 
-  /// [PERBAIKAN 1] Fungsi untuk memanggil API ongkir per toko
   Future<void> _fetchOngkirForToko(
     _CheckoutTokoState tokoState,
     String token,
   ) async {
+    // ... (Fungsi ini tidak berubah) ...
     try {
       final options = await _apiService.getOngkirOptions(
         token: token,
         idToko: tokoState.tokoId,
       );
-
       if (mounted) {
         setState(() {
           tokoState.ongkirOptions = options;
           tokoState.isLoadingOngkir = false;
-
-          // --- [PERBAIKAN 1] HAPUS AUTO-SELECT ---
-          // if (options.isNotEmpty) {
-          //   tokoState.selectedOngkirOption = options.first;
-          //   _calculateTotals(); // Hitung ulang total
-          // }
-          // --- [PERBAIKAN 1 SELESAI] ---
         });
       }
     } catch (e) {
@@ -184,16 +180,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  /// Helper untuk menghitung total harga
+  Future<void> _fetchPaymentMethodsForToko(
+    _CheckoutTokoState tokoState,
+    String token,
+  ) async {
+    // ... (Fungsi ini tidak berubah) ...
+    try {
+      final options = await _apiService.getPaymentMethodsForToko(
+        token: token,
+        idToko: tokoState.tokoId,
+      );
+      if (mounted) {
+        setState(() {
+          tokoState.paymentOptions = options;
+          tokoState.isLoadingPayment = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          tokoState.paymentError = e.toString().replaceAll('Exception: ', '');
+          tokoState.isLoadingPayment = false;
+        });
+      }
+    }
+  }
+
   void _calculateTotals() {
+    // ... (Fungsi ini tidak berubah) ...
     double newSubtotalProduk = 0;
     double newSubtotalOngkir = 0;
-
     _tokoStates.values.forEach((toko) {
       newSubtotalProduk += toko.subtotalToko;
       newSubtotalOngkir += toko.selectedOngkir;
     });
-
     setState(() {
       _subtotalProduk = newSubtotalProduk;
       _subtotalOngkir = newSubtotalOngkir;
@@ -202,6 +222,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   String _formatCurrency(double value) {
+    // ... (Fungsi ini tidak berubah) ...
     return NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -209,7 +230,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ).format(value);
   }
 
-  /// [PERBAIKAN 2] Fungsi "Bayar Sekarang" dengan Validasi
+  /// [PERBAIKAN] Fungsi "Bayar Sekarang" dengan Validasi Alamat
   Future<void> _handlePayment() async {
     final auth = context.read<AuthProvider>();
     if (auth.token == null || auth.user == null) {
@@ -217,42 +238,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // --- [PERBAIKAN 2] VALIDASI ONGKIR ---
-    bool allOngkirSelected = true;
-    _tokoStates.forEach((tokoId, state) {
-      // Cek: Apakah ongkir belum dipilih DAN ada opsi yang tersedia
-      if (state.selectedOngkirOption == null &&
-          state.ongkirOptions.isNotEmpty) {
-        allOngkirSelected = false;
-      }
-    });
-
-    if (!allOngkirSelected) {
+    // --- [PERBAIKAN 1: Validasi Alamat] ---
+    final String? alamat = auth.user?.alamat;
+    if (alamat == null || alamat.isEmpty) {
       setState(() {
-        _validationFailed = true; // <-- Aktifkan UI Merah
-      });
+        _validationFailed = true;
+      }); // <-- Aktifkan UI Merah
       _showErrorToast(
-        "Harap pilih ongkir untuk semua toko.",
+        "Harap atur alamat pengiriman Anda terlebih dahulu.",
         Theme.of(context),
       );
       return; // Stop
     }
-    // --- [PERBAIKAN 2 SELESAI] ---
+    // --- [PERBAIKAN 1 SELESAI] ---
+
+    // Validasi Ongkir & Pembayaran
+    bool allSelected = true;
+    _tokoStates.forEach((tokoId, state) {
+      if (state.selectedOngkirOption == null &&
+          state.ongkirOptions.isNotEmpty) {
+        allSelected = false;
+      }
+      if (state.selectedPaymentOption == null &&
+          state.paymentOptions.isNotEmpty) {
+        allSelected = false;
+      }
+    });
+
+    if (!allSelected) {
+      setState(() {
+        _validationFailed = true;
+      });
+      _showErrorToast(
+        "Harap pilih ongkir DAN metode bayar untuk semua toko.",
+        Theme.of(context),
+      );
+      return; // Stop
+    }
 
     setState(() {
       _isLoading = true;
-      _validationFailed = false; // Reset error jika validasi lolos
+      _validationFailed = false;
     });
-
-    // (Sisa logika tidak berubah)
-    final String alamat = "Jl. Sudirman No. 123 (Dummy)";
-    final String metodePembayaran = "Transfer Bank";
 
     try {
       List<Map<String, dynamic>>? pesananPerToko;
       Map<String, dynamic>? directItem;
 
       if (widget.itemsByToko != null) {
+        // Skenario A: Kirim Array Pesanan per Toko
         pesananPerToko = [];
         _tokoStates.forEach((tokoId, state) {
           pesananPerToko!.add({
@@ -263,9 +297,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             "catatan": state.noteController.text.isNotEmpty
                 ? state.noteController.text
                 : null,
+            "metode_pembayaran": state.selectedMetodePembayaran,
+            "nomor_tujuan": state.selectedNomorTujuan,
           });
         });
       } else {
+        // Skenario B: Kirim Objek Beli Langsung
         final state = _tokoStates.values.first;
         final item = state.items.first;
         directItem = {
@@ -278,14 +315,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'catatan': state.noteController.text.isNotEmpty
               ? state.noteController.text
               : null,
+          "metode_pembayaran": state.selectedMetodePembayaran,
+          "nomor_tujuan": state.selectedNomorTujuan,
         };
       }
 
       final response = await _apiService.createOrder(
         token: auth.token!,
         userId: auth.user!.id,
-        alamat: alamat,
-        metodePembayaran: metodePembayaran,
+        alamat: alamat, // <-- [PERBAIKAN] Menggunakan alamat asli
         pesananPerToko: pesananPerToko,
         directItem: directItem,
       );
@@ -293,26 +331,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _isLoading = false;
       });
-      final String noPembayaran = response['no_pembayaran'];
+      final List<dynamic> daftarTransaksi = response['data_pembayaran'];
 
       showToast(
-        "Checkout Berhasil! No Pembayaran: $noPembayaran",
+        "Checkout Berhasil! ${daftarTransaksi.length} pesanan dibuat.",
         context: context,
         backgroundColor: Colors.green,
         position: StyledToastPosition.top,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 3),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
       );
 
       if (widget.itemsByToko != null) {
         context.read<CartProvider>().fetchCart();
       }
 
+      // TODO: Arahkan ke halaman "Belum Dibayar"
       Navigator.pop(context); // Kembali dari Checkout
       if (widget.itemsByToko != null) {
         Navigator.pop(context); // Kembali dari Cart
@@ -329,6 +361,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showErrorToast(String message, ThemeData theme) {
+    // ... (Fungsi ini tidak berubah) ...
     showToast(
       message,
       context: context,
@@ -344,16 +377,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// [PERBAIKAN] Fungsi Modal Ongkir
+  // --- Modal Ongkir (Tidak berubah) ---
   Future<void> _showOngkirModal(
     BuildContext context,
     _CheckoutTokoState tokoState,
   ) {
+    // ... (Seluruh logika _showOngkirModal tidak berubah) ...
     final theme = Theme.of(context);
-
-    // Simpan pilihan sementara di dalam modal
     OngkirModel? tempSelected = tokoState.selectedOngkirOption;
-
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -391,7 +422,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   const Divider(height: 24),
-
                   if (tokoState.isLoadingOngkir)
                     const Center(child: CircularProgressIndicator())
                   else if (tokoState.ongkirError != null)
@@ -406,7 +436,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: Text('Tidak ada opsi pengiriman untuk toko ini.'),
                     )
                   else
-                    // Tampilkan Pilihan Ongkir
                     Flexible(
                       child: ListView.builder(
                         shrinkWrap: true,
@@ -422,17 +451,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               modalSetState(() {
                                 tempSelected = value;
                               });
-                              // [PERBAIKAN] Jangan langsung tutup,
-                              // biarkan user lihat pilihannya
                             },
                           );
                         },
                       ),
                     ),
-
                   const SizedBox(height: 16),
-
-                  // [BARU] Tombol Konfirmasi Pilihan Ongkir
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
@@ -440,15 +464,121 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () {
-                      // Kirim data HANYA saat tombol ini ditekan
                       if (tempSelected != null) {
                         setState(() {
                           tokoState.selectedOngkirOption = tempSelected;
-                          _calculateTotals(); // Hitung ulang total
+                          _calculateTotals();
                         });
                         Navigator.pop(modalContext);
-                      } else {
-                        // (Atau tampilkan error jika perlu)
+                      }
+                    },
+                    child: const Text('Pilih'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Modal Metode Bayar (Tidak berubah) ---
+  Future<void> _showPaymentModal(
+    BuildContext context,
+    _CheckoutTokoState tokoState,
+  ) {
+    // ... (Seluruh logika _showPaymentModal tidak berubah) ...
+    final theme = Theme.of(context);
+    PaymentMethodModel? tempSelected = tokoState.selectedPaymentOption;
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalContext, modalSetState) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Pilih Pembayaran',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(modalContext),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Untuk pesanan dari ${tokoState.namaToko}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  if (tokoState.isLoadingPayment)
+                    const Center(child: CircularProgressIndicator())
+                  else if (tokoState.paymentError != null)
+                    Center(
+                      child: Text(
+                        tokoState.paymentError!,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    )
+                  else if (tokoState.paymentOptions.isEmpty)
+                    const Center(
+                      child: Text(
+                        'Tidak ada metode pembayaran untuk toko ini.',
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: tokoState.paymentOptions.length,
+                        itemBuilder: (listContext, index) {
+                          final option = tokoState.paymentOptions[index];
+                          return RadioListTile<PaymentMethodModel>(
+                            title: Text(option.namaMetode),
+                            subtitle: Text(
+                              "${option.namaPenerima} - ${option.nomorTujuan}",
+                            ),
+                            value: option,
+                            groupValue: tempSelected,
+                            onChanged: (PaymentMethodModel? value) {
+                              modalSetState(() {
+                                tempSelected = value;
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: () {
+                      if (tempSelected != null) {
+                        setState(() {
+                          tokoState.selectedPaymentOption = tempSelected;
+                        });
+                        Navigator.pop(modalContext);
                       }
                     },
                     child: const Text('Pilih'),
@@ -470,6 +600,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
+        // ... (AppBar tidak berubah) ...
         elevation: 1,
         backgroundColor: theme.cardColor,
         centerTitle: true,
@@ -499,7 +630,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    AddressCard(theme: theme),
+                    // --- [PERBAIKAN] AddressCard sekarang dinamis ---
+                    AddressCard(
+                      theme: theme,
+                      validationFailed: _validationFailed,
+                    ),
                     const SizedBox(height: 18),
 
                     ..._tokoStates.values.map((tokoState) {
@@ -508,10 +643,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: StoreCard(
                           theme: theme,
                           tokoState: tokoState,
-                          // [PERBAIKAN 3] Kirim state validasi
                           validationFailed: _validationFailed,
                           onOngkirPressed: () {
                             _showOngkirModal(context, tokoState);
+                          },
+                          onPaymentPressed: () {
+                            _showPaymentModal(context, tokoState);
                           },
                         ),
                       );
@@ -548,6 +685,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, ThemeData theme) {
+    // ... (UI Bottom Bar tidak berubah) ...
     return Container(
       color: theme.cardColor,
       padding: EdgeInsets.fromLTRB(
@@ -607,64 +745,153 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 // --- WIDGET-WIDGET CARD (DIMODIFIKASI) ---
 // =========================================================================
 
+// --- [PERBAIKAN] WIDGET KARTU ALAMAT ---
 class AddressCard extends StatelessWidget {
-  // ... (Tidak berubah) ...
   final ThemeData theme;
-  const AddressCard({super.key, required this.theme});
+  final bool validationFailed;
+
+  const AddressCard({
+    super.key,
+    required this.theme,
+    required this.validationFailed,
+  });
+
+  // Fungsi navigasi
+  void _navigateToEditProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shadowColor: theme.shadowColor.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Andi Pratama | +62 812-3456-7890',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Jl. Sudirman No. 123, RT 05/RW 02, Kelurahan Menteng, Kecamatan Menteng, Jakarta Pusat, DKI Jakarta 10310',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.4,
-                color: theme.hintColor,
-              ),
-            ),
-          ],
-        ),
-      ),
+    // Gunakan Consumer untuk membaca AuthProvider
+    return Consumer<AuthProvider>(
+      builder: (context, auth, child) {
+        // [PERBAIKAN] Cek user & alamat dengan aman
+        final user = auth.user;
+        final bool hasAddress =
+            user != null && user.alamat != null && user.alamat!.isNotEmpty;
+
+        // Cek apakah HARUS error (Gagal validasi DAN tidak punya alamat)
+        final bool hasError = validationFailed && !hasAddress;
+
+        return Card(
+          elevation: 4,
+          shadowColor: theme.shadowColor.withOpacity(0.1),
+          // [PERBAIKAN 1] Tampilkan border merah jika error
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: hasError
+                ? BorderSide(color: theme.colorScheme.error, width: 1.5)
+                : BorderSide.none,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: hasAddress
+                // --- TAMPILAN JIKA ALAMAT ADA ---
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // [PERBAIKAN 3] Hapus nomor telepon
+                          Text(
+                            user?.name ?? 'Nama Pengguna',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _navigateToEditProfile(context),
+                            child: Text(
+                              'Ubah',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        // [PERBAIKAN] Ini sekarang aman karena ada di 'if (hasAddress)'
+                        user!.alamat!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.4,
+                          color: theme.hintColor,
+                        ),
+                      ),
+                    ],
+                  )
+                // --- TAMPILAN JIKA ALAMAT KOSONG ---
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Alamat pengiriman belum diatur.',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: hasError ? theme.colorScheme.error : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // [PERBAIKAN 2] Tombol "Atur"
+                      OutlinedButton(
+                        onPressed: () => _navigateToEditProfile(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: hasError
+                              ? theme.colorScheme.error
+                              : null,
+                          side: hasError
+                              ? BorderSide(color: theme.colorScheme.error)
+                              : null,
+                        ),
+                        child: const Text('Atur'),
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }
+// --- [PERBAIKAN SELESAI] ---
 
-// --- [PERBAIKAN 3] WIDGET KARTU TOKO ---
+// --- WIDGET KARTU TOKO ---
 class StoreCard extends StatelessWidget {
   final ThemeData theme;
   final _CheckoutTokoState tokoState;
   final VoidCallback onOngkirPressed;
-  final bool validationFailed; // <-- [BARU] Terima status error
+  final VoidCallback onPaymentPressed;
+  final bool validationFailed;
 
   const StoreCard({
     super.key,
     required this.theme,
     required this.tokoState,
     required this.onOngkirPressed,
-    required this.validationFailed, // <-- [BARU]
+    required this.onPaymentPressed,
+    required this.validationFailed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Cek apakah HARUS error
-    final bool hasError =
+    // ... (Logika Error tidak berubah) ...
+    final bool hasOngkirError =
         validationFailed &&
         tokoState.selectedOngkirOption == null &&
         tokoState.ongkirOptions.isNotEmpty;
+    final bool hasPaymentError =
+        validationFailed &&
+        tokoState.selectedPaymentOption == null &&
+        tokoState.paymentOptions.isNotEmpty;
 
     return Card(
       elevation: 4,
@@ -696,17 +923,13 @@ class StoreCard extends StatelessWidget {
                   ),
                 )
                 .toList(),
-
             const Divider(height: 16),
 
-            // --- [PERBAIKAN 3] Pilihan Ongkir ---
+            // Pilihan Ongkir
             Container(
               decoration: BoxDecoration(
-                border: hasError
-                    ? Border.all(
-                        color: theme.colorScheme.error,
-                        width: 1.5,
-                      ) // <-- TAMPILAN MERAH
+                border: hasOngkirError
+                    ? Border.all(color: theme.colorScheme.error, width: 1.5)
                     : null,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -716,8 +939,7 @@ class StoreCard extends StatelessWidget {
                   'Pilihan Pengiriman',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    // Ubah warna teks jika error
-                    color: hasError ? theme.colorScheme.error : null,
+                    color: hasOngkirError ? theme.colorScheme.error : null,
                   ),
                 ),
                 subtitle: Text(
@@ -725,8 +947,7 @@ class StoreCard extends StatelessWidget {
                       ? 'Memuat opsi...'
                       : (tokoState.ongkirError != null
                             ? 'Gagal memuat ongkir'
-                            : tokoState
-                                  .selectedJasaPengiriman), // "Belum dipilih"
+                            : tokoState.selectedJasaPengiriman),
                   style: TextStyle(
                     color: tokoState.ongkirError != null
                         ? theme.colorScheme.error
@@ -742,13 +963,15 @@ class StoreCard extends StatelessWidget {
                         _formatCurrency(tokoState.selectedOngkir),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: hasError ? theme.colorScheme.error : null,
+                          color: hasOngkirError
+                              ? theme.colorScheme.error
+                              : null,
                         ),
                       ),
                     const SizedBox(width: 8),
                     Icon(
                       Icons.chevron_right,
-                      color: hasError
+                      color: hasOngkirError
                           ? theme.colorScheme.error
                           : theme.hintColor,
                     ),
@@ -758,10 +981,47 @@ class StoreCard extends StatelessWidget {
               ),
             ),
 
-            // --- [PERBAIKAN 3 SELESAI] ---
+            // Pilihan Metode Pembayaran
             const Divider(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                border: hasPaymentError
+                    ? Border.all(color: theme.colorScheme.error, width: 1.5)
+                    : null,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                title: Text(
+                  'Metode Pembayaran',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: hasPaymentError ? theme.colorScheme.error : null,
+                  ),
+                ),
+                subtitle: Text(
+                  tokoState.isLoadingPayment
+                      ? 'Memuat opsi...'
+                      : (tokoState.paymentError != null
+                            ? 'Gagal memuat metode bayar'
+                            : tokoState.selectedMetodePembayaran),
+                  style: TextStyle(
+                    color: tokoState.paymentError != null
+                        ? theme.colorScheme.error
+                        : theme.hintColor,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: hasPaymentError
+                      ? theme.colorScheme.error
+                      : theme.hintColor,
+                ),
+                onTap: tokoState.isLoadingPayment ? null : onPaymentPressed,
+              ),
+            ),
 
-            // Catatan per Toko
+            const Divider(height: 16),
             NoteCard(theme: theme, controller: tokoState.noteController),
           ],
         ),
@@ -882,7 +1142,6 @@ class NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Tidak berubah) ...
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -936,7 +1195,6 @@ class CostBreakdownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Tidak berubah) ...
     return Card(
       elevation: 4,
       shadowColor: theme.shadowColor.withOpacity(0.1),
