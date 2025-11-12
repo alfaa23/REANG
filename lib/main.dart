@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:reang_app/providers/cart_provider.dart';
 import 'package:reang_app/services/api_service.dart';
+import 'package:reang_app/screens/ecomerce/umkm_screen.dart';
 
 Future<void> main() async {
   // Pastikan Flutter sudah siap
@@ -51,6 +52,7 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
+          navigatorObservers: [umkmRouteObserver],
           home: const SplashScreen(),
         );
       },

@@ -1,5 +1,3 @@
-// Lokasi: lib/screens/ecomerce/payment_instruction_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
@@ -20,7 +18,16 @@ import 'package:reang_app/services/api_service.dart';
 class PaymentInstructionScreen extends StatelessWidget {
   final List<Map<String, dynamic>> paymentData;
 
-  const PaymentInstructionScreen({super.key, required this.paymentData});
+  // --- [PERUBAHAN 1] ---
+  // Tambahkan parameter opsional untuk aksi 'close' kustom
+  final VoidCallback? onCustomClose;
+  // --- [SELESAI PERUBAHAN 1] ---
+
+  const PaymentInstructionScreen({
+    super.key,
+    required this.paymentData,
+    this.onCustomClose, // <-- Tambahkan ini di konstruktor
+  });
 
   String _formatCurrency(double value) {
     return NumberFormat.currency(
@@ -30,13 +37,12 @@ class PaymentInstructionScreen extends StatelessWidget {
     ).format(value);
   }
 
-  void _goToOrderList(BuildContext context) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
-      (route) => false,
-    );
-  }
+  // --- [DIHAPUS] ---
+  // Fungsi ini tidak lagi diperlukan karena logikanya dipindah
+  // void _goToHomeAndRefresh(BuildContext context) {
+  //   Navigator.popUntil(context, (route) => route.isFirst);
+  // }
+  // --- [SELESAI DIHAPUS] ---
 
   @override
   Widget build(BuildContext context) {
@@ -46,95 +52,140 @@ class PaymentInstructionScreen extends StatelessWidget {
       (sum, item) => sum + (item['total_bayar'] as num).toDouble(),
     );
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        title: const Text('Instruksi Pembayaran'),
-        automaticallyImplyLeading: false,
-      ),
-      bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          16 + MediaQuery.of(context).padding.bottom,
+    return PopScope(
+      // Menggantikan WillPopScope di Flutter versi baru
+      canPop: false, // Mencegah pop default
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // --- [PERUBAHAN 2] ---
+          // Logika fleksibel untuk swipe back / tombol back fisik
+          if (onCustomClose != null) {
+            // Jika ada aksi kustom (misal: dari ProsesOrderScreen), jalankan
+            onCustomClose!();
+          } else {
+            // Jika tidak ada (default dari checkout), kembali ke Home
+            Navigator.popUntil(context, (route) => route.isFirst);
+          }
+          // --- [SELESAI PERUBAHAN 2] ---
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surfaceContainerLowest,
+        appBar: AppBar(
+          title: const Text('Instruksi Pembayaran'),
+          // Tombol back default akan dihilangkan karena canPop: false
+          automaticallyImplyLeading: false,
+
+          // --- [PERUBAHAN 3] ---
+          // Mengganti tombol 'X' menjadi 'Back' dengan logika fleksibel
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back), // <-- Ikon diubah
+            onPressed: () {
+              // Logika fleksibel yang sama dengan onPopInvoked
+              if (onCustomClose != null) {
+                onCustomClose!();
+              } else {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
+            },
+          ),
+          // --- [SELESAI PERUBAHAN 3] ---
         ),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          border: Border(top: BorderSide(color: theme.dividerColor, width: 1)),
-        ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        bottomNavigationBar: Container(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.of(context).padding.bottom,
+          ),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            border: Border(
+              top: BorderSide(color: theme.dividerColor, width: 1),
             ),
           ),
-          onPressed: () {
-            _goToOrderList(context);
-          },
-          child: const Text(
-            'Cek Status Pembayaran',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () {
+              // (Logika ini tetap sama seperti permintaan Anda sebelumnya)
+              // Mengganti layar saat ini dengan ProsesOrderScreen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProsesOrderScreen(),
+                ),
+              );
+            },
+            child: const Text(
+              'Selesai & Lihat Pesanan Saya', // (Teks ini tetap sama)
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'Total Pembayaran',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatCurrency(totalKeseluruhan),
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // ... (Sisa konten Body: Card Total Keseluruhan) ...
+              Card(
+                elevation: 0,
+                color: theme.colorScheme.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Total Pembayaran',
+                          style: theme.textTheme.titleMedium,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Selesaikan pembayaran sebelum 06 Nov, 12:00', // (Dummy)
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatCurrency(totalKeseluruhan),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Selesaikan pembayaran sebelum 06 Nov, 12:00',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: paymentData.length,
-              itemBuilder: (context, index) {
-                final item = paymentData[index];
-                return PaymentInstructionCard(
-                  theme: theme,
-                  paymentItem: item,
-                  formatCurrency: _formatCurrency,
-                );
-              },
-            ),
-          ],
+              const SizedBox(height: 24),
+              // ... (ListView Builder untuk PaymentInstructionCard) ...
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: paymentData.length,
+                itemBuilder: (context, index) {
+                  final item = paymentData[index];
+                  return PaymentInstructionCard(
+                    theme: theme,
+                    paymentItem: item,
+                    formatCurrency: _formatCurrency,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -143,7 +194,7 @@ class PaymentInstructionScreen extends StatelessWidget {
 
 // =========================================================================
 // --- WIDGET CARD INSTRUKSI (per toko) ---
-// --- [PERUBAHAN] Diubah menjadi StatefulWidget ---
+// (Tidak ada perubahan di sini)
 // =========================================================================
 class PaymentInstructionCard extends StatefulWidget {
   final ThemeData theme;

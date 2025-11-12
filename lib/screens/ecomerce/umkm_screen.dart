@@ -1,11 +1,9 @@
-// lib/screens/ecomerce/umkm_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/produk_model.dart';
-// [BARU] Impor model riwayat
+
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
@@ -17,6 +15,9 @@ import 'package:reang_app/screens/auth/login_screen.dart';
 import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 import 'package:reang_app/screens/ecomerce/search_page.dart';
 
+final RouteObserver<ModalRoute<void>> umkmRouteObserver =
+    RouteObserver<ModalRoute<void>>();
+
 class UmkmScreen extends StatefulWidget {
   const UmkmScreen({super.key});
 
@@ -24,7 +25,12 @@ class UmkmScreen extends StatefulWidget {
   State<UmkmScreen> createState() => _UmkmScreenState();
 }
 
-class _UmkmScreenState extends State<UmkmScreen> {
+// --- [UBAH] ---
+// Tambahkan 'RouteAware' untuk membuat state ini "sadar" akan navigasi
+class _UmkmScreenState extends State<UmkmScreen>
+    with WidgetsBindingObserver, RouteAware {
+  // --- [SELESAI UBAH] ---
+
   // --- STATE ---
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
@@ -54,6 +60,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
 
@@ -61,11 +68,57 @@ class _UmkmScreenState extends State<UmkmScreen> {
     _fetchUnpaidCount();
   }
 
+  // --- [BARU] ---
+  // Lifecycle ini dipanggil setelah initState dan saat dependensi berubah.
+  // Ini tempat yang tepat untuk berlangganan (subscribe) ke RouteObserver.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      umkmRouteObserver.subscribe(this, route);
+      debugPrint("!!! UmkmScreen: Berhasil subscribe ke RouteObserver.");
+    }
+  }
+  // --- [SELESAI BARU] ---
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    // --- [UBAH] ---
+    // Wajib berhenti berlangganan (unsubscribe) saat widget hancur
+    umkmRouteObserver.unsubscribe(this);
+    debugPrint("!!! UmkmScreen: Berhasil unsubscribe dari RouteObserver.");
+    // --- [SELESAI UBAH] ---
+
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // --- [BARU] ---
+  // Ini adalah fungsi AJAIB dari RouteAware.
+  // Ini akan otomatis dipanggil oleh RouteObserver setiap kali
+  // rute di atasnya (misal: PaymentInstructionScreen) di-pop,
+  // dan UmkmScreen kembali menjadi rute yang aktif/terlihat.
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    debugPrint("!!! UmkmScreen: didPopNext() terpicu! Refreshing notifikasi.");
+
+    // PANGGIL FUNGSI REFRESH NOTIFIKASI ANDA DI SINI
+    _fetchUnpaidCount();
+  }
+  // --- [SELESAI BARU] ---
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _fetchUnpaidCount(); // <-- Panggil fungsi refresh notif
+      // debugPrint("!!! UmkmScreen: Auto-refresh triggered by App Resume.");
+    }
   }
 
   // =========================================================================
@@ -102,6 +155,18 @@ class _UmkmScreenState extends State<UmkmScreen> {
       if (mounted) setState(() => _unpaidOrderCount = 0);
     }
   }
+
+  // --- [BARU] ---
+  // Fungsi gabungan untuk RefreshIndicator (Tarik untuk Refresh)
+  // Ini akan me-refresh produk DAN notifikasi secara bersamaan
+  Future<void> _handleRefresh() async {
+    // Kita jalankan kedua fetch secara paralel
+    await Future.wait([
+      _fetchInitialProducts(),
+      _fetchUnpaidCount(), // <-- Sekalian refresh notifikasi
+    ]);
+  }
+  // --- [SELESAI BARU] ---
 
   Future<void> _fetchInitialProducts() async {
     // ... (Fungsi ini tidak berubah) ...
@@ -243,20 +308,23 @@ class _UmkmScreenState extends State<UmkmScreen> {
 
   // [DIPERBARUI] Ubah menjadi async untuk me-refresh notif
   void _showFabMenu() {
-    // 1. Tampilkan modal SECEPAT MUNGKIN.
-    //    Modal ini akan menggunakan angka '_unpaidOrderCount'
-    //    yang sudah ada di state (dari 'initState').
     final authProvider = context.read<AuthProvider>();
     final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
+      // [PERBAIKAN KRITIS]: Pertahankan isScrollControlled dan useSafeArea
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) {
+        // [PERBAIKAN]: HAPUS SizedBox(height: MediaQuery.of(context).size.height * 0.9)
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
+            // [KUNCI]: Pertahankan mainAxisSize.min agar tinggi menyesuaikan konten
             mainAxisSize: MainAxisSize.min,
             children: [
+              // --- OPSI 1: TOKO SAYA ---
               ListTile(
                 leading: Icon(
                   Icons.store_outlined,
@@ -280,7 +348,6 @@ class _UmkmScreenState extends State<UmkmScreen> {
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                     ).then((_) {
-                      // [BARU] Refresh notif setelah login
                       _fetchUnpaidCount();
                     });
                   } else {
@@ -292,6 +359,7 @@ class _UmkmScreenState extends State<UmkmScreen> {
                         ),
                       );
                     } else {
+                      // Navigasi Daftar Toko
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -302,19 +370,16 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   }
                 },
               ),
+              // --- OPSI 2: PESANAN SAYA ---
               ListTile(
                 leading: Icon(
                   Icons.receipt_long_outlined,
                   color: theme.hintColor,
                 ),
-                // [DIPERBARUI] Bungkus title dengan _buildNotificationBadge
                 title: _buildNotificationBadge(
                   _unpaidOrderCount,
                   const Text('Pesanan Saya'),
-                  // Set 'showBadge' ke false agar hanya 'Titik' merah
-                  // atau atur styling badge kustom di sini.
-                  // Mari kita buat badge kustom sederhana untuk ListTile
-                  isDense: true, // true berarti badge lebih kecil untuk list
+                  isDense: true,
                 ),
                 subtitle: const Text('Lacak semua pesanan produk UMKM Anda'),
                 onTap: () {
@@ -322,11 +387,15 @@ class _UmkmScreenState extends State<UmkmScreen> {
                   _navigateToOrderProcess();
                 },
               ),
+              //size
             ],
           ),
         );
       },
     );
+
+    // 2. SETELAH modal tampil, panggil API di latar belakang.
+    _fetchUnpaidCount();
   }
 
   // [BARU] Widget helper untuk membuat badge notifikasi
@@ -554,10 +623,13 @@ class _UmkmScreenState extends State<UmkmScreen> {
                 ),
               ),
 
-              // ... (Expanded, RefreshIndicator, CustomScrollView tidak berubah) ...
+              // ... (Expanded) ...
               Expanded(
+                // --- [UBAH] ---
+                // Arahkan onRefresh ke fungsi gabungan _handleRefresh
                 child: RefreshIndicator(
-                  onRefresh: _fetchInitialProducts,
+                  onRefresh: _handleRefresh,
+                  // --- [SELESAI UBAH] ---
                   child: CustomScrollView(
                     controller: _scrollController,
                     slivers: [

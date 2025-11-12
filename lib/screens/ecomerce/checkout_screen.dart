@@ -1,5 +1,3 @@
-// Lokasi: lib/screens/ecomerce/checkout_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +12,7 @@ import 'package:reang_app/screens/profile/edit_profile_screen.dart';
 import 'payment_instruction_screen.dart';
 
 // =========================================================================
-// --- [PERBAIKAN] Helper class untuk menyimpan state per toko ---
+// --- Helper class untuk menyimpan state per toko ---
 // =========================================================================
 class _CheckoutTokoState {
   final int tokoId;
@@ -49,16 +47,17 @@ class _CheckoutTokoState {
       selectedOngkirOption?.daerah ?? "Belum dipilih";
   String get selectedMetodePembayaran =>
       selectedPaymentOption?.namaMetode ?? "Belum dipilih";
+
+  // Getter ini akan mengembalikan "" (String kosong) jika metode bayar belum dipilih,
+  // atau jika metode bayar terpilih tapi tidak ada nomor tujuan (misal, QRIS tidak punya nomor).
   String get selectedNomorTujuan => selectedPaymentOption?.nomorTujuan ?? "";
-  // --- [BARU] Getter untuk Data Pembayaran ---
+
   String get selectedNamaPenerima => selectedPaymentOption?.namaPenerima ?? "";
   String? get selectedFotoQris => selectedPaymentOption?.fotoQris;
-  // --- [BARU SELESAI] ---
 }
 // =========================================================================
 
 class CheckoutScreen extends StatefulWidget {
-  // ... (Constructor tidak berubah) ...
   final Map<int, List<CartItemModel>>? itemsByToko;
   final Map<String, dynamic>? directBuyItem;
   final String? directBuyNamaToko;
@@ -81,7 +80,6 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  // ... (State tidak berubah) ...
   late Map<int, _CheckoutTokoState> _tokoStates;
   double _subtotalProduk = 0;
   double _subtotalOngkir = 0;
@@ -106,7 +104,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _buildDisplayItemsAndFetchData() {
-    // ... (Fungsi ini tidak berubah) ...
     final String? token = context.read<AuthProvider>().token;
     if (token == null) {
       return;
@@ -164,7 +161,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _CheckoutTokoState tokoState,
     String token,
   ) async {
-    // ... (Fungsi ini tidak berubah) ...
     try {
       final options = await _apiService.getOngkirOptions(
         token: token,
@@ -190,7 +186,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _CheckoutTokoState tokoState,
     String token,
   ) async {
-    // ... (Fungsi ini tidak berubah) ...
     try {
       final options = await _apiService.getPaymentMethodsForToko(
         token: token,
@@ -213,7 +208,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _calculateTotals() {
-    // ... (Fungsi ini tidak berubah) ...
     double newSubtotalProduk = 0;
     double newSubtotalOngkir = 0;
     _tokoStates.values.forEach((toko) {
@@ -228,7 +222,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   String _formatCurrency(double value) {
-    // ... (Fungsi ini tidak berubah) ...
     return NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -262,10 +255,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           state.ongkirOptions.isNotEmpty) {
         allSelected = false;
       }
-      if (state.selectedPaymentOption == null &&
-          state.paymentOptions.isNotEmpty) {
+
+      // [PERBAIKAN VALIDASI KRITIS]: Logika cek nomor tujuan yang lebih canggih
+      final bool isPaymentSelected = state.selectedPaymentOption != null;
+      final String metode = state.selectedMetodePembayaran;
+
+      if (!isPaymentSelected) {
         allSelected = false;
+      } else {
+        // Jika TIDAK QRIS dan nomor tujuan kosong, gagal.
+        // Asumsi metode QRIS Anda memiliki nama yang mengandung 'QRIS' atau 'BANK'
+        // Jika nama metode pembayaran adalah "QRIS", nomor tujuan boleh kosong.
+        // Jika nama metode adalah "Transfer Bank" / "BCA" / "BNI", nomor tujuan wajib diisi.
+        final isNotQris = !metode.toUpperCase().contains('QRIS');
+
+        if (isNotQris && state.selectedNomorTujuan.isEmpty) {
+          allSelected = false;
+        }
       }
+      // END PERBAIKAN VALIDASI KRITIS
     });
 
     if (!allSelected) {
@@ -273,7 +281,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _validationFailed = true;
       });
       _showErrorToast(
-        "Harap pilih ongkir DAN metode bayar untuk semua toko.",
+        "Harap pilih pengiriman, metode bayar, dan pastikan Nomor Tujuan sudah lengkap.", // Pesan umum yang cukup jelas
         Theme.of(context),
       );
       return;
@@ -301,8 +309,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? state.noteController.text
                 : null,
             "metode_pembayaran": state.selectedMetodePembayaran,
-            "nomor_tujuan": state.selectedNomorTujuan,
-            "nama_penerima": state.selectedNamaPenerima, // <-- [PERBAIKAN]
+            // [LOGIKA NULL]: Kirim null jika string kosong (untuk QRIS)
+            "nomor_tujuan": state.selectedNomorTujuan.isEmpty
+                ? null
+                : state.selectedNomorTujuan,
+            "nama_penerima": state.selectedNamaPenerima,
             "foto_qris": state.selectedFotoQris,
           });
         });
@@ -321,8 +332,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ? state.noteController.text
               : null,
           "metode_pembayaran": state.selectedMetodePembayaran,
-          "nomor_tujuan": state.selectedNomorTujuan,
-          "nama_penerima": state.selectedNamaPenerima, // <-- [PERBAIKAN]
+          // [LOGIKA NULL]: Kirim null jika string kosong (untuk QRIS)
+          "nomor_tujuan": state.selectedNomorTujuan.isEmpty
+              ? null
+              : state.selectedNomorTujuan,
+          "nama_penerima": state.selectedNamaPenerima,
           "foto_qris": state.selectedFotoQris,
         };
       }
@@ -366,7 +380,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showErrorToast(String message, ThemeData theme) {
-    // ... (Fungsi ini tidak berubah) ...
     showToast(
       message,
       context: context,
@@ -387,7 +400,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     BuildContext context,
     _CheckoutTokoState tokoState,
   ) {
-    // ... (Logika tidak berubah) ...
     final theme = Theme.of(context);
     OngkirModel? tempSelected = tokoState.selectedOngkirOption;
     return showModalBottomSheet<void>(
@@ -610,7 +622,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ... (UI Build tidak berubah) ...
     final theme = Theme.of(context);
     const double bottomBarHeight = 72.0;
     return Scaffold(
@@ -697,7 +708,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, ThemeData theme) {
-    // ... (UI Bottom Bar tidak berubah) ...
     return Container(
       color: theme.cardColor,
       padding: EdgeInsets.fromLTRB(

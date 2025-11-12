@@ -1,5 +1,3 @@
-// lib/screens/ecomerce/proses_order_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -188,6 +186,7 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
 
 // ===============================================
 // --- [WIDGET BARU] Order List Tab View (Lazy Load Murni) ---
+// (Tidak ada perubahan di sini)
 // ===============================================
 class OrderListTabView extends StatefulWidget {
   final String tabCategory;
@@ -389,6 +388,7 @@ class _OrderListTabViewState extends State<OrderListTabView>
 
 // ===============================================
 // --- Komponen Kartu Pesanan (OrderCard) ---
+// (Perubahan ada di dalam sini)
 // ===============================================
 
 class OrderCard extends StatelessWidget {
@@ -468,8 +468,19 @@ class OrderCard extends StatelessWidget {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              PaymentInstructionScreen(paymentData: paymentData),
+          builder: (context) => PaymentInstructionScreen(
+            paymentData: paymentData,
+
+            // --- [INI ADALAH PERUBAHANNYA] ---
+            // Kita berikan fungsi 'onCustomClose' ke layar instruksi.
+            // Saat tombol 'Back' di AppBar (atau swipe back)
+            // di PaymentInstructionScreen ditekan, fungsi ini akan dijalankan.
+            onCustomClose: () {
+              Navigator.pop(context); // Cukup tutup layar instruksi
+            },
+
+            // --- [SELESAI PERUBAHAN] ---
+          ),
         ),
       );
 
