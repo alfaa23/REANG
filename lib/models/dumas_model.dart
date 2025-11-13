@@ -84,7 +84,10 @@ class DumasModel {
     return DumasModel(
       id: json['id'] ?? 0,
       jenisLaporan: json['jenis_laporan'] ?? 'Tidak ada jenis laporan',
-      kategoriLaporan: json['kategori_laporan'] ?? 'Umum',
+      kategoriLaporan:
+          json['kategori']?['nama_kategori'] ??
+          json['kategori_laporan'] ??
+          'Umum',
       dinas: json['dinas'] ?? 'Tidak Diketahui',
       lokasiLaporan: json['lokasi_laporan'] ?? 'Lokasi tidak diketahui',
       deskripsi: unescape.convert(json['deskripsi'] ?? ''),
