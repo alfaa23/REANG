@@ -15,7 +15,8 @@ Future<void> openAppLink(String appName, BuildContext context) async {
     }
   } else if (appName == 'IKD') {
     if (Platform.isAndroid) {
-      url = 'https://play.google.com/store/apps/details?id=id.go.dukcapil.ikd';
+      url =
+          'https://play.google.com/store/apps/details?id=gov.dukcapil.mobile_id';
     } else if (Platform.isIOS) {
       url =
           'https://apps.apple.com/id/app/identitas-kependudukan-digital/id6448944056';
