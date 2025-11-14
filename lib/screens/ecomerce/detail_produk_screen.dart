@@ -124,7 +124,12 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: EdgeInsets.fromLTRB(
+          16, // kiri
+          12, // atas
+          16, // kanan
+          16 + MediaQuery.of(context).padding.bottom, // bawah + safe area
+        ),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
           border: Border(top: BorderSide(color: theme.dividerColor, width: 1)),
