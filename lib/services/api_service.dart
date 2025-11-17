@@ -1561,6 +1561,7 @@ class ApiService {
   // ---
   Future<Map<String, dynamic>> buatToko({
     required String token,
+    required int userId,
     required String nama,
     required String deskripsi,
     required String alamat,
@@ -1575,6 +1576,7 @@ class ApiService {
       final response = await _dio.post(
         url, // <-- Menggunakan URL lengkap yang sudah kita buat
         data: {
+          'id_user': userId,
           'nama': nama,
           'deskripsi': deskripsi,
           'alamat': alamat,
@@ -2315,6 +2317,34 @@ class ApiService {
     } catch (e) {
       debugPrint("Error on deleteProduk: $e");
       throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  // =========================================================================
+  // [PERBAIKAN] FUNGSI PROFILE (Mengambil data user terbaru dari token)
+  // =========================================================================
+  Future<Map<String, dynamic>> getUserProfile({
+    required String token,
+    // [DIHAPUS] required int userId, <-- Tidak diperlukan karena Laravel pakai token
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/auth/user', // <-- Sesuai route /api/user
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Gagal mengambil data profil.');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Kesalahan jaringan.');
     }
   }
 }

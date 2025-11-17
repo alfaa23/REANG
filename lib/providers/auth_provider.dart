@@ -219,6 +219,37 @@ class AuthProvider with ChangeNotifier {
       debugPrint("AuthProvider: Role user di-upgrade ke UMKM!");
     }
   }
+
+  // ============================================================================
+  //  [BARU] FUNGSI REFRESH USER PROFILE
+  //  Memaksa Provider mengambil ulang data user dari backend dan memperbarui
+  //  state + secure storage secara sinkron.
+  // ============================================================================
+
+  Future<void> fetchUserProfile() async {
+    // Jika tidak ada token atau user belum login → hentikan
+    if (_token == null || _currentUser is! UserModel) return;
+
+    try {
+      // 1. Ambil profil terbaru dari API Laravel
+      final response = await _apiService.getUserProfile(token: _token!);
+
+      // 2. Konversi hasil JSON menjadi UserModel terbaru
+      final updatedUser = UserModel.fromMap(response['user']);
+
+      // 3. Update user di memori provider
+      _currentUser = updatedUser;
+
+      // 4. [PENTING] Simpan user baru ke SecureStorage agar sinkron setelah restart
+      await _storage.saveUser(updatedUser);
+
+      // 5. Beritahu semua widget bahwa data user berubah
+      notifyListeners();
+    } catch (e) {
+      print('Gagal refresh profile: $e');
+    }
+  }
+
   // ------------------------------------
 
   // --- FUNGSI HELPER (Internal) ---

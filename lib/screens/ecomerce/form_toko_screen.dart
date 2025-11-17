@@ -4,6 +4,7 @@ import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/services/api_service.dart';
 // import 'package:reang_app/providers/user_provider.dart'; // <-- 1. DIHAPUS
 import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 
 class FormTokoScreen extends StatefulWidget {
   const FormTokoScreen({super.key});
@@ -32,19 +33,13 @@ class _FormTokoScreenState extends State<FormTokoScreen> {
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    // 1. Validasi form
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    // Ambil provider dan navigator sebelum async gap
-    final authProvider = context
-        .read<AuthProvider>(); // <-- 2. HANYA AuthProvider
-    // final userProvider = context.read<UserProvider>(); // <-- 3. DIHAPUS
-    final navigator = Navigator.of(context); // Ambil navigator
+    final authProvider = context.read<AuthProvider>();
+    final navigator = Navigator.of(context);
 
     try {
       final token = authProvider.token;
@@ -52,23 +47,37 @@ class _FormTokoScreenState extends State<FormTokoScreen> {
         throw Exception("Sesi Anda telah berakhir. Silakan login kembali.");
       }
 
-      // 1. Panggil API untuk BUAT TOKO
+      final userId = authProvider.user!.id; // ID user aktif
+
+      // =========================================================================
+      // 2. BUAT TOKO BARU
+      // =========================================================================
       await _apiService.buatToko(
         token: token,
+        userId: userId,
         nama: _namaController.text,
         deskripsi: _deskripsiController.text,
         alamat: _alamatController.text,
         noHp: _noHpController.text,
       );
 
-      // --- 2. PERBAIKAN UTAMA ---
-      // Panggil 'upgradeToUmkm' dari AuthProvider
-      await authProvider.upgradeToUmkm();
-      // --- AKHIR PERBAIKAN ---
+      // =========================================================================
+      // 3. SINKRONISASI ULANG DATA USER (PERBAIKAN UTAMA)
+      // =========================================================================
 
-      // 3. Tampilkan pesan sukses dan kembali
-      // (Gunakan context.mounted untuk keamanan)
+      // 3a. Update role lokal (jika belum UMKM)
+      if (!authProvider.isUmkm) {
+        await authProvider.upgradeToUmkm();
+      }
+
+      // 3b. Ambil ulang profil user dari backend (agar id_toko masuk)
+      await authProvider.fetchUserProfile();
+
+      // =========================================================================
+      // 4. TAMPILKAN NOTIFIKASI BERHASIL
+      // =========================================================================
       if (!mounted) return;
+
       showToast(
         "Toko Anda berhasil didaftarkan!",
         context: context,
@@ -76,22 +85,27 @@ class _FormTokoScreenState extends State<FormTokoScreen> {
         position: StyledToastPosition.bottom,
       );
 
-      navigator.pop(); // Kembali ke halaman UmkmScreen
+      // =========================================================================
+      // 5. ARAHKAN USER KE DASHBOARD UMKM
+      // =========================================================================
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeAdminUmkmScreen()),
+      );
     } catch (e) {
-      // 4. JIKA GAGAL: Tampilkan error
+      // =========================================================================
+      // 6. ERROR HANDLING
+      // =========================================================================
       if (!mounted) return;
+
       showToast(
-        e.toString(), // Akan menampilkan pesan error dari ApiService
+        e.toString().replaceAll('Exception: ', ''),
         context: context,
         backgroundColor: Colors.red,
         position: StyledToastPosition.bottom,
       );
     } finally {
-      // 5. Selalu hentikan loading
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }

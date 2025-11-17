@@ -269,6 +269,70 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
     );
   }
 
+  Widget _buildEmptyState(ThemeData theme) {
+    // Hitung tinggi ruang kosong agar RefreshIndicator tetap dapat ditarik
+    final double availableHeight =
+        MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.top -
+        kToolbarHeight;
+
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: availableHeight > 0 ? availableHeight : 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              const SizedBox(height: 50),
+
+              // ----------------------------------------------------------------
+              // Ikon Empty State
+              // ----------------------------------------------------------------
+              Icon(
+                Icons.store_mall_directory_outlined,
+                size: 80,
+                color: theme.colorScheme.primary.withOpacity(0.7),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ----------------------------------------------------------------
+              // Judul
+              // ----------------------------------------------------------------
+              Text(
+                'Belum Ada Produk Terdaftar',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ----------------------------------------------------------------
+              // Subjudul
+              // ----------------------------------------------------------------
+              Text(
+                'Toko Anda belum memiliki produk aktif.\n'
+                'Tambahkan produk pertama Anda melalui tombol "Tambah Produk" di bawah.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+
+              const SizedBox(
+                height: 100,
+              ), // Spacer agar tidak terlalu mepet FAB
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ===========================================================
   // BUILD UI (Dirombak untuk FutureBuilder + RefreshIndicator)
   // ===========================================================
@@ -322,25 +386,9 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
               );
             }
 
-            // --- 3. Jika Data Kosong ---
+            ///alt gambar produk kosong
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              // [PERUBAHAN 10]: Bungkus Empty state dengan RefreshIndicator
-              return RefreshIndicator(
-                onRefresh: _onRefresh,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Container(
-                    height: MediaQuery.of(context).size.height * 0.5,
-                    alignment: Alignment.center,
-                    child: Center(
-                      child: Text(
-                        "Anda belum memiliki produk.",
-                        style: TextStyle(color: theme.hintColor),
-                      ),
-                    ),
-                  ),
-                ),
-              );
+              return _buildEmptyState(theme); // <-- Panggil helper baru di sini
             }
 
             // --- 4. Jika Sukses (Ada Data) ---
