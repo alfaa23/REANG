@@ -1,40 +1,65 @@
-// lib/models/produk_model.dart
+// Lokasi: lib/models/produk_model.dart
+
+import 'dart:convert';
+// [PERBAIKAN] Pastikan path ini benar
+import 'produk_varian_model.dart';
 
 class ProdukModel {
   final int id;
   final int idToko;
   final String nama;
-  final String? foto; // Bisa null
-  final int harga;
-  final String? variasi; // Bisa null
-  final String? deskripsi; // Bisa null
-  final String? spesifikasi; // Bisa null
-  final String? lokasi; // Bisa null
-  final String? fitur; // Bisa null
-  final int stok;
+  final String? foto;
+  final String? deskripsi;
+  final String? spesifikasi;
+  final String? lokasi;
+  final String? fitur;
   final String? namaToko;
+
+  // [PERUBAHAN UTAMA] Kolom 'harga', 'stok', 'variasi' DIGANTI dengan ini:
+  final List<ProdukVarianModel> varians;
 
   ProdukModel({
     required this.id,
     required this.idToko,
     required this.nama,
     this.foto,
-    required this.harga,
-    this.variasi,
     this.deskripsi,
     this.spesifikasi,
     this.lokasi,
     this.fitur,
-    required this.stok,
     this.namaToko,
+    this.varians = const [], // Default list kosong
   });
 
-  // [BARU] Helper function untuk mem-parsing dari String, num, atau int
+  // =================================================================
+  // --- [PERBAIKAN LOGIKA GETTER] ---
+
+  /// [PERBAIKAN] Mengembalikan HARGA TERENDAH dari semua varian.
+  int get harga {
+    if (varians.isEmpty) return 0;
+    // Ambil semua harga, cari yang terkecil
+    final prices = varians.map((v) => v.harga).toList();
+    prices.sort(); // Urutkan dari kecil ke besar
+    return prices.first; // Kembalikan yang pertama (terkecil)
+  }
+
+  /// [BENAR] Mengembalikan TOTAL STOK dari SEMUA varian.
+  int get stok {
+    if (varians.isEmpty) return 0;
+    return varians.fold(0, (previousValue, v) => previousValue + v.stok);
+  }
+
+  /// [BENAR] Mengembalikan string gabungan dari nama varian.
+  String get variasi {
+    if (varians.isEmpty) return "";
+    return varians.map((v) => v.namaVarian).join(', ');
+  }
+
+  // Helper parsing INT yang aman
   static int _parseInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
     if (value is String) {
-      // Jika ada desimal (.00), hilangkan dulu, lalu parse
       final cleanString = value.split('.').first;
       return int.tryParse(cleanString) ?? 0;
     }
@@ -44,46 +69,41 @@ class ProdukModel {
     return 0;
   }
 
-  // Factory constructor untuk membuat instance dari JSON (Map)
   factory ProdukModel.fromJson(Map<String, dynamic> json) {
+    // Parsing list varian jika ada di JSON
+    List<ProdukVarianModel> parsedVarians = [];
+    if (json['varians'] != null && json['varians'] is List) {
+      parsedVarians = (json['varians'] as List)
+          .map((v) => ProdukVarianModel.fromJson(v))
+          .toList();
+    }
+
     return ProdukModel(
-      id: json['id'] as int,
-      idToko: json['id_toko'] as int,
-      nama: json['nama'],
+      id: json['id'] ?? 0,
+      idToko: _parseInt(json['id_toko']),
+      nama: json['nama'] ?? '',
       foto: json['foto'],
-
-      // [PERBAIKAN KRITIS]: Menggunakan helper untuk parsing String harga ke Int
-      harga: _parseInt(json['harga']),
-
-      variasi: json['variasi'],
       deskripsi: json['deskripsi'],
       spesifikasi: json['spesifikasi'],
       lokasi: json['lokasi'],
       fitur: json['fitur'],
-
-      // [PERBAIKAN KEDUA]: Menggunakan helper untuk stok (jaga-jaga jika dikirim string)
-      stok: _parseInt(json['stok']),
-
-      // Field ini mungkin tidak selalu ada di respons API produk show
-      namaToko: json['nama_toko'] as String?,
+      namaToko: json['nama_toko'],
+      varians: parsedVarians, // Masukkan list varian
     );
   }
 
-  // Method untuk mengubah instance menjadi Map (misal untuk POST/UPDATE)
+  // Mengubah ke JSON (untuk dikirim ke API 'store'/'update')
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'id_toko': idToko,
       'nama': nama,
       'foto': foto,
-      'harga': harga,
-      'variasi': variasi,
       'deskripsi': deskripsi,
       'spesifikasi': spesifikasi,
-      'lokasi': lokasi,
       'fitur': fitur,
-      'stok': stok,
-      'nama_toko': namaToko,
+      // Kirim varian sebagai list of map
+      'varians': varians.map((v) => v.toJson()).toList(),
     };
   }
 }

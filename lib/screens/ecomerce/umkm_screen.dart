@@ -1,9 +1,11 @@
+// Lokasi: lib/screens/ecomerce/umkm_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/produk_model.dart';
-
+import 'package:reang_app/models/produk_varian_model.dart'; // <-- [PENTING] Impor model varian
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
@@ -25,12 +27,8 @@ class UmkmScreen extends StatefulWidget {
   State<UmkmScreen> createState() => _UmkmScreenState();
 }
 
-// --- [UBAH] ---
-// Tambahkan 'RouteAware' untuk membuat state ini "sadar" akan navigasi
 class _UmkmScreenState extends State<UmkmScreen>
     with WidgetsBindingObserver, RouteAware {
-  // --- [SELESAI UBAH] ---
-
   // --- STATE ---
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
@@ -38,7 +36,7 @@ class _UmkmScreenState extends State<UmkmScreen>
   List<ProdukModel> _masterProductList = [];
   List<Map<String, dynamic>> _filteredProducts = [];
 
-  // [BARU] State untuk notifikasi "Belum Dibayar"
+  // State untuk notifikasi "Belum Dibayar"
   int _unpaidOrderCount = 0;
 
   // State Paginasi & Error
@@ -63,14 +61,10 @@ class _UmkmScreenState extends State<UmkmScreen>
     WidgetsBinding.instance.addObserver(this);
     _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
-
-    // [BARU] Panggil hitung notifikasi saat layar dimuat
     _fetchUnpaidCount();
   }
 
-  // --- [BARU] ---
-  // Lifecycle ini dipanggil setelah initState dan saat dependensi berubah.
-  // Ini tempat yang tepat untuk berlangganan (subscribe) ke RouteObserver.
+  // --- Lifecycle untuk Auto-Refresh Notifikasi ---
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -80,44 +74,29 @@ class _UmkmScreenState extends State<UmkmScreen>
       debugPrint("!!! UmkmScreen: Berhasil subscribe ke RouteObserver.");
     }
   }
-  // --- [SELESAI BARU] ---
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-
-    // --- [UBAH] ---
-    // Wajib berhenti berlangganan (unsubscribe) saat widget hancur
     umkmRouteObserver.unsubscribe(this);
     debugPrint("!!! UmkmScreen: Berhasil unsubscribe dari RouteObserver.");
-    // --- [SELESAI UBAH] ---
-
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
 
-  // --- [BARU] ---
-  // Ini adalah fungsi AJAIB dari RouteAware.
-  // Ini akan otomatis dipanggil oleh RouteObserver setiap kali
-  // rute di atasnya (misal: PaymentInstructionScreen) di-pop,
-  // dan UmkmScreen kembali menjadi rute yang aktif/terlihat.
   @override
   void didPopNext() {
     super.didPopNext();
     debugPrint("!!! UmkmScreen: didPopNext() terpicu! Refreshing notifikasi.");
-
-    // PANGGIL FUNGSI REFRESH NOTIFIKASI ANDA DI SINI
     _fetchUnpaidCount();
   }
-  // --- [SELESAI BARU] ---
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      _fetchUnpaidCount(); // <-- Panggil fungsi refresh notif
-      // debugPrint("!!! UmkmScreen: Auto-refresh triggered by App Resume.");
+      _fetchUnpaidCount();
     }
   }
 
@@ -125,57 +104,38 @@ class _UmkmScreenState extends State<UmkmScreen>
   // --- FUNGSI DATA & API ---
   // =========================================================================
 
-  // [BARU] Fungsi untuk mengambil & menghitung pesanan "Belum Dibayar"
   Future<void> _fetchUnpaidCount() async {
-    // Cek auth provider
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
       if (mounted) setState(() => _unpaidOrderCount = 0);
       return;
     }
-
     try {
-      // Panggil API riwayat yang sudah ada
       final List<RiwayatTransaksiModel> allOrders = await _apiService
           .fetchRiwayatTransaksi(token: auth.token!, userId: auth.user!.id);
-
-      // Filter HANYA untuk "Belum Dibayar"
       final count = allOrders
           .where((order) => order.getTabKategori == 'Belum Dibayar')
           .length;
-
-      // Update state
       if (mounted) {
         setState(() {
           _unpaidOrderCount = count;
         });
       }
     } catch (e) {
-      // Jika gagal, anggap 0, jangan tampilkan error
       if (mounted) setState(() => _unpaidOrderCount = 0);
     }
   }
 
-  // --- [BARU] ---
-  // Fungsi gabungan untuk RefreshIndicator (Tarik untuk Refresh)
-  // Ini akan me-refresh produk DAN notifikasi secara bersamaan
   Future<void> _handleRefresh() async {
-    // Kita jalankan kedua fetch secara paralel
-    await Future.wait([
-      _fetchInitialProducts(),
-      _fetchUnpaidCount(), // <-- Sekalian refresh notifikasi
-    ]);
+    await Future.wait([_fetchInitialProducts(), _fetchUnpaidCount()]);
   }
-  // --- [SELESAI BARU] ---
 
   Future<void> _fetchInitialProducts() async {
-    // ... (Fungsi ini tidak berubah) ...
     if (!_isLoadingInitial) {
       setState(() {
         _isLoadingInitial = true;
       });
     }
-
     _currentPage = 1;
     _hasMorePages = true;
     _apiError = null;
@@ -204,7 +164,6 @@ class _UmkmScreenState extends State<UmkmScreen>
   }
 
   Future<void> _fetchMoreProducts() async {
-    // ... (Fungsi ini tidak berubah) ...
     if (_isLoadingMore || !_hasMorePages) return;
     setState(() {
       _isLoadingMore = true;
@@ -230,23 +189,45 @@ class _UmkmScreenState extends State<UmkmScreen>
   }
 
   void _onScroll() {
-    // ... (Fungsi ini tidak berubah) ...
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.9) {
       _fetchMoreProducts();
     }
   }
 
-  Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
-    // ... (Fungsi ini tidak berubah, pastikan URL ngrok benar) ...
-    String baseUrl = "https://zara-gruffiest-silas.ngrok-free.dev";
+  // [BARU] Helper format mata uang
+  String _formatCurrency(int value) {
+    return NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(value);
+  }
 
+  // [PERBAIKAN UTAMA 1]: Mapping data ke Card
+  Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
+    String baseUrl = "https://zara-gruffiest-silas.ngrok-free.dev"; // Sesuaikan
     String? fotoUrl = produk.foto;
+
     if (fotoUrl != null && !fotoUrl.startsWith('http')) {
       if (fotoUrl.startsWith('storage/')) {
         fotoUrl = '$baseUrl/$fotoUrl';
       } else {
         fotoUrl = '$baseUrl/storage/$fotoUrl';
+      }
+    }
+
+    // [PERBAIKAN] Logika Harga dan Stok (Varian)
+    String priceDisplay = _formatCurrency(produk.harga);
+    int totalStok = produk.stok;
+
+    // [OPSIONAL] Jika Anda ingin rentang harga (bukan hanya terendah)
+    if (produk.varians.length > 1) {
+      final prices = produk.varians.map((v) => v.harga).toList();
+      prices.sort();
+      if (prices.first != prices.last) {
+        priceDisplay =
+            "${_formatCurrency(prices.first)} - ${_formatCurrency(prices.last)}";
       }
     }
 
@@ -257,23 +238,19 @@ class _UmkmScreenState extends State<UmkmScreen>
       'title': produk.nama,
       'subtitle': produk.deskripsi ?? produk.nama,
       'rating': 4.5,
-      'sold': produk.stok,
-      'price_final': NumberFormat.currency(
-        locale: 'id_ID',
-        symbol: 'Rp ',
-        decimalDigits: 0,
-      ).format(produk.harga),
+      'sold_text': '$totalStok Stok', // [PERBAIKAN] Tampilkan total stok
+      'price_final':
+          priceDisplay, // [PERBAIKAN] Tampilkan harga terendah/rentang
       'location': produk.lokasi ?? 'Indramayu',
       'category': produk.fitur ?? 'Lainnya',
-      'stock': produk.stok,
+      'stock': totalStok,
       'description': produk.deskripsi,
       'specifications': produk.spesifikasi,
-      'variasi': produk.variasi,
+      'varians': produk.varians.map((v) => v.toJson()).toList(),
     };
   }
 
   void _filterProducts() {
-    // ... (Fungsi ini tidak berubah) ...
     _filteredProducts = _masterProductList
         .map((p) => _mapProdukModelToCardData(p))
         .toList();
@@ -287,7 +264,6 @@ class _UmkmScreenState extends State<UmkmScreen>
   // =========================================================================
 
   void _onCategorySelected(int index) {
-    // ... (Fungsi ini tidak berubah) ...
     setState(() {
       _selectedCategoryIndex = index;
     });
@@ -300,28 +276,28 @@ class _UmkmScreenState extends State<UmkmScreen>
       context,
       MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
     ).then((_) {
-      // Saat pengguna kembali dari ProsesOrderScreen,
-      // panggil lagi _fetchUnpaidCount() untuk refresh notif
       _fetchUnpaidCount();
     });
   }
 
-  // [DIPERBARUI] Ubah menjadi async untuk me-refresh notif
   void _showFabMenu() {
     final authProvider = context.read<AuthProvider>();
     final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
-      // [PERBAIKAN KRITIS]: Pertahankan isScrollControlled dan useSafeArea
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) {
-        // [PERBAIKAN]: HAPUS SizedBox(height: MediaQuery.of(context).size.height * 0.9)
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          // [PERBAIKAN] Padding untuk menaikkan menu
+          padding: const EdgeInsets.only(
+            top: 16,
+            left: 16,
+            right: 16,
+            bottom: 24,
+          ),
           child: Column(
-            // [KUNCI]: Pertahankan mainAxisSize.min agar tinggi menyesuaikan konten
             mainAxisSize: MainAxisSize.min,
             children: [
               // --- OPSI 1: TOKO SAYA ---
@@ -359,7 +335,6 @@ class _UmkmScreenState extends State<UmkmScreen>
                         ),
                       );
                     } else {
-                      // Navigasi Daftar Toko
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -387,39 +362,35 @@ class _UmkmScreenState extends State<UmkmScreen>
                   _navigateToOrderProcess();
                 },
               ),
-              //size
             ],
           ),
         );
       },
     );
 
-    // 2. SETELAH modal tampil, panggil API di latar belakang.
     _fetchUnpaidCount();
   }
 
-  // [BARU] Widget helper untuk membuat badge notifikasi
+  // [PERBAIKAN] Widget helper untuk badge (warna hardcoded)
   Widget _buildNotificationBadge(
     int count,
     Widget child, {
     bool isDense = false,
   }) {
     if (count == 0) {
-      return child; // Jika tidak ada notif, kembalikan widget aslinya
+      return child;
     }
-
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child, // Widget utama (Tombol FAB atau Teks ListTile)
+        child,
         Positioned(
-          // Sesuaikan posisi badge
           top: isDense ? -4 : 0,
           right: isDense ? -4 : 0,
           child: Container(
             padding: EdgeInsets.all(isDense ? 4 : 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.error, // Warna merah
+              color: Colors.red, // <-- Warna merah hardcoded
               shape: BoxShape.circle,
               border: Border.all(
                 color: Theme.of(context).scaffoldBackgroundColor,
@@ -451,7 +422,6 @@ class _UmkmScreenState extends State<UmkmScreen>
   // =========================================================================
   @override
   Widget build(BuildContext context) {
-    // ... (Logika kalkulasi grid tidak berubah) ...
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -459,7 +429,8 @@ class _UmkmScreenState extends State<UmkmScreen>
     const double crossAxisSpacing = 8.0;
     final double itemWidth =
         (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const double heightMultiplier = 1.8;
+    // [PERBAIKAN] Sesuaikan rasio untuk mengakomodasi teks harga 2 baris
+    const double heightMultiplier = 1.9;
     final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
 
     final bottomInset =
@@ -468,7 +439,6 @@ class _UmkmScreenState extends State<UmkmScreen>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      // ... (AppBar tidak berubah) ...
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(65.0),
         child: AppBar(
@@ -572,10 +542,10 @@ class _UmkmScreenState extends State<UmkmScreen>
       ),
       body: Stack(
         children: [
-          // ... (Column dan Kategori tidak berubah) ...
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              // --- WIDGET 1: Category Chips (Sticky) ---
               SizedBox(
                 height: 70,
                 child: ListView.builder(
@@ -623,16 +593,14 @@ class _UmkmScreenState extends State<UmkmScreen>
                 ),
               ),
 
-              // ... (Expanded) ...
+              // --- WIDGET 2: Bagian Scrollable (Refresh + Header + Grid) ---
               Expanded(
-                // --- [UBAH] ---
-                // Arahkan onRefresh ke fungsi gabungan _handleRefresh
                 child: RefreshIndicator(
                   onRefresh: _handleRefresh,
-                  // --- [SELESAI UBAH] ---
                   child: CustomScrollView(
                     controller: _scrollController,
                     slivers: [
+                      // --- SLIVER 1: Header "Hasil Produk" (Scrollable) ---
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(
@@ -661,6 +629,7 @@ class _UmkmScreenState extends State<UmkmScreen>
                           ),
                         ),
                       ),
+                      // --- SLIVER 2: Grid Produk (Loading/Error/Grid) ---
                       _buildProductGrid(childAspectRatio, bottomInset),
                     ],
                   ),
@@ -668,8 +637,7 @@ class _UmkmScreenState extends State<UmkmScreen>
               ),
             ],
           ),
-
-          // --- [DIPERBARUI] FAB (Floating Action Button) ---
+          // --- FAB (Floating Action Button) ---
           Align(
             alignment: Alignment.bottomRight,
             child: Padding(
@@ -680,7 +648,6 @@ class _UmkmScreenState extends State<UmkmScreen>
               child: SizedBox(
                 width: 55.0,
                 height: 55.0,
-                // [DIPERBARUI] Bungkus FAB dengan Badge
                 child: _buildNotificationBadge(
                   _unpaidOrderCount, // Gunakan state count
                   FloatingActionButton(
@@ -700,7 +667,7 @@ class _UmkmScreenState extends State<UmkmScreen>
     );
   }
 
-  // ... (Fungsi _buildProductGrid tidak berubah) ...
+  /// Widget helper ini di-refactor untuk mengembalikan Sliver
   Widget _buildProductGrid(double childAspectRatio, double bottomInset) {
     if (_isLoadingInitial) {
       return const SliverFillRemaining(
@@ -761,17 +728,25 @@ class _UmkmScreenState extends State<UmkmScreen>
           if (index == _filteredProducts.length) {
             return const Center(child: CircularProgressIndicator());
           }
-          final product = _filteredProducts[index];
+          final productMap =
+              _filteredProducts[index]; // Map → untuk ProductCard
+          final produkModel =
+              _masterProductList[index]; // Model → untuk DetailScreen
+
           return GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DetailProdukScreen(product: product),
+                  builder: (context) => DetailProdukScreen(
+                    product: produkModel, // kirim Model ke Detail
+                  ),
                 ),
               );
             },
-            child: ProductCard(product: product),
+            child: ProductCard(
+              product: productMap, // ProductCard tetap menerima Map
+            ),
           );
         },
       ),
@@ -780,19 +755,19 @@ class _UmkmScreenState extends State<UmkmScreen>
 }
 
 // =========================================================================
-// --- ProductCard (Tidak Berubah) ---
+// --- [PERBAIKAN UTAMA 2] ProductCard ---
 // =========================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const ProductCard({required this.product, super.key});
 
+  /// Helper: membangun widget gambar produk (tidak berubah dari aslinya)
   Widget _buildProductImage(String? imageUrl, BuildContext context) {
-    // ... (Fungsi ini tidak berubah) ...
     if (imageUrl == null || imageUrl.isEmpty) {
       return Container(
         width: double.infinity,
         height: double.infinity,
-        color: Theme.of(context).colorScheme.surfaceContainer,
+        color: Theme.of(context).colorScheme.surfaceVariant,
         child: Center(
           child: Icon(
             Icons.image_not_supported_outlined,
@@ -823,7 +798,7 @@ class ProductCard extends StatelessWidget {
         return Container(
           width: double.infinity,
           height: double.infinity,
-          color: Theme.of(context).colorScheme.surfaceContainer,
+          color: Theme.of(context).colorScheme.surfaceVariant,
           child: Center(
             child: Icon(
               Icons.broken_image_outlined,
@@ -838,9 +813,22 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Fungsi ini tidak berubah) ...
     final theme = Theme.of(context);
     final Color priceColor = theme.colorScheme.primary;
+
+    // Safe getters with fallback
+    final String idTag = product['id']?.toString() ?? UniqueKey().toString();
+    final String title = product['title']?.toString() ?? 'Nama Produk';
+    final String image = product['image']?.toString() ?? '';
+    final String priceFinal = product['price_final']?.toString() ?? '-';
+    final String rating = (product['rating'] != null)
+        ? product['rating'].toString()
+        : '-';
+    final String soldText =
+        product['sold_text']?.toString() ??
+        (product['stock'] != null ? 'Stok: ${product['stock']}' : 'Stok: 0');
+    final String location =
+        product['location']?.toString() ?? 'Lokasi tidak diketahui';
 
     return Card(
       elevation: 1.0,
@@ -850,21 +838,25 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          // 1. Foto produk
           AspectRatio(
             aspectRatio: 1,
             child: Hero(
-              tag: 'produk-${product['id']}',
-              child: _buildProductImage(product['image'], context),
+              tag: 'produk-$idTag',
+              child: _buildProductImage(image, context),
             ),
           ),
+
+          // 2. Area teks
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Judul
                   Text(
-                    product['title'] ?? 'Nama Produk',
+                    title,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),
@@ -872,8 +864,10 @@ class ProductCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
+
+                  // Harga (menampilkan rentang atau value yang sudah ada)
                   Text(
-                    product['price_final']!,
+                    priceFinal,
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: priceColor,
                       fontWeight: FontWeight.w800,
@@ -881,7 +875,9 @@ class ProductCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Spacer(),
+
+                  const Spacer(), // dorong bar bawah ke bawah
+                  // Rating & Stok
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -892,24 +888,26 @@ class ProductCard extends StatelessWidget {
                             color: Colors.amber.shade700,
                             size: 14,
                           ),
-                          const SizedBox(width: 2),
-                          Text(
-                            product['rating'].toString(),
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          const SizedBox(width: 4),
+                          Text(rating, style: theme.textTheme.bodySmall),
                         ],
                       ),
-                      Text(
-                        'Stok: ${product['sold']}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
+                      Expanded(
+                        child: Text(
+                          soldText,
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
+
+                  // Lokasi
                   Row(
                     children: [
                       Icon(
@@ -920,13 +918,12 @@ class ProductCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          product['location'] ?? 'Lokasi tidak diketahui',
+                          location,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.hintColor,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          softWrap: false,
                         ),
                       ),
                     ],

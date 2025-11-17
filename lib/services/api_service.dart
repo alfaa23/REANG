@@ -32,6 +32,7 @@ import 'package:reang_app/models/ongkir_model.dart';
 import 'package:reang_app/models/payment_method_model.dart';
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/models/detail_transaksi_response.dart';
+import 'package:reang_app/models/produk_varian_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -1630,33 +1631,97 @@ class ApiService {
     try {
       String endpoint;
       final Map<String, dynamic> queryParams = {'page': page};
+
+      // Mode search
       if (query != null && query.isNotEmpty) {
         endpoint = '$_baseUrlBackend/produk/show';
         queryParams['q'] = query;
+
+        // Mode filter kategori
       } else if (fitur != null && fitur != 'Semua') {
         final kategoriEncoded = Uri.encodeComponent(fitur);
         endpoint = '$_baseUrlBackend/produk/kategori/$kategoriEncoded';
+
+        // Default
       } else {
         endpoint = '$_baseUrlBackend/produk/show';
       }
-      if (query != null && query.isNotEmpty) {
-        queryParams['q'] = query;
-      }
+
       final response = await _dio.get(endpoint, queryParameters: queryParams);
-      if (response.statusCode == 200) {
-        final responseData = response.data;
-        return PaginationResponseModel<ProdukModel>(
-          currentPage: responseData['current_page'] ?? 1,
-          lastPage: responseData['last_page'] ?? 1,
-          data: (responseData['data'] as List)
-              .map((item) => ProdukModel.fromJson(item))
-              .toList(),
-        );
-      } else {
+
+      if (response.statusCode != 200) {
         throw Exception('Gagal memuat data produk');
       }
+
+      final responseData = response.data;
+      final List dataList = responseData['data'] ?? [];
+
+      final parsedProducts = dataList
+          .map((json) => ProdukModel.fromJson(json))
+          .whereType<ProdukModel>()
+          .toList();
+
+      return PaginationResponseModel<ProdukModel>(
+        currentPage: responseData['current_page'] ?? 1,
+        lastPage: responseData['last_page'] ?? 1,
+        data: parsedProducts,
+      );
     } catch (e) {
       throw Exception('Terjadi error saat mengambil data produk: $e');
+    }
+  }
+
+  // ============================================================================
+  // FETCH PRODUK BY TOKO (KHUSUS ADMIN TOKO)
+  // ============================================================================
+  Future<List<ProdukModel>> fetchProdukByToko({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/produk/toko/$idToko',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      // Jika backend mengembalikan 404 = toko belum punya produk
+      if (response.statusCode == 404) return [];
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal memuat produk toko');
+      }
+
+      final List dataList = response.data['data'] ?? [];
+
+      final parsedProducts = dataList
+          .map((item) {
+            try {
+              return ProdukModel.fromJson(item);
+            } catch (e) {
+              debugPrint('--- ERROR PARSING PRODUK BY TOKO ---');
+              debugPrint('Detail: $e');
+              debugPrint('DATA: $item');
+              return null;
+            }
+          })
+          .whereType<ProdukModel>()
+          .toList();
+
+      return parsedProducts;
+    } on DioException catch (e) {
+      // Jika 404 dari Dio
+      if (e.response?.statusCode == 404) {
+        return [];
+      }
+
+      final message =
+          e.response?.data?['message'] ?? 'Gagal memuat produk toko';
+      throw Exception(message);
     }
   }
 
@@ -1686,6 +1751,7 @@ class ApiService {
     required int userId,
     required int tokoId,
     required int produkId,
+    required int idVarian,
     required int jumlah,
     String? variasi,
   }) async {
@@ -1696,6 +1762,7 @@ class ApiService {
           'id_user': userId,
           'id_toko': tokoId,
           'id_produk': produkId,
+          'id_varian': idVarian,
           'jumlah': jumlah,
           'variasi': variasi,
         },
@@ -2055,6 +2122,148 @@ class ApiService {
             'Gagal terhubung',
       );
     } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+  // =======================================================================
+  // --- [PERBAIKAN TOTAL] FUNGSI KELOLA PRODUK (CRUD) ---
+  // =======================================================================
+
+  /// 1. POST: Menambahkan produk baru (Menggunakan Varian)
+  Future<Map<String, dynamic>> createProduk({
+    required String token,
+    required ProdukModel dataProduk, // <-- Model produk induk
+    required List<ProdukVarianModel> varians, // <-- List varian
+    XFile? foto, // Foto dari image_picker (opsional)
+  }) async {
+    try {
+      List<Map<String, dynamic>> listVarianJson = varians
+          .map((v) => v.toJson())
+          .toList();
+
+      FormData formData = FormData.fromMap({
+        'id_toko': dataProduk.idToko,
+        'nama': dataProduk.nama,
+        'deskripsi': dataProduk.deskripsi,
+        'spesifikasi': dataProduk.spesifikasi,
+        'fitur': dataProduk.fitur,
+        'varians': listVarianJson,
+      });
+
+      if (foto != null) {
+        formData.files.add(
+          MapEntry(
+            'foto',
+            await MultipartFile.fromFile(foto.path, filename: foto.name),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/produk/store',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on createProduk: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Gagal menambah produk');
+    } catch (e) {
+      debugPrint("Error on createProduk: $e");
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  /// 2. POST (PUT): Memperbarui produk (Menggunakan Varian)
+  Future<Map<String, dynamic>> updateProduk({
+    required String token,
+    required int produkId,
+    required ProdukModel dataProduk,
+    required List<ProdukVarianModel> varians,
+    XFile? fotoBaru,
+    bool hapusFoto = false,
+  }) async {
+    try {
+      List<Map<String, dynamic>> listVarianJson = varians
+          .map((v) => v.toJson())
+          .toList();
+
+      FormData formData = FormData.fromMap({
+        '_method': 'PUT',
+        'nama': dataProduk.nama,
+        'deskripsi': dataProduk.deskripsi,
+        'spesifikasi': dataProduk.spesifikasi,
+        'fitur': dataProduk.fitur,
+        'varians': listVarianJson,
+      });
+
+      if (hapusFoto) {
+        formData.fields.add(const MapEntry('foto', ''));
+      } else if (fotoBaru != null) {
+        formData.files.add(
+          MapEntry(
+            'foto',
+            await MultipartFile.fromFile(
+              fotoBaru.path,
+              filename: fotoBaru.name,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/produk/update/$produkId',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on updateProduk: ${e.response?.data}");
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal memperbarui produk',
+      );
+    } catch (e) {
+      debugPrint("Error on updateProduk: $e");
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  /// 3. DELETE: Menghapus produk
+  Future<Map<String, dynamic>> deleteProduk({
+    required String token,
+    required int produkId,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        '$_baseUrlBackend/produk/$produkId',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on deleteProduk: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Gagal menghapus produk');
+    } catch (e) {
+      debugPrint("Error on deleteProduk: $e");
       throw Exception('Terjadi kesalahan: $e');
     }
   }

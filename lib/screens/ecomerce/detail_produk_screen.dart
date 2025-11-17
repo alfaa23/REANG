@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/models/produk_model.dart';
+import 'package:reang_app/models/produk_varian_model.dart'; // <-- [BARU] Impor model varian
 import 'package:reang_app/services/api_service.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/providers/cart_provider.dart';
@@ -10,7 +11,8 @@ import 'checkout_screen.dart';
 import 'package:intl/intl.dart';
 
 class DetailProdukScreen extends StatefulWidget {
-  final Map<String, dynamic> product;
+  // [PERBAIKAN] Terima ProdukModel, bukan Map
+  final ProdukModel product;
 
   const DetailProdukScreen({required this.product, super.key});
 
@@ -28,6 +30,26 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
   List<ProdukModel> _similarProducts = [];
   bool _isLoadingSimilar = true;
 
+  // [BARU] Helper format mata uang
+  String _formatCurrency(int value) {
+    return NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(value);
+  }
+
+  // [BARU] Helper untuk mendapatkan rentang harga
+  String _getPriceRange(List<ProdukVarianModel> varians) {
+    if (varians.isEmpty) return "Rp 0";
+    final prices = varians.map((v) => v.harga).toList();
+    prices.sort();
+    final minPrice = _formatCurrency(prices.first);
+    final maxPrice = _formatCurrency(prices.last);
+    if (minPrice == maxPrice) return minPrice;
+    return "$minPrice - $maxPrice";
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,22 +65,25 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
 
   /// Mengatur galeri foto dari DATA ASLI
   void _setupProductImages() {
-    final String? mainImage = widget.product['image'];
+    // [PERBAIKAN] Ambil dari model
+    final String? mainImage = widget.product.foto;
     if (mainImage != null && mainImage.isNotEmpty) {
       _productImages = [mainImage];
+      // TODO: Nanti jika Anda punya galeri (foto_tambahan), tambahkan di sini
+      // _productImages.addAll(widget.product.gallery);
     } else {
-      _productImages = ['assets/placeholder.png'];
+      _productImages = ['assets/placeholder.png']; // Fallback
     }
   }
 
   /// Mengambil "Produk Serupa"
   void _fetchSimilarProducts() async {
-    setState(() {
-      _isLoadingSimilar = true;
-    });
+    setState(() => _isLoadingSimilar = true);
     try {
-      final String category = widget.product['category'] ?? 'baju';
-      final int currentId = widget.product['id'] ?? 0;
+      // [PERBAIKAN] Ambil dari model
+      final String category = widget.product.fitur ?? 'Lainnya';
+      final int currentId = widget.product.id;
+
       final response = await _apiService.fetchProdukPaginated(
         page: 1,
         fitur: category,
@@ -77,27 +102,80 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     }
   }
 
-  /// Helper untuk toast error
-  void _showErrorToast(String message, ThemeData theme) {
+  /// Helper untuk toast error (Sesuai preferensi Anda)
+  void _showToast(String message, {bool isError = false}) {
+    final theme = Theme.of(context);
     showToast(
       message,
       context: context,
-      position: StyledToastPosition.top,
-      backgroundColor: theme.colorScheme.error,
+      position: StyledToastPosition.bottom,
       animation: StyledToastAnimation.scale,
       reverseAnimation: StyledToastAnimation.fade,
       animDuration: const Duration(milliseconds: 150),
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 2),
       borderRadius: BorderRadius.circular(25),
       textStyle: const TextStyle(color: Colors.white),
       curve: Curves.fastOutSlowIn,
+      backgroundColor: isError
+          ? theme.colorScheme.error
+          : Colors.black.withOpacity(0.8),
     );
+  }
+
+  // [PERBAIKAN] Helper yang hilang ditambahkan
+  Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
+    String baseUrl = "https://zara-gruffiest-silas.ngrok-free.dev"; // Sesuaikan
+    String? fotoUrl = produk.foto;
+
+    if (fotoUrl != null && !fotoUrl.startsWith('http')) {
+      if (fotoUrl.startsWith('storage/')) {
+        fotoUrl = '$baseUrl/$fotoUrl';
+      } else {
+        fotoUrl = '$baseUrl/storage/$fotoUrl';
+      }
+    }
+
+    String priceDisplay;
+    int totalStok = 0;
+
+    if (produk.varians.isEmpty) {
+      priceDisplay = "Rp 0";
+      totalStok = 0;
+    } else {
+      final prices = produk.varians.map((v) => v.harga).toList();
+      prices.sort();
+      totalStok = produk.varians.fold(0, (sum, v) => sum + v.stok);
+
+      if (prices.first == prices.last) {
+        priceDisplay = _formatCurrency(prices.first);
+      } else {
+        priceDisplay =
+            "${_formatCurrency(prices.first)} - ${_formatCurrency(prices.last)}";
+      }
+    }
+
+    return {
+      'id': produk.id,
+      'id_toko': produk.idToko,
+      'image': fotoUrl,
+      'title': produk.nama,
+      'subtitle': produk.deskripsi ?? produk.nama,
+      'rating': 4.5,
+      'sold_text': '$totalStok Stok',
+      'price_final': priceDisplay,
+      'location': produk.lokasi ?? 'Indramayu',
+      'category': produk.fitur ?? 'Lainnya',
+      'stock': totalStok,
+      'description': produk.deskripsi,
+      'specifications': produk.spesifikasi,
+      'varians': produk.varians.map((v) => v.toJson()).toList(),
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final data = widget.product;
+    final data = widget.product; // data sekarang adalah ProdukModel
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -123,12 +201,13 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
           ),
         ],
       ),
+      // [PERBAIKAN] Padding Bottom Bar
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(
-          16, // kiri
-          12, // atas
-          16, // kanan
-          16 + MediaQuery.of(context).padding.bottom, // bawah + safe area
+          16,
+          12,
+          16,
+          16 + MediaQuery.of(context).padding.bottom, // <-- Padding aman
         ),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
@@ -154,7 +233,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    data['title'] ?? 'Nama Produk',
+                    data.nama, // [PERBAIKAN] Ambil dari model
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -165,7 +244,8 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                       Icon(Icons.star, color: Colors.amber.shade700, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        '${data['rating'] ?? '0.0'} (${data['sold'] ?? '0'}+ terjual)',
+                        // [PERBAIKAN] Ambil dari model (dummy rating)
+                        '4.5 (Stok: ${data.stok})', // Menggunakan getter stok total
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.hintColor,
                         ),
@@ -174,7 +254,8 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    data['price_final'] ?? 'Rp 0',
+                    // [PERBAIKAN] Tampilkan rentang harga
+                    _getPriceRange(data.varians),
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -188,7 +269,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
               padding: const EdgeInsets.all(16.0),
               child: _buildDescriptionSection(
                 theme,
-                data['description'] ?? 'Deskripsi produk tidak tersedia.',
+                data.deskripsi ?? 'Deskripsi produk tidak tersedia.',
               ),
             ),
             Divider(color: theme.dividerColor, thickness: 8),
@@ -221,7 +302,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
 
   Widget _buildImageCarousel(ThemeData theme) {
     return Hero(
-      tag: widget.product['title'] ?? 'produk-${widget.product.hashCode}',
+      tag: 'produk-${widget.product.id}', // [PERBAIKAN] Tag Hero
       child: SizedBox(
         height: 300,
         child: PageView.builder(
@@ -276,7 +357,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         imageUrl.isEmpty ||
         imageUrl.startsWith('assets/')) {
       return Image.asset(
-        'assets/placeholder.png',
+        'assets/placeholder.png', // Pastikan Anda punya placeholder ini
         fit: BoxFit.cover,
         width: double.infinity,
         height: height ?? double.infinity,
@@ -362,22 +443,18 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     );
   }
 
-  /// Fungsi utama untuk menampilkan Modal Bottom Sheet
+  /// [PERBAIKAN TOTAL] Fungsi utama untuk menampilkan Modal Bottom Sheet
   void _showOptionsModal(BuildContext context, {required bool isBuyNow}) {
     final theme = Theme.of(context);
-    final data = widget.product;
+    final ProdukModel data = widget.product;
     int modalQuantity = 1;
-    String? modalSelectedSize;
 
-    final List<String> availableSizes =
-        (data['variasi'] as String?)
-            ?.split(',')
-            .where((s) => s.trim().isNotEmpty)
-            .toList() ??
-        [];
+    ProdukVarianModel? modalSelectedVarian;
+    final List<ProdukVarianModel> availableVarians = data.varians;
 
-    if (availableSizes.length == 1) {
-      modalSelectedSize = availableSizes.first;
+    // Jika hanya ada 1 varian, otomatis pilih varian itu
+    if (availableVarians.length == 1) {
+      modalSelectedVarian = availableVarians.first;
     }
 
     showModalBottomSheet(
@@ -390,45 +467,59 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
+            // --- Helper Internal Modal ---
             void _incrementModalQuantity() {
-              final int stok = data['stock'] ?? 0;
+              final int stok =
+                  modalSelectedVarian?.stok ??
+                  data.stok; // Fallback ke stok utama (getter)
+              if (stok == 0) {
+                _showToast("Pilih varian yang masih tersedia", isError: true);
+                return;
+              }
               if (modalQuantity < stok) {
-                setModalState(() {
-                  modalQuantity++;
-                });
+                setModalState(() => modalQuantity++);
               } else {
-                _showErrorToast("Jumlah melebihi stok (Stok: $stok)", theme);
+                _showToast("Jumlah melebihi stok (Stok: $stok)", isError: true);
               }
             }
 
             void _decrementModalQuantity() {
               if (modalQuantity > 1) {
-                setModalState(() {
-                  modalQuantity--;
-                });
+                setModalState(() => modalQuantity--);
               }
             }
 
-            void _selectModalSize(String size) {
+            void _selectModalVarian(ProdukVarianModel varian) {
               setModalState(() {
-                modalSelectedSize = size;
+                modalSelectedVarian = varian;
+                // Reset kuantitas jika stok varian baru < kuantitas saat ini
+                if (modalQuantity > varian.stok) {
+                  modalQuantity = (varian.stok > 0) ? 1 : 0;
+                }
+                if (modalQuantity == 0 && varian.stok > 0) {
+                  modalQuantity = 1;
+                }
               });
             }
 
-            // =================================================================
-            // --- [PERBAIKAN] INI ADALAH FUNGSI _confirmAction YANG BENAR ---
-            // =================================================================
+            // --- Aksi Konfirmasi ---
             void _confirmAction() async {
-              // 1. Validasi Ukuran
-              if (availableSizes.isNotEmpty && modalSelectedSize == null) {
-                _showErrorToast(
-                  "Silakan pilih variasi/ukuran terlebih dahulu",
-                  theme,
+              // 1. Validasi Varian
+              if (availableVarians.isNotEmpty && modalSelectedVarian == null) {
+                _showToast(
+                  "Silakan pilih varian terlebih dahulu",
+                  isError: true,
                 );
                 return;
               }
 
-              // 2. Ambil Provider
+              // 2. Validasi Stok
+              final selectedStok = modalSelectedVarian?.stok ?? data.stok;
+              if (selectedStok < modalQuantity || modalQuantity == 0) {
+                _showToast("Stok tidak mencukupi", isError: true);
+                return;
+              }
+
               final cartProvider = Provider.of<CartProvider>(
                 this.context,
                 listen: false,
@@ -438,70 +529,70 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 listen: false,
               );
 
-              // 3. Cek Login untuk KEDUA skenario
               if (authProvider.token == null || authProvider.user == null) {
-                _showErrorToast("Anda harus login untuk melanjutkan.", theme);
+                _showToast(
+                  "Anda harus login untuk melanjutkan.",
+                  isError: true,
+                );
                 return;
               }
 
+              // [PERBAIKAN] Siapkan data Map
+              final Map<String, dynamic> itemToSend = {
+                'id': data.id,
+                'id_toko': data.idToko,
+                'nama_toko': data.namaToko,
+                'title': data.nama,
+                'image': data.foto,
+                'location': data.lokasi,
+                // [PENTING] Ambil harga dan stok dari VARIAN TERPILIH
+                'price_final': _formatCurrency(
+                  modalSelectedVarian?.harga ?? data.harga,
+                ),
+                'stock': modalSelectedVarian?.stok ?? data.stok,
+                'variasi': modalSelectedVarian?.namaVarian ?? data.variasi,
+                'description': data.deskripsi,
+                'specifications': data.spesifikasi,
+              };
+
               if (isBuyNow) {
-                // --- SKENARIO B: BELI LANGSUNG (PERBAIKAN ALUR) ---
-
-                // 4a. Tutup Modal
+                // --- SKENARIO B: BELI LANGSUNG ---
                 if (mounted) Navigator.pop(ctx);
-
-                // [PERBAIKAN] Cek apakah 'nama_toko' ada di map produk
-                // Jika tidak ada, kirim fallback.
-                final String namaToko =
-                    widget.product['nama_toko'] ?? "Toko Penjual";
-
-                // 5a. Navigasi ke Halaman Checkout
                 Navigator.push(
-                  this.context, // Gunakan context dari State
+                  this.context,
                   MaterialPageRoute(
                     builder: (context) => CheckoutScreen(
-                      directBuyItem: widget.product,
+                      directBuyItem: itemToSend,
                       directBuyQty: modalQuantity,
-                      directBuyNamaToko:
-                          namaToko, // <-- [PERBAIKAN] Kirim nama toko
+                      directBuyNamaToko: data.namaToko ?? "Toko Penjual",
                     ),
                   ),
                 );
               } else {
                 // --- SKENARIO A: TAMBAH KE KERANJANG ---
                 try {
-                  // 4b. Panggil 'addToCart'
                   await cartProvider.addToCart(
-                    product: widget.product,
+                    product: itemToSend,
                     quantity: modalQuantity,
-                    selectedSize: modalSelectedSize ?? '',
+                    selectedSize: modalSelectedVarian!.namaVarian,
+                    idVarian: modalSelectedVarian!
+                        .id!, // Kirim ID varian yang dipilih
                   );
 
-                  // 5b. Sukses
                   if (mounted) Navigator.pop(ctx); // Tutup modal
-                  showToast(
-                    "Produk ditambahkan ke keranjang!",
-                    context: this.context,
-                    backgroundColor: Colors.black.withOpacity(0.7),
-                    position: StyledToastPosition.bottom,
-                    duration: const Duration(seconds: 2),
-                    borderRadius: BorderRadius.circular(25),
-                  );
+                  _showToast("Produk ditambahkan ke keranjang!");
 
-                  // 6b. Refresh keranjang di background
+                  // Refresh data keranjang
                   cartProvider.fetchCart();
                 } catch (e) {
-                  // 7b. Gagal
-                  _showErrorToast(
+                  _showToast(
                     e.toString().replaceAll('Exception: ', ''),
-                    theme,
+                    isError: true,
                   );
                 }
               }
             }
-            // =================================================================
-            // --- [PERBAIKAN SELESAI] ---
-            // =================================================================
+            // --- Selesai Aksi Konfirmasi ---
 
             return ConstrainedBox(
               constraints: BoxConstraints(
@@ -529,7 +620,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: _buildProductImage(
-                            widget.product['image'],
+                            widget.product.foto,
                             context,
                           ),
                         ),
@@ -539,7 +630,9 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                data['price_final'] ?? 'Rp 0',
+                                _formatCurrency(
+                                  modalSelectedVarian?.harga ?? data.harga,
+                                ),
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.primary,
@@ -547,7 +640,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Stok: ${data['stock'] ?? '0'}',
+                                'Stok: ${modalSelectedVarian?.stok ?? data.stok}',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.hintColor,
                                 ),
@@ -562,12 +655,13 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                       ],
                     ),
                     const Divider(height: 32),
+
                     Flexible(
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (availableSizes.isNotEmpty) ...[
+                            if (availableVarians.isNotEmpty) ...[
                               Text(
                                 'Ukuran / Variasi',
                                 style: theme.textTheme.titleMedium,
@@ -575,11 +669,12 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8.0,
-                                children: availableSizes.map((size) {
-                                  return _buildSizeChip(
-                                    size,
-                                    isSelected: modalSelectedSize == size,
-                                    onSelect: _selectModalSize,
+                                children: availableVarians.map((varian) {
+                                  return _buildVarianChip(
+                                    varian,
+                                    isSelected:
+                                        modalSelectedVarian?.id == varian.id,
+                                    onSelect: _selectModalVarian,
                                   );
                                 }).toList(),
                               ),
@@ -596,17 +691,17 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                             const SizedBox(height: 20),
                             _buildSpecificationsSection(
                               theme,
-                              (data['specifications'] as String?)
-                                      ?.split(',')
-                                      .where((s) => s.trim().isNotEmpty)
-                                      .toList() ??
-                                  [],
+                              (data.spesifikasi ?? '')
+                                  .split(',')
+                                  .where((s) => s.trim().isNotEmpty)
+                                  .toList(),
                             ),
                           ],
                         ),
                       ),
                     ),
                     const Divider(height: 24),
+
                     ElevatedButton(
                       onPressed: _confirmAction,
                       style: ElevatedButton.styleFrom(
@@ -638,27 +733,32 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
 
   // --- Widget helper lainnya ---
 
-  Widget _buildSizeChip(
-    String label, {
+  Widget _buildVarianChip(
+    ProdukVarianModel varian, {
     required bool isSelected,
-    required Function(String) onSelect,
+    required Function(ProdukVarianModel) onSelect,
   }) {
     final theme = Theme.of(context);
-    final bool isDarkMode = theme.brightness == Brightness.dark;
-    final Color selectedContentColor = isDarkMode ? Colors.black : Colors.white;
+    final bool isStokHabis = varian.stok == 0;
+
     return ChoiceChip(
-      label: Text(label),
+      label: Text(varian.namaVarian),
       selected: isSelected,
-      onSelected: (selected) {
-        if (selected) {
-          onSelect(label);
-        }
-      },
+      onSelected: isStokHabis
+          ? null
+          : (selected) {
+              if (selected) {
+                onSelect(varian);
+              }
+            },
       selectedColor: theme.colorScheme.primary,
       backgroundColor: theme.colorScheme.surface,
-      checkmarkColor: selectedContentColor,
       labelStyle: TextStyle(
-        color: isSelected ? selectedContentColor : theme.colorScheme.onSurface,
+        color: isStokHabis
+            ? theme.disabledColor
+            : (isSelected
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface),
         fontWeight: FontWeight.bold,
       ),
       shape: RoundedRectangleBorder(
@@ -773,39 +873,29 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         itemBuilder: (context, index) {
           final produk = _similarProducts[index];
-          final item = {
-            'id': produk.id,
-            'id_toko': produk.idToko,
-            'nama_toko': produk.namaToko, // <-- [PENTING] Kirim nama_toko
-            'title': produk.nama,
-            'subtitle': produk.deskripsi ?? produk.nama,
-            'price_final': NumberFormat.currency(
-              locale: 'id_ID',
-              symbol: 'Rp ',
-              decimalDigits: 0,
-            ).format(produk.harga),
-            'image': (produk.foto != null && !produk.foto!.startsWith('http'))
-                ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
-                : produk.foto,
-            'category': produk.fitur ?? 'Lainnya',
-            'stock': produk.stok,
-            'rating': 4.5,
-            'sold': produk.stok,
-            'description': produk.deskripsi,
-            'specifications': produk.spesifikasi,
-            'variasi': produk.variasi,
-          };
+
+          // [PERBAIKAN 2]: Panggil fungsi helper yang baru ditambahkan
+          final item = _mapProdukModelToCardData(produk);
 
           return Padding(
             padding: const EdgeInsets.only(right: 12.0),
-            child: _buildSimilarProductCard(theme, item),
+            child: _buildSimilarProductCard(
+              theme,
+              item,
+              produk,
+            ), // Kirim model asli
           );
         },
       ),
     );
   }
 
-  Widget _buildSimilarProductCard(ThemeData theme, Map<String, dynamic> item) {
+  // [PERBAIKAN 3]: Perbarui _buildSimilarProductCard agar menerima ProdukModel
+  Widget _buildSimilarProductCard(
+    ThemeData theme,
+    Map<String, dynamic> item,
+    ProdukModel model,
+  ) {
     return SizedBox(
       width: 140,
       child: Card(
@@ -814,10 +904,11 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
+            // [PERBAIKAN 4]: Kirim model-nya, bukan map
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => DetailProdukScreen(product: item),
+                builder: (context) => DetailProdukScreen(product: model),
               ),
             );
           },

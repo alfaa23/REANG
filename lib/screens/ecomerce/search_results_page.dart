@@ -422,18 +422,25 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     childAspectRatio: childAspectRatio,
                   ),
                   itemBuilder: (context, index) {
-                    final product = _mappedRecommendations[index];
+                    final productMap =
+                        _mappedRecommendations[index]; // Map (untuk Card)
+                    final produkModel =
+                        _recommendations[index]; // Model (untuk Detail)
+
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                DetailProdukScreen(product: product),
+                            builder: (context) => DetailProdukScreen(
+                              product: produkModel, // kirim Model ke Detail
+                            ),
                           ),
                         );
                       },
-                      child: ProductCard(product: product),
+                      child: ProductCard(
+                        product: productMap, // Card tetap pakai Map
+                      ),
                     );
                   },
                 ),
@@ -459,17 +466,23 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           if (index == _filteredProducts.length) {
             return const Center(child: CircularProgressIndicator());
           }
-          final product = _filteredProducts[index];
+          final productMap = _filteredProducts[index]; // Map untuk Card
+          final produkModel = _masterProductList[index]; // Model untuk Detail
+
           return GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DetailProdukScreen(product: product),
+                  builder: (context) => DetailProdukScreen(
+                    product: produkModel, // kirim Model ke Detail
+                  ),
                 ),
               );
             },
-            child: ProductCard(product: product),
+            child: ProductCard(
+              product: productMap, // Card tetap pakai Map
+            ),
           );
         },
       ),

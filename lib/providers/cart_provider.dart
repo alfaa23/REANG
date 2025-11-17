@@ -106,36 +106,28 @@ class CartProvider with ChangeNotifier {
   // =========================================================================
   // --- FUNGSI 'CREATE' (Add) ---
   // =========================================================================
-
-  // [PERBAIKAN] Fungsi ini diubah agar CEPAT (Tidak memanggil fetchCart)
   Future<void> addToCart({
     required Map<String, dynamic> product,
     required int quantity,
     required String selectedSize,
+    required int idVarian, // <-- tetap wajib
   }) async {
     if (_authProvider.token == null || _authProvider.user == null) {
       throw Exception('Anda harus login terlebih dahulu.');
     }
 
-    // (State loading tidak perlu di-set di sini, agar tidak memblokir UI)
-
     try {
-      // HANYA panggil 1 API
       await _apiService.addToCart(
         token: _authProvider.token!,
         userId: _authProvider.user!.id,
         tokoId: product['id_toko'],
         produkId: product['id'],
+        idVarian: idVarian,
         jumlah: quantity,
         variasi: selectedSize,
       );
-
-      // [DIHAPUS] await fetchCart();
-      // Kita panggil fetchCart() secara terpisah di UI
-      // agar toast bisa muncul dulu.
     } catch (e) {
-      // Lempar error agar UI (DetailProdukScreen) bisa menangkapnya
-      throw Exception(e.toString());
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
     }
   }
 

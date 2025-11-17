@@ -11,6 +11,7 @@ class UserModel {
   String? alamat;
   String phone;
   String noKtp;
+  int? idToko;
 
   // --- INI PERUBAHAN UTAMA ---
   // Role bukan lagi String, tapi sebuah List dari RoleModel
@@ -24,6 +25,7 @@ class UserModel {
     this.alamat,
     required this.phone,
     required this.noKtp,
+    this.idToko,
     required this.role, // Diperbarui
   });
 
@@ -44,6 +46,7 @@ class UserModel {
       alamat: map['alamat'],
       phone: map['phone'] ?? '',
       noKtp: map['no_ktp'] ?? '',
+      idToko: (map['id_toko'] as num?)?.toInt(),
       role: roles, // Gunakan list yang sudah diparsing
     );
   }
@@ -56,6 +59,7 @@ class UserModel {
     "alamat": alamat,
     "phone": phone,
     "no_ktp": noKtp,
+    "id_toko": idToko,
     // Mengubah List<RoleModel> kembali menjadi list JSON
     "role": List<dynamic>.from(role.map((x) => x.toMap())),
   };
