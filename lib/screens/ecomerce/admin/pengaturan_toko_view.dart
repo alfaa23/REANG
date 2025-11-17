@@ -1,5 +1,3 @@
-// Lokasi: lib/screens/ecomerce/admin/pengaturan_toko_view.dart
-
 import 'package:flutter/material.dart';
 import 'kelola_metode_pembayaran_screen.dart'; // <-- Pastikan file ini ada
 import 'kelola_ongkir_screen.dart'; // <-- Pastikan file ini ada
@@ -9,7 +7,7 @@ class PengaturanTokoView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    //final theme = Theme.of(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),

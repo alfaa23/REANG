@@ -1,11 +1,8 @@
-// Lokasi: lib/screens/ecomerce/umkm_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/produk_model.dart';
-import 'package:reang_app/models/produk_varian_model.dart'; // <-- [PENTING] Impor model varian
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';

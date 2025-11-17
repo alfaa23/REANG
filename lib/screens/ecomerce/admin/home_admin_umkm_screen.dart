@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
 import 'kelola_produk_view.dart';
 import 'umkm_analytics_dashboard.dart'; // <--- Tambahkan Import ini

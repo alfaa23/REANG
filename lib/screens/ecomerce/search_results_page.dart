@@ -2,17 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:reang_app/models/produk_model.dart';
+import 'package:reang_app/models/produk_varian_model.dart'; // <-- [BARU] Impor Varian
 import 'package:reang_app/services/api_service.dart';
 import 'cart_screen.dart';
 import 'detail_produk_screen.dart';
 
-// Import yang tidak perlu (FAB) sudah dihapus
-// import 'package:provider/provider.dart';
-// import 'package:reang_app/providers/auth_provider.dart';
-// ... dll ...
-
 class SearchResultsPage extends StatefulWidget {
-  // Wajib menerima query
   final String query;
   const SearchResultsPage({super.key, required this.query});
 
@@ -41,9 +36,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   List<Map<String, dynamic>> _mappedRecommendations = [];
   bool _isLoadingRecs = false;
 
-  // State Kategori (dihapus)
-  // final List<Map<String, dynamic>> categories = ... (DIHAPUS)
-  // int _selectedCategoryIndex = 0; (DIHAPUS)
+  // Base URL fallback (sesuaikan bila ApiService menyediakan lokasi baseUrl)
+  final String _baseUrl = "https://zara-gruffiest-silas.ngrok-free.dev";
 
   @override
   void initState() {
@@ -63,12 +57,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   // --- FUNGSI DATA & API ---
   // =========================================================================
 
-  /// [PERBAIKAN 1] Fungsi ini sekarang adalah target untuk RefreshIndicator
   Future<void> _fetchInitialProducts() async {
     if (!_isLoadingInitial) {
-      setState(() {
-        _isLoadingInitial = true;
-      });
+      setState(() => _isLoadingInitial = true);
     }
     _currentPage = 1;
     _hasMorePages = true;
@@ -79,7 +70,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     try {
       final response = await _apiService.fetchProdukPaginated(
         page: _currentPage,
-        // [PERUBAHAN] Menggunakan query, bukan fitur
         query: widget.query,
       );
 
@@ -87,15 +77,15 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       _currentPage = response.currentPage;
       _hasMorePages = response.hasMorePages;
 
-      // Jika hasil pencarian utama kosong, panggil rekomendasi
       if (_masterProductList.isEmpty && _apiError == null) {
-        _fetchRecommendations(); // (Tidak perlu 'await')
+        _fetchRecommendations();
       }
     } catch (e) {
       _apiError = e.toString();
       _masterProductList = [];
     }
 
+    // Animasi kecil supaya UI tidak langsung "kejepret"
     await Future.delayed(const Duration(milliseconds: 300));
 
     if (mounted) {
@@ -106,13 +96,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-  /// Fungsi baru untuk mengambil rekomendasi (produk terbaru)
   Future<void> _fetchRecommendations() async {
-    setState(() {
-      _isLoadingRecs = true;
-    });
+    setState(() => _isLoadingRecs = true);
     try {
-      // Panggil API tanpa query (atau fitur 'Semua')
       final recResponse = await _apiService.fetchProdukPaginated(
         page: 1,
         fitur: 'Semua',
@@ -125,21 +111,16 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       _recommendations = [];
       _mappedRecommendations = [];
     }
-    setState(() {
-      _isLoadingRecs = false;
-    });
+    if (mounted) setState(() => _isLoadingRecs = false);
   }
 
   Future<void> _fetchMoreProducts() async {
     if (_isLoadingMore || !_hasMorePages) return;
-    setState(() {
-      _isLoadingMore = true;
-    });
+    setState(() => _isLoadingMore = true);
 
     try {
       final response = await _apiService.fetchProdukPaginated(
         page: _currentPage + 1,
-        // [PERUBAHAN] Menggunakan query, bukan fitur
         query: widget.query,
       );
       _masterProductList.addAll(response.data);
@@ -150,10 +131,12 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       _hasMorePages = false;
     }
 
-    setState(() {
-      _isLoadingMore = false;
-      _filterProducts();
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingMore = false;
+        _filterProducts();
+      });
+    }
   }
 
   void _onScroll() {
@@ -163,29 +146,65 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-  /// [PERBAIKAN] Fungsi ini disalin utuh dari umkm_screen.dart
+  // [BARU] Helper format mata uang
+  String _formatCurrency(int value) {
+    return NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(value);
+  }
+
+  // [PERBAIKAN UTAMA 1]: Mapping data ke Card (disamakan dengan UmkmScreen)
   Map<String, dynamic> _mapProdukModelToCardData(ProdukModel produk) {
+    String? fotoUrl = produk.foto;
+
+    if (fotoUrl != null && fotoUrl.isNotEmpty && !fotoUrl.startsWith('http')) {
+      if (fotoUrl.startsWith('storage/')) {
+        fotoUrl = '$_baseUrl/$fotoUrl';
+      } else {
+        fotoUrl = '$_baseUrl/storage/$fotoUrl';
+      }
+    }
+
+    // [PERBAIKAN] Logika Harga dan Stok (Varian)
+    String priceDisplay;
+    int totalStok = 0;
+
+    final List<ProdukVarianModel> varianList = produk.varians;
+    if (varianList.isEmpty) {
+      priceDisplay = _formatCurrency(0);
+      totalStok = 0;
+    } else {
+      final prices = varianList.map((v) => v.harga).whereType<int>().toList();
+      prices.sort();
+      totalStok = varianList.fold(0, (sum, v) => sum + (v.stok));
+
+      if (prices.isEmpty) {
+        priceDisplay = _formatCurrency(0);
+      } else if (prices.first == prices.last) {
+        priceDisplay = _formatCurrency(prices.first);
+      } else {
+        priceDisplay =
+            "${_formatCurrency(prices.first)} - ${_formatCurrency(prices.last)}";
+      }
+    }
+
     return {
       'id': produk.id,
       'id_toko': produk.idToko,
-      'image': (produk.foto != null && !produk.foto!.startsWith('http'))
-          ? 'https://92021ca9d48a.ngrok-free.app/storage/${produk.foto}'
-          : produk.foto,
+      'image': fotoUrl,
       'title': produk.nama,
       'subtitle': produk.deskripsi ?? produk.nama,
       'rating': 4.5,
-      'sold': produk.stok,
-      'price_final': NumberFormat.currency(
-        locale: 'id_ID',
-        symbol: 'Rp ',
-        decimalDigits: 0,
-      ).format(produk.harga),
+      'sold_text': '$totalStok Stok',
+      'price_final': priceDisplay,
       'location': produk.lokasi ?? 'Indramayu',
       'category': produk.fitur ?? 'Lainnya',
-      'stock': produk.stok,
+      'stock': totalStok,
       'description': produk.deskripsi,
       'specifications': produk.spesifikasi,
-      'variasi': produk.variasi,
+      'varians': varianList.map((v) => v.toJson()).toList(),
     };
   }
 
@@ -206,37 +225,33 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // --- [PERBAIKAN 4] Kalkulasi Grid "Rapat" (disalin) ---
     const double horizontalPadding = 12.0 * 2;
     const double crossAxisSpacing = 8.0;
     final double itemWidth =
         (screenWidth - horizontalPadding - crossAxisSpacing) / 2;
-    const double heightMultiplier = 1.8;
+    // [PERBAIKAN] Rasio disamakan dengan UmkmScreen
+    const double heightMultiplier = 1.9;
     final double childAspectRatio = itemWidth / (itemWidth * heightMultiplier);
-    // --- [PERBAIKAN 4 SELESAI] ---
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      // --- [PERBAIKAN 3] AppBar Dibesarkan & Disesuaikan ---
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(65.0), // <-- Dibesarkan
+        preferredSize: const Size.fromHeight(65.0),
         child: AppBar(
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          // titleSpacing 0 agar search bar rapat ke tombol back
           titleSpacing: 0.0,
           title: SafeArea(
             child: Container(
               padding: const EdgeInsets.only(top: 8.0),
               child: GestureDetector(
-                // Tap search bar untuk kembali ke halaman sugesti
                 onTap: () => Navigator.of(context).pop(),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 12, // <-- Dibesarkan
+                    vertical: 12,
                   ),
                   decoration: BoxDecoration(
                     color: theme.cardColor,
@@ -257,7 +272,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     children: [
                       Icon(Icons.search, color: theme.hintColor, size: 20),
                       const SizedBox(width: 10),
-                      // Tampilkan query yang sedang dicari
                       Expanded(
                         child: Text(
                           widget.query,
@@ -279,7 +293,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 padding: const EdgeInsets.only(top: 8.0),
                 child: IconButton(
                   icon: const Icon(Icons.shopping_cart_outlined),
-                  iconSize: 28.0, // <-- Dibesarkan
+                  iconSize: 28.0,
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -291,20 +305,18 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 8), // Padding kanan
+            const SizedBox(width: 8),
           ],
           backgroundColor: theme.scaffoldBackgroundColor,
           elevation: 0,
           foregroundColor: theme.colorScheme.onSurface,
         ),
       ),
-      // --- [PERBAIKAN 5 & 7] Body di-refactor ---
       body: RefreshIndicator(
-        onRefresh: _fetchInitialProducts, // <-- [PERBAIKAN 1]
+        onRefresh: _fetchInitialProducts,
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            // --- SLIVER 1: Header "Hasil untuk..." (Scrollable) ---
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
@@ -316,16 +328,13 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 ),
               ),
             ),
-            // --- SLIVER 2: Grid Produk (Loading/Error/Grid/Not Found) ---
             _buildProductGrid(childAspectRatio),
           ],
         ),
       ),
-      // FAB Dihapus dari halaman hasil pencarian
     );
   }
 
-  /// [PERBAIKAN 1, 2, 5]
   /// Widget helper ini di-refactor untuk mengembalikan Sliver
   Widget _buildProductGrid(double childAspectRatio) {
     final theme = Theme.of(context);
@@ -337,7 +346,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
 
     if (_apiError != null) {
-      // [PERBAIKAN 2] Tampilkan error
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -365,7 +373,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       // [PERBAIKAN] Tampilkan "Not Found" + Rekomendasi
       return SliverList(
         delegate: SliverChildListDelegate([
-          // "Maaf..." message
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 24.0,
@@ -422,6 +429,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     childAspectRatio: childAspectRatio,
                   ),
                   itemBuilder: (context, index) {
+                    // Ambil Map dan Model
                     final productMap =
                         _mappedRecommendations[index]; // Map (untuk Card)
                     final produkModel =
@@ -433,7 +441,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => DetailProdukScreen(
-                              product: produkModel, // kirim Model ke Detail
+                              product: produkModel, // kirim Model
                             ),
                           ),
                         );
@@ -451,13 +459,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
     // [PERBAIKAN 5] Kembalikan SliverPadding + SliverGrid (State Sukses)
     return SliverPadding(
-      // [PERBAIKAN 4] Padding grid "rapat"
       padding: const EdgeInsets.fromLTRB(12.0, 0, 12.0, 80),
       sliver: SliverGrid.builder(
         itemCount: _filteredProducts.length + (_hasMorePages ? 1 : 0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          // [PERBAIKAN 4] Spasi grid "rapat"
           crossAxisSpacing: 8.0,
           mainAxisSpacing: 8.0,
           childAspectRatio: childAspectRatio,
@@ -466,6 +472,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           if (index == _filteredProducts.length) {
             return const Center(child: CircularProgressIndicator());
           }
+
+          // Ambil Map dan Model
           final productMap = _filteredProducts[index]; // Map untuk Card
           final produkModel = _masterProductList[index]; // Model untuk Detail
 
@@ -474,15 +482,12 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DetailProdukScreen(
-                    product: produkModel, // kirim Model ke Detail
-                  ),
+                  builder: (context) =>
+                      DetailProdukScreen(product: produkModel),
                 ),
               );
             },
-            child: ProductCard(
-              product: productMap, // Card tetap pakai Map
-            ),
+            child: ProductCard(product: productMap),
           );
         },
       ),
@@ -491,19 +496,19 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 }
 
 // =========================================================================
-// --- ProductCard (DISALIN PERSIS DARI umkm_screen.dart) ---
+// --- ProductCard (Anti-Overflow) ---
 // =========================================================================
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const ProductCard({required this.product, super.key});
 
-  /// (Helper _buildProductImage tidak berubah)
+  /// (Helper _buildProductImage)
   Widget _buildProductImage(String? imageUrl, BuildContext context) {
     if (imageUrl == null || imageUrl.isEmpty) {
       return Container(
         width: double.infinity,
         height: double.infinity,
-        color: Theme.of(context).colorScheme.surfaceContainer,
+        color: Theme.of(context).colorScheme.surfaceVariant,
         child: Center(
           child: Icon(
             Icons.image_not_supported_outlined,
@@ -534,7 +539,7 @@ class ProductCard extends StatelessWidget {
         return Container(
           width: double.infinity,
           height: double.infinity,
-          color: Theme.of(context).colorScheme.surfaceContainer,
+          color: Theme.of(context).colorScheme.surfaceVariant,
           child: Center(
             child: Icon(
               Icons.broken_image_outlined,
@@ -552,115 +557,105 @@ class ProductCard extends StatelessWidget {
     final theme = Theme.of(context);
     final Color priceColor = theme.colorScheme.primary;
 
+    final title = (product['title'] ?? 'Nama Produk').toString();
+    final priceFinal = (product['price_final'] ?? 'Rp 0').toString();
+    final rating = product['rating']?.toString() ?? '0';
+    final soldText = product['sold_text'] ?? 'Stok: 0';
+    final location = product['location'] ?? 'Lokasi tidak diketahui';
+
     return Card(
-      // [PERBAIKAN 4] Desain "Rapat" (ala Shopee)
       elevation: 1.0,
       shadowColor: theme.shadowColor.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6.0), // <-- Ujung tidak melengkung
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.0)),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // --- FOTO PRODUK (TETAP) ---
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: Hero(
-                  tag: 'produk-${product['id']}',
-                  child: _buildProductImage(product['image'], context),
-                ),
-              ),
-            ],
-          ),
-
-          // --- [PERBAIKAN 1 & 4] ---
-          // Bagian teks "rapat", tidak "renggang", dan tidak "panjang"
-          Padding(
-            padding: const EdgeInsets.all(6.0), // <-- Padding dikurangi
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              // mainAxisAlignment: MainAxisAlignment.spaceBetween (DIHAPUS)
-              children: [
-                // [PERBAIKAN 1] Judul lebih besar, max 2 baris
-                Text(
-                  product['title'] ?? '', // <-- DULU 'subtitle'
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    // <-- LEBIH BESAR
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4), // <-- Spasi rapat
-                Text(
-                  product['price_final']!,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: priceColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6), // <-- Spasi rapat
-                // Baris Rating & Stok
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: Colors.amber.shade700,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          product['rating'].toString(),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'Stok: ${product['sold']}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4), // <-- Spasi rapat
-                // Baris Lokasi
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      color: theme.hintColor,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-
-                    // [PERBAIKAN] Bungkus Text dengan Expanded
-                    Expanded(
-                      child: Text(
-                        product['location'] ??
-                            'Lokasi tidak diketahui', // <-- Tambah ??
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
-                        ),
-
-                        // [PERBAIKAN] Tambahkan properti ini
-                        maxLines: 1, // <-- Hanya 1 baris
-                        overflow: TextOverflow.ellipsis, // <-- Tampilkan '...'
-                        softWrap: false, // <-- Jangan coba-coba wrap
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          AspectRatio(
+            aspectRatio: 1,
+            child: Hero(
+              tag: 'produk-${product['id']}',
+              child: _buildProductImage(product['image'] as String?, context),
             ),
           ),
-          // --- [PERBAIKAN SELESAI] ---
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0), // <-- Padding Rapat
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    priceFinal,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: priceColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber.shade700,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(rating, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                      Expanded(
+                        child: Text(
+                          soldText,
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: theme.hintColor,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          location,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

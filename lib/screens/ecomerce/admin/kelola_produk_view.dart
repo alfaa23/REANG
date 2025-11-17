@@ -19,65 +19,69 @@ class KelolaProdukView extends StatefulWidget {
   State<KelolaProdukView> createState() => _KelolaProdukViewState();
 }
 
-class _KelolaProdukViewState extends State<KelolaProdukView> {
+// [PERUBAHAN 1]: Tambahkan 'AutomaticKeepAliveClientMixin'
+class _KelolaProdukViewState extends State<KelolaProdukView>
+    with AutomaticKeepAliveClientMixin {
   final ApiService _apiService = ApiService();
 
-  List<ProdukModel> _produkList = [];
-  bool _isLoading = true;
-  String? _apiError;
+  // [PERUBAHAN 2]: Ganti bool _isLoading, _apiError, dan _produkList
+  // dengan satu 'Future' yang akan mengelola semua state tersebut.
+  late Future<List<ProdukModel>> _produkFuture;
+
+  // [PERUBAHAN 3]: Implementasi 'wantKeepAlive'
+  // Ini memberi tahu TabBarView untuk menyimpan state widget ini
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _fetchProdukSaya();
+    // [PERUBAHAN 4]: Panggil Future saat pertama kali widget dibuat
+    // Future ini akan 'hidup' selama widget 'keep alive'
+    _produkFuture = _fetchProdukSaya();
   }
 
   // ===========================================================
-  // FETCH DATA
+  // FETCH DATA (Sekarang mengembalikan Future<List<ProdukModel>>)
   // ===========================================================
 
-  Future<void> _fetchProdukSaya() async {
-    if (!mounted) return;
+  Future<List<ProdukModel>> _fetchProdukSaya() async {
+    // [PERUBAHAN 5]: Hapus semua 'setState' dari fungsi fetch data.
+    // FutureBuilder akan menangani state loading/error secara otomatis.
+    if (!mounted) return [];
 
     final auth = context.read<AuthProvider>();
 
     if (auth.token == null || auth.user?.idToko == null) {
-      setState(() {
-        _isLoading = false;
-        _apiError = "Tidak dapat memuat produk: ID Toko tidak ditemukan.";
-      });
-      return;
+      // Lemparkan error agar FutureBuilder bisa menangkapnya
+      throw Exception("Tidak dapat memuat produk: ID Toko tidak ditemukan.");
     }
-
-    setState(() {
-      _isLoading = true;
-      _apiError = null;
-    });
 
     try {
       final List<ProdukModel> data = await _apiService.fetchProdukByToko(
         token: auth.token!,
         idToko: auth.user!.idToko!,
       );
-
-      if (mounted) {
-        setState(() {
-          _produkList = data;
-          _isLoading = false;
-        });
-      }
+      // Kembalikan data jika sukses
+      return data;
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _apiError = e.toString().replaceAll("Exception: ", "");
-        });
-      }
+      // Lemparkan kembali error agar FutureBuilder menangkapnya
+      throw Exception(e.toString().replaceAll("Exception: ", ""));
     }
   }
 
+  // [PERUBAHAN 6]: Buat fungsi _onRefresh
+  // Fungsi ini akan dipanggil oleh RefreshIndicator
+  Future<void> _onRefresh() async {
+    // Panggil setState dan buat Future baru.
+    // Ini akan memicu FutureBuilder untuk rebuild dan menampilkan loading spinner.
+    setState(() {
+      _produkFuture = _fetchProdukSaya();
+    });
+  }
+
   // ===========================================================
-  // UI HELPERS
+  // UI HELPERS (Tidak berubah)
   // ===========================================================
 
   void _showToast(String message, {bool isError = false}) {
@@ -99,7 +103,7 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
   }
 
   // ===========================================================
-  // NAVIGASI
+  // NAVIGASI (Diperbarui untuk memanggil _onRefresh)
   // ===========================================================
 
   void _goToAddProduk() {
@@ -109,7 +113,8 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
         builder: (context) => const FormProdukScreen(produk: null),
       ),
     ).then((result) {
-      if (result == true) _fetchProdukSaya();
+      // [PERUBAHAN 7]: Panggil _onRefresh jika ada perubahan data
+      if (result == true) _onRefresh();
     });
   }
 
@@ -118,12 +123,13 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
       context,
       MaterialPageRoute(builder: (context) => FormProdukScreen(produk: produk)),
     ).then((result) {
-      if (result == true) _fetchProdukSaya();
+      // [PERUBAHAN 7]: Panggil _onRefresh jika ada perubahan data
+      if (result == true) _onRefresh();
     });
   }
 
   // ===========================================================
-  // HAPUS PRODUK
+  // HAPUS PRODUK (Diperbarui untuk memanggil _onRefresh)
   // ===========================================================
 
   Future<void> _hapusProduk(int produkId, String namaProduk) async {
@@ -163,14 +169,15 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
       );
 
       _showToast(res['message'] ?? "Produk berhasil dihapus");
-      _fetchProdukSaya();
+      // [PERUBAHAN 7]: Panggil _onRefresh jika ada perubahan data
+      _onRefresh();
     } catch (e) {
       _showToast(e.toString().replaceAll("Exception: ", ""), isError: true);
     }
   }
 
   // ===========================================================
-  // DATA FORMATTER
+  // DATA FORMATTER (Tidak berubah)
   // ===========================================================
 
   String _formatCurrency(int value) {
@@ -197,7 +204,7 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
   }
 
   // ===========================================================
-  // UI COMPONENTS
+  // UI COMPONENTS (Tidak berubah)
   // ===========================================================
 
   Widget _buildStatItem(ThemeData theme, String value, String label) {
@@ -263,11 +270,14 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
   }
 
   // ===========================================================
-  // BUILD UI
+  // BUILD UI (Dirombak untuk FutureBuilder + RefreshIndicator)
   // ===========================================================
 
   @override
   Widget build(BuildContext context) {
+    // [PERUBAHAN 8]: Panggil super.build()
+    super.build(context);
+
     final theme = Theme.of(context);
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
@@ -281,27 +291,69 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
       ),
 
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _apiError != null
-            ? Center(
-                child: Text(
-                  _apiError!,
-                  style: TextStyle(color: theme.colorScheme.error),
+        // [PERUBAHAN 9]: Ganti logika if-else dengan FutureBuilder
+        child: FutureBuilder<List<ProdukModel>>(
+          future: _produkFuture,
+          builder: (context, snapshot) {
+            // --- 1. Saat Loading ---
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // --- 2. Jika Gagal (Error) ---
+            if (snapshot.hasError) {
+              // [PERUBAHAN 10]: Bungkus Error state dengan RefreshIndicator
+              return RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    alignment: Alignment.center,
+                    child: Center(
+                      child: Text(
+                        snapshot.error.toString(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  ),
                 ),
-              )
-            : _produkList.isEmpty
-            ? Center(
-                child: Text(
-                  "Anda belum memiliki produk.",
-                  style: TextStyle(color: theme.hintColor),
+              );
+            }
+
+            // --- 3. Jika Data Kosong ---
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              // [PERUBAHAN 10]: Bungkus Empty state dengan RefreshIndicator
+              return RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    alignment: Alignment.center,
+                    child: Center(
+                      child: Text(
+                        "Anda belum memiliki produk.",
+                        style: TextStyle(color: theme.hintColor),
+                      ),
+                    ),
+                  ),
                 ),
-              )
-            : ListView.builder(
+              );
+            }
+
+            // --- 4. Jika Sukses (Ada Data) ---
+            final produkList = snapshot.data!;
+
+            // [PERUBAHAN 10]: Bungkus ListView dengan RefreshIndicator
+            return RefreshIndicator(
+              onRefresh: _onRefresh,
+              child: ListView.builder(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + 72 + bottomPad),
-                itemCount: _produkList.length,
+                itemCount: produkList.length,
                 itemBuilder: (context, i) {
-                  final produk = _produkList[i];
+                  final produk = produkList[i];
 
                   return Card(
                     elevation: 1.5,
@@ -407,6 +459,9 @@ class _KelolaProdukViewState extends State<KelolaProdukView> {
                   );
                 },
               ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,19 +1,16 @@
-// Lokasi: lib/screens/ecomerce/admin/form_produk_screen.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:reang_app/models/produk_model.dart';
-import 'package:reang_app/models/produk_varian_model.dart'; // <-- Impor model varian
+import 'package:reang_app/models/produk_varian_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-import 'package:intl/intl.dart';
 
 class FormProdukScreen extends StatefulWidget {
-  final ProdukModel? produk; // Jika null = Mode Tambah, Jika diisi = Mode Edit
+  final ProdukModel? produk;
 
   const FormProdukScreen({super.key, this.produk});
 
@@ -24,21 +21,31 @@ class FormProdukScreen extends StatefulWidget {
 class _FormProdukScreenState extends State<FormProdukScreen> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
 
-  // Controllers
+  // Controllers Utama
   late TextEditingController _namaController;
   late TextEditingController _deskripsiController;
   late TextEditingController _spesifikasiController;
 
-  // State
+  // State Utama
   String? _selectedFitur;
-  XFile? _pickedImage;
-  String? _existingImageUrl;
   bool _isLoading = false;
   bool _isEditMode = false;
 
+  // State Foto
+  XFile? _fotoUtamaBaru;
+  String? _fotoUtamaLamaUrl;
+  List<XFile> _galeriBaru = [];
+  List<GaleriFotoModel> _galeriLama = [];
+  List<int> _hapusGaleriIds = [];
+
+  // State Varian
   List<ProdukVarianModel> _varians = [];
-  final List<GlobalKey<FormState>> _varianFormKeys = [];
+  List<GlobalKey<FormState>> _varianFormKeys = [];
+  List<TextEditingController> _varianNamaControllers = [];
+  List<TextEditingController> _varianHargaControllers = [];
+  List<TextEditingController> _varianStokControllers = [];
 
   final List<String> _kategoriList = [
     'Fashion',
@@ -60,17 +67,30 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       text: widget.produk?.spesifikasi ?? '',
     );
     _selectedFitur = widget.produk?.fitur;
-    _existingImageUrl = widget.produk?.foto;
+    _fotoUtamaLamaUrl = widget.produk?.foto;
 
-    if (_isEditMode && widget.produk!.varians.isNotEmpty) {
-      _varians = List.from(widget.produk!.varians);
+    if (_isEditMode) {
+      _varians = widget.produk!.varians.isNotEmpty
+          ? List.from(widget.produk!.varians)
+          : [
+              ProdukVarianModel(
+                idProduk: widget.produk!.id,
+                namaVarian: '',
+                harga: 0,
+                stok: 0,
+              ),
+            ];
+      _galeriLama = List.from(widget.produk!.galeriFoto);
     } else {
       _varians = [
         ProdukVarianModel(idProduk: 0, namaVarian: '', harga: 0, stok: 0),
       ];
+      _galeriLama = [];
     }
 
-    _varians.forEach((_) => _varianFormKeys.add(GlobalKey<FormState>()));
+    for (var varian in _varians) {
+      _addVarianControllers(varian);
+    }
   }
 
   @override
@@ -78,6 +98,17 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
     _namaController.dispose();
     _deskripsiController.dispose();
     _spesifikasiController.dispose();
+
+    for (var controller in _varianNamaControllers) {
+      controller.dispose();
+    }
+    for (var controller in _varianHargaControllers) {
+      controller.dispose();
+    }
+    for (var controller in _varianStokControllers) {
+      controller.dispose();
+    }
+
     super.dispose();
   }
 
@@ -102,14 +133,13 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
   }
 
   // --- Fungsi Ambil Gambar ---
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
+  Future<void> _pickFotoUtama() async {
     try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          _pickedImage = image;
-          _existingImageUrl = null;
+          _fotoUtamaBaru = image;
+          _fotoUtamaLamaUrl = null;
         });
       }
     } catch (e) {
@@ -117,7 +147,35 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
     }
   }
 
-  // [BARU] Fungsi untuk menambah Varian baru
+  Future<void> _pickGaleriFoto() async {
+    try {
+      final List<XFile> images = await _picker.pickMultiImage();
+      if (images.isNotEmpty) {
+        setState(() {
+          _galeriBaru.addAll(images);
+        });
+      }
+    } catch (e) {
+      _showToast("Gagal mengambil gambar: $e", isError: true);
+    }
+  }
+
+  // --- Fungsi Varian ---
+  void _addVarianControllers(ProdukVarianModel varian) {
+    _varianFormKeys.add(GlobalKey<FormState>());
+    _varianNamaControllers.add(TextEditingController(text: varian.namaVarian));
+    _varianHargaControllers.add(
+      TextEditingController(
+        text: varian.harga > 0 ? varian.harga.toString() : '',
+      ),
+    );
+    _varianStokControllers.add(
+      TextEditingController(
+        text: varian.stok > 0 ? varian.stok.toString() : '',
+      ),
+    );
+  }
+
   void _addVarian() {
     setState(() {
       _varians.add(
@@ -128,29 +186,22 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
           stok: 0,
         ),
       );
-      _varianFormKeys.add(GlobalKey<FormState>());
+      _addVarianControllers(_varians.last); // Tambahkan controller baru
     });
   }
 
-  // [BARU] Fungsi untuk menghapus Varian
   void _removeVarian(int index) {
     if (_varians.length > 1) {
       setState(() {
         _varians.removeAt(index);
         _varianFormKeys.removeAt(index);
+        _varianNamaControllers.removeAt(index).dispose();
+        _varianHargaControllers.removeAt(index).dispose();
+        _varianStokControllers.removeAt(index).dispose();
       });
     } else {
       _showToast("Minimal harus ada 1 varian produk.", isError: true);
     }
-  }
-
-  // [BARU] Helper untuk format Rupiah
-  String _formatCurrency(int value) {
-    return NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    ).format(value);
   }
 
   // --- Fungsi Simpan (Tambah/Edit) ---
@@ -174,10 +225,18 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       return;
     }
 
-    final auth = context.read<AuthProvider>();
+    // Update model _varians dari controllers sebelum submit
+    for (int i = 0; i < _varians.length; i++) {
+      _varians[i] = ProdukVarianModel(
+        id: _varians[i].id,
+        idProduk: _varians[i].idProduk,
+        namaVarian: _varianNamaControllers[i].text,
+        harga: int.tryParse(_varianHargaControllers[i].text) ?? 0,
+        stok: int.tryParse(_varianStokControllers[i].text) ?? 0,
+      );
+    }
 
-    // [PERBAIKAN ERROR DI SINI]
-    // Cek apakah user sudah login DAN punya idToko
+    final auth = context.read<AuthProvider>();
     if (auth.token == null ||
         auth.user?.idToko == null ||
         auth.user?.idToko == 0) {
@@ -187,40 +246,40 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       );
       return;
     }
-    // [SELESAI PERBAIKAN]
 
     setState(() => _isLoading = true);
 
     try {
       ProdukModel dataProduk = ProdukModel(
         id: widget.produk?.id ?? 0,
-        idToko: auth.user!.idToko!, // <-- Sekarang ini aman karena sudah dicek
+        idToko: auth.user!.idToko!,
         nama: _namaController.text,
         deskripsi: _deskripsiController.text,
         spesifikasi: _spesifikasiController.text,
         fitur: _selectedFitur,
-        foto: _existingImageUrl,
+        foto: _fotoUtamaLamaUrl,
         varians: _varians,
       );
 
       if (_isEditMode) {
-        // --- PROSES UPDATE ---
         await _apiService.updateProduk(
           token: auth.token!,
           produkId: widget.produk!.id,
           dataProduk: dataProduk,
           varians: _varians,
-          fotoBaru: _pickedImage,
-          hapusFoto: (_existingImageUrl == null && _pickedImage == null),
+          fotoBaru: _fotoUtamaBaru,
+          galeriBaru: _galeriBaru,
+          hapusFoto: (_fotoUtamaLamaUrl == null && _fotoUtamaBaru == null),
+          hapusGaleriIds: _hapusGaleriIds,
         );
         _showToast("Produk berhasil diperbarui!");
       } else {
-        // --- PROSES CREATE ---
         await _apiService.createProduk(
           token: auth.token!,
           dataProduk: dataProduk,
           varians: _varians,
-          foto: _pickedImage,
+          fotoUtama: _fotoUtamaBaru,
+          galeriFoto: _galeriBaru,
         );
         _showToast("Produk berhasil ditambahkan!");
       }
@@ -247,102 +306,121 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildImagePicker(theme),
-              const SizedBox(height: 24),
-
-              Text("Nama Produk*", style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _namaController,
-                decoration: const InputDecoration(
-                  hintText: 'Misal: Kaos Polos Premium',
-                ),
-                validator: (value) => (value == null || value.isEmpty)
-                    ? 'Nama produk tidak boleh kosong'
-                    : null,
-              ),
-              const SizedBox(height: 16),
-
-              Text("Kategori", style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedFitur,
-                hint: const Text('Pilih Kategori'),
-                decoration: const InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                items: _kategoriList.map((String kategori) {
-                  return DropdownMenuItem<String>(
-                    value: kategori,
-                    child: Text(kategori),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() => _selectedFitur = newValue);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              Text("Deskripsi", style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _deskripsiController,
-                decoration: const InputDecoration(
-                  hintText: 'Jelaskan produk Anda...',
-                ),
-                maxLines: 5,
-                minLines: 3,
-              ),
-              const SizedBox(height: 16),
-
-              Text(
-                "Spesifikasi (Opsional)",
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _spesifikasiController,
-                decoration: const InputDecoration(
-                  hintText: 'Pisahkan dengan koma, misal: Bahan Katun, Adem',
+              // --- Card untuk Foto ---
+              _buildSectionCard(
+                theme,
+                title: "Foto Produk",
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel("Foto Utama (Cover)*"),
+                    _buildImagePicker(theme),
+                    const SizedBox(height: 20),
+                    _buildLabel("Foto Galeri (Opsional)"),
+                    _buildGalleryPicker(theme),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
 
-              Text(
-                "Varian Produk",
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+              // --- Card untuk Info Utama ---
+              _buildSectionCard(
+                theme,
+                title: "Informasi Utama",
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel("Nama Produk*"),
+                    TextFormField(
+                      controller: _namaController,
+                      decoration: const InputDecoration(
+                        hintText: 'Misal: Kaos Polos Premium',
+                      ),
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Nama produk tidak boleh kosong'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildLabel("Kategori"),
+                    DropdownButtonFormField<String>(
+                      value: _selectedFitur,
+                      hint: const Text('Pilih Kategori'),
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items: _kategoriList.map((String kategori) {
+                        return DropdownMenuItem<String>(
+                          value: kategori,
+                          child: Text(kategori),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        setState(() => _selectedFitur = newValue);
+                      },
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                "Tambahkan varian seperti ukuran atau warna. Jika produk Anda tidak memiliki varian, isi 1 saja.",
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.hintColor,
+
+              // --- Card untuk Deskripsi ---
+              _buildSectionCard(
+                theme,
+                title: "Detail Produk",
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel("Deskripsi"),
+                    TextFormField(
+                      controller: _deskripsiController,
+                      decoration: const InputDecoration(
+                        hintText: 'Jelaskan produk Anda...',
+                      ),
+                      maxLines: 5,
+                      minLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildLabel("Spesifikasi (Opsional)"),
+                    TextFormField(
+                      controller: _spesifikasiController,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'Pisahkan dengan koma, misal: Bahan Katun, Adem',
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
 
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _varians.length,
-                itemBuilder: (context, index) {
-                  return _buildVarianCard(theme, index);
-                },
-              ),
-
-              const SizedBox(height: 8),
-              TextButton.icon(
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text('Tambah Varian Lain'),
-                onPressed: _addVarian,
+              // --- Varian Produk ---
+              _buildSectionCard(
+                theme,
+                title: "Varian & Stok",
+                subtitle:
+                    "Jika produk Anda tidak memiliki varian (misal: beda ukuran/warna), isi 1 saja.",
+                child: Column(
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _varians.length,
+                      itemBuilder: (context, index) {
+                        return _buildVarianCard(theme, index);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // [PERBAIKAN] Tombol Tambah Varian lebih jelas
+                    _buildAddVarianButton(theme),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 32),
 
+              // --- TOMBOL SIMPAN ---
               ElevatedButton(
                 onPressed: _isLoading ? null : _submitForm,
                 style: ElevatedButton.styleFrom(
@@ -359,8 +437,15 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                           strokeWidth: 3,
                         ),
                       )
-                    : Text(_isEditMode ? 'Update Produk' : 'Simpan Produk'),
+                    : Text(
+                        _isEditMode ? 'Update Produk' : 'Simpan Produk',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
+              const SizedBox(height: 20), // Padding Bawah
             ],
           ),
         ),
@@ -368,47 +453,90 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
     );
   }
 
-  Widget _buildVarianCard(ThemeData theme, int index) {
-    final varian = _varians[index];
+  // =========================================================================
+  // --- WIDGET BUILDER HELPER (DESAIN BARU) ---
+  // =========================================================================
 
-    final namaController = TextEditingController(text: varian.namaVarian);
-    final hargaController = TextEditingController(
-      text: varian.harga > 0 ? varian.harga.toString() : '',
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(text, style: Theme.of(context).textTheme.titleSmall),
     );
-    final stokController = TextEditingController(
-      text: varian.stok > 0 ? varian.stok.toString() : '',
-    );
+  }
 
-    namaController.addListener(() {
-      _varians[index] = ProdukVarianModel(
-        id: varian.id,
-        idProduk: varian.idProduk,
-        namaVarian: namaController.text,
-        harga: varian.harga,
-        stok: varian.stok,
-      );
-    });
-    hargaController.addListener(() {
-      _varians[index] = ProdukVarianModel(
-        id: varian.id,
-        idProduk: varian.idProduk,
-        namaVarian: varian.namaVarian,
-        harga: int.tryParse(hargaController.text) ?? 0,
-        stok: varian.stok,
-      );
-    });
-    stokController.addListener(() {
-      _varians[index] = ProdukVarianModel(
-        id: varian.id,
-        idProduk: varian.idProduk,
-        namaVarian: varian.namaVarian,
-        harga: varian.harga,
-        stok: int.tryParse(stokController.text) ?? 0,
-      );
-    });
-
+  Widget _buildSectionCard(
+    ThemeData theme, {
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
     return Card(
       elevation: 1,
+      shadowColor: theme.shadowColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (subtitle != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+              ),
+            const Divider(height: 24),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // [PERBAIKAN] Mengganti DottedBorder dengan OutlinedButton
+  Widget _buildAddVarianButton(ThemeData theme) {
+    return OutlinedButton.icon(
+      onPressed: _addVarian,
+      icon: const Icon(Icons.add_circle_outline, size: 20),
+      label: const Text(
+        "Tambah Varian Lain",
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.colorScheme.primary,
+        side: BorderSide(
+          color: theme.colorScheme.primary.withOpacity(0.5),
+          width: 1.5,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        minimumSize: const Size(double.infinity, 52), // Tinggi tombol
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      ),
+    );
+  }
+
+  Widget _buildVarianCard(ThemeData theme, int index) {
+    final namaController = _varianNamaControllers[index];
+    final hargaController = _varianHargaControllers[index];
+    final stokController = _varianStokControllers[index];
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -438,8 +566,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
               ),
               const Divider(),
 
-              Text("Nama Varian*", style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 8),
+              _buildLabel("Nama Varian*"),
               TextFormField(
                 controller: namaController,
                 decoration: const InputDecoration(
@@ -457,8 +584,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Harga (Rp)*", style: theme.textTheme.bodyMedium),
-                        const SizedBox(height: 8),
+                        _buildLabel("Harga (Rp)*"),
                         TextFormField(
                           controller: hargaController,
                           decoration: const InputDecoration(
@@ -471,7 +597,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                           validator: (value) =>
                               (value == null ||
                                   value.isEmpty ||
-                                  int.tryParse(value) == 0)
+                                  (int.tryParse(value) ?? 0) <= 0)
                               ? 'Harga > 0'
                               : null,
                         ),
@@ -483,8 +609,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Stok*", style: theme.textTheme.bodyMedium),
-                        const SizedBox(height: 8),
+                        _buildLabel("Stok*"),
                         TextFormField(
                           controller: stokController,
                           decoration: const InputDecoration(
@@ -523,11 +648,11 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
               border: Border.all(color: theme.dividerColor),
             ),
             clipBehavior: Clip.antiAlias,
-            child: _pickedImage != null
-                ? Image.file(File(_pickedImage!.path), fit: BoxFit.cover)
-                : (_existingImageUrl != null
+            child: _fotoUtamaBaru != null
+                ? Image.file(File(_fotoUtamaBaru!.path), fit: BoxFit.cover)
+                : (_fotoUtamaLamaUrl != null
                       ? Image.network(
-                          _existingImageUrl!,
+                          _fotoUtamaLamaUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (c, e, s) => Icon(
                             Icons.broken_image,
@@ -550,7 +675,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
               color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(20),
               child: InkWell(
-                onTap: _pickImage,
+                onTap: _pickFotoUtama,
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
                   padding: const EdgeInsets.all(6.0),
@@ -563,7 +688,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
               ),
             ),
           ),
-          if (_existingImageUrl != null || _pickedImage != null)
+          if (_fotoUtamaLamaUrl != null || _fotoUtamaBaru != null)
             Positioned(
               top: 4,
               right: 4,
@@ -573,8 +698,8 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                 child: InkWell(
                   onTap: () {
                     setState(() {
-                      _pickedImage = null;
-                      _existingImageUrl = null;
+                      _fotoUtamaBaru = null;
+                      _fotoUtamaLamaUrl = null;
                     });
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -589,6 +714,124 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGalleryPicker(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      height: 120,
+      child: Row(
+        children: [
+          // Tombol Tambah
+          GestureDetector(
+            onTap: _pickGaleriFoto,
+            child: Container(
+              width: 104,
+              height: 104,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_a_photo_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 4),
+                  Text("Tambah Foto", style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+
+          // List Foto
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              // [PERBAIKAN] Hitung item dari kedua list
+              itemCount: _galeriLama.length + _galeriBaru.length,
+              itemBuilder: (context, index) {
+                Widget imageWidget;
+                bool isFotoBaru = index >= _galeriLama.length;
+
+                if (isFotoBaru) {
+                  // Ambil dari file baru (XFile)
+                  final file = _galeriBaru[index - _galeriLama.length];
+                  imageWidget = Image.file(File(file.path), fit: BoxFit.cover);
+                } else {
+                  // [PERBAIKAN] Ambil dari URL lama (GaleriFotoModel)
+                  final url = _galeriLama[index].pathFoto;
+                  imageWidget = Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) =>
+                        Icon(Icons.broken_image, color: theme.hintColor),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 104,
+                        height: 104,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: imageWidget,
+                      ),
+                      // Tombol Hapus per foto
+                      Positioned(
+                        top: -8,
+                        right: -8,
+                        child: Material(
+                          color: theme.colorScheme.error,
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              setState(() {
+                                if (isFotoBaru) {
+                                  _galeriBaru.removeAt(
+                                    index - _galeriLama.length,
+                                  );
+                                } else {
+                                  // Tandai ID ini untuk dihapus di API
+                                  final id = _galeriLama[index].id;
+                                  _hapusGaleriIds.add(id);
+                                  _galeriLama.removeAt(index);
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.close,
+                                color: theme.colorScheme.onError,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

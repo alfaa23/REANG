@@ -2132,15 +2132,18 @@ class ApiService {
   /// 1. POST: Menambahkan produk baru (Menggunakan Varian)
   Future<Map<String, dynamic>> createProduk({
     required String token,
-    required ProdukModel dataProduk, // <-- Model produk induk
-    required List<ProdukVarianModel> varians, // <-- List varian
-    XFile? foto, // Foto dari image_picker (opsional)
+    required ProdukModel dataProduk,
+    required List<ProdukVarianModel> varians,
+    XFile? fotoUtama, // Foto utama (cover)
+    List<XFile>? galeriFoto, // Foto galeri (banyak)
   }) async {
     try {
+      // Convert varian ke JSON list
       List<Map<String, dynamic>> listVarianJson = varians
           .map((v) => v.toJson())
           .toList();
 
+      // FormData utama
       FormData formData = FormData.fromMap({
         'id_toko': dataProduk.idToko,
         'nama': dataProduk.nama,
@@ -2150,13 +2153,33 @@ class ApiService {
         'varians': listVarianJson,
       });
 
-      if (foto != null) {
+      // ===============================
+      // 1. FOTO UTAMA (Cover)
+      // ===============================
+      if (fotoUtama != null) {
         formData.files.add(
           MapEntry(
-            'foto',
-            await MultipartFile.fromFile(foto.path, filename: foto.name),
+            'foto', // FIELD WAJIB SAMA DI LARAVEL
+            await MultipartFile.fromFile(
+              fotoUtama.path,
+              filename: fotoUtama.name,
+            ),
           ),
         );
+      }
+
+      // ===============================
+      // 2. FOTO GALERI (Foto Banyak)
+      // ===============================
+      if (galeriFoto != null && galeriFoto.isNotEmpty) {
+        for (var file in galeriFoto) {
+          formData.files.add(
+            MapEntry(
+              'galeri_foto[]', // WAJIB ARRAY DI LARAVEL
+              await MultipartFile.fromFile(file.path, filename: file.name),
+            ),
+          );
+        }
       }
 
       final response = await _dio.post(
@@ -2189,12 +2212,16 @@ class ApiService {
     required List<ProdukVarianModel> varians,
     XFile? fotoBaru,
     bool hapusFoto = false,
+    List<XFile>? galeriBaru, // Foto galeri baru
+    List<int>? hapusGaleriIds, // ID galeri yang ingin dihapus
   }) async {
     try {
-      List<Map<String, dynamic>> listVarianJson = varians
-          .map((v) => v.toJson())
-          .toList();
+      // Convert varian ke JSON
+      final listVarianJson = varians.map((v) => v.toJson()).toList();
 
+      // ===============================
+      // FORM DATA
+      // ===============================
       FormData formData = FormData.fromMap({
         '_method': 'PUT',
         'nama': dataProduk.nama,
@@ -2202,9 +2229,18 @@ class ApiService {
         'spesifikasi': dataProduk.spesifikasi,
         'fitur': dataProduk.fitur,
         'varians': listVarianJson,
+
+        // Hapus galeri tertentu (jika ada)
+        if (hapusGaleriIds != null && hapusGaleriIds.isNotEmpty)
+          'hapus_galeri_ids': hapusGaleriIds,
       });
 
-      if (hapusFoto) {
+      // ===============================
+      // FOTO UTAMA (hapus atau upload baru)
+      // ===============================
+
+      if (hapusFoto == true) {
+        // Kirim string kosong → Laravel akan menghapus foto utama
         formData.fields.add(const MapEntry('foto', ''));
       } else if (fotoBaru != null) {
         formData.files.add(
@@ -2216,6 +2252,20 @@ class ApiService {
             ),
           ),
         );
+      }
+
+      // ===============================
+      // GALERI BARU (array)
+      // ===============================
+      if (galeriBaru != null && galeriBaru.isNotEmpty) {
+        for (var file in galeriBaru) {
+          formData.files.add(
+            MapEntry(
+              'galeri_foto[]', // wajib array []
+              await MultipartFile.fromFile(file.path, filename: file.name),
+            ),
+          );
+        }
       }
 
       final response = await _dio.post(
