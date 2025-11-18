@@ -553,7 +553,7 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 return;
               }
 
-              // [PERBAIKAN] Siapkan data Map
+              // [PERBAIKAN] Siapkan data Map untuk Beli Langsung & Keranjang
               final Map<String, dynamic> itemToSend = {
                 'id': data.id,
                 'id_toko': data.idToko,
@@ -561,12 +561,25 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 'title': data.nama,
                 'image': data.foto,
                 'location': data.lokasi,
-                // [PENTING] Ambil harga dan stok dari VARIAN TERPILIH
+
+                // Untuk tampilan UI (misalnya harga dengan format "Rp 50.000")
                 'price_final': _formatCurrency(
                   modalSelectedVarian?.harga ?? data.harga,
                 ),
+
+                // [PERBAIKAN 1] Harga dalam bentuk integer asli (untuk API Beli Langsung)
+                'harga': modalSelectedVarian?.harga ?? data.harga,
+
+                // Stok real–wajib mengikuti varian jika ada
                 'stock': modalSelectedVarian?.stok ?? data.stok,
+
+                // Nama variasi (String)
                 'variasi': modalSelectedVarian?.namaVarian ?? data.variasi,
+
+                // [PERBAIKAN 2] ID varian untuk backend (wajib saat beli langsung)
+                'id_varian': modalSelectedVarian?.id,
+
+                // Deskripsi & spesifikasi untuk detail produk
                 'description': data.deskripsi,
                 'specifications': data.spesifikasi,
               };

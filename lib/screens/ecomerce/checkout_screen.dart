@@ -318,35 +318,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           });
         });
       } else {
-        // Skenario B: Kirim Objek Beli Langsung
+        // --- SKENARIO B: Beli Langsung ---
         final state = _tokoStates.values.first;
         final item = state.items.first;
+
         directItem = {
           'id_produk': item.idProduk,
           'id_toko': item.idToko,
           'jumlah': item.jumlah,
+
+          // Harga asli (integer) — WAJIB untuk validasi backend
           'harga': item.harga,
+
+          // Nama varian (string)
+          'variasi': item.variasi,
+
+          // [PERBAIKAN] Kirim ID varian dari data directBuyItem
+          'id_varian': widget.directBuyItem!['id_varian'],
+
+          // Informasi pengiriman
           'jasa_pengiriman': state.selectedJasaPengiriman,
           'ongkir': state.selectedOngkir,
+
+          // Catatan (opsional)
           'catatan': state.noteController.text.isNotEmpty
               ? state.noteController.text
               : null,
-          "metode_pembayaran": state.selectedMetodePembayaran,
-          // [LOGIKA NULL]: Kirim null jika string kosong (untuk QRIS)
-          "nomor_tujuan": state.selectedNomorTujuan.isEmpty
+
+          // Informasi pembayaran
+          'metode_pembayaran': state.selectedMetodePembayaran,
+          'nomor_tujuan': state.selectedNomorTujuan.isEmpty
               ? null
               : state.selectedNomorTujuan,
-          "nama_penerima": state.selectedNamaPenerima,
-          "foto_qris": state.selectedFotoQris,
+          'nama_penerima': state.selectedNamaPenerima,
+          'foto_qris': state.selectedFotoQris,
         };
       }
 
+      // Kirim ke API
       final response = await _apiService.createOrder(
         token: auth.token!,
         userId: auth.user!.id,
         alamat: alamat,
         pesananPerToko: pesananPerToko,
-        directItem: directItem,
+        directItem: directItem, // ✔️ Sekarang membawa id_varian
       );
 
       setState(() {
