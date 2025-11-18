@@ -10,6 +10,7 @@ import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/providers/cart_provider.dart';
 import 'package:reang_app/screens/profile/edit_profile_screen.dart';
 import 'payment_instruction_screen.dart';
+import 'package:reang_app/screens/ecomerce/proses_order_screen.dart';
 
 // =========================================================================
 // --- Helper class untuk menyimpan state per toko ---
@@ -45,8 +46,17 @@ class _CheckoutTokoState {
   double get selectedOngkir => selectedOngkirOption?.harga ?? 0.0;
   String get selectedJasaPengiriman =>
       selectedOngkirOption?.daerah ?? "Belum dipilih";
-  String get selectedMetodePembayaran =>
-      selectedPaymentOption?.namaMetode ?? "Belum dipilih";
+  String get selectedMetodePembayaran {
+    // [PERBAIKAN] Kita cek berdasarkan 'jenis', BUKAN 'namaMetode'
+    final String jenis = selectedPaymentOption?.jenis.toLowerCase() ?? '';
+
+    if (jenis == 'cod') {
+      return 'cod'; // Kirim 'cod' jika jenisnya adalah cod
+    }
+
+    // Jika bukan cod, kembalikan nama metodenya (cth: 'Bank BCA')
+    return selectedPaymentOption?.namaMetode ?? "Belum dipilih";
+  }
 
   // Getter ini akan mengembalikan "" (String kosong) jika metode bayar belum dipilih,
   // atau jika metode bayar terpilih tapi tidak ada nomor tujuan (misal, QRIS tidak punya nomor).
@@ -268,8 +278,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // Jika nama metode pembayaran adalah "QRIS", nomor tujuan boleh kosong.
         // Jika nama metode adalah "Transfer Bank" / "BCA" / "BNI", nomor tujuan wajib diisi.
         final isNotQris = !metode.toUpperCase().contains('QRIS');
+        final isNotCod = (metode.toLowerCase() != 'cod');
 
-        if (isNotQris && state.selectedNomorTujuan.isEmpty) {
+        if (isNotQris && isNotCod && state.selectedNomorTujuan.isEmpty) {
           allSelected = false;
         }
       }
@@ -374,15 +385,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         context.read<CartProvider>().fetchCart();
       }
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentInstructionScreen(
-            paymentData: List<Map<String, dynamic>>.from(dataPembayaran),
+      // --- [PERBAIKAN LOGIKA NAVIGASI COD] ---
+
+      // 1. Cek apakah ada pembayaran yang BUKAN COD
+      final List<dynamic> nonCodPayments = dataPembayaran
+          .where(
+            (p) => (p['metode_pembayaran'] as String?)?.toLowerCase() != 'cod',
+          )
+          .toList();
+
+      if (nonCodPayments.isNotEmpty) {
+        // --- KASUS 1: Ada yang harus dibayar (Transfer/QRIS) ---
+        // Arahkan ke instruksi pembayaran HANYA untuk item non-COD
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentInstructionScreen(
+              paymentData: List<Map<String, dynamic>>.from(nonCodPayments),
+            ),
           ),
-        ),
-        (route) => route.isFirst,
-      );
+          (route) => route.isFirst,
+        );
+      } else {
+        // --- KASUS 2: Semua pesanan adalah COD ---
+        // Tampilkan toast sukses dan arahkan ke "Pesanan Saya"
+        _showSuccessToast(
+          "Pesanan COD Anda berhasil dibuat!",
+          Theme.of(context),
+        );
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
+          (route) => route.isFirst,
+        );
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -400,6 +437,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       context: context,
       position: StyledToastPosition.top,
       backgroundColor: theme.colorScheme.error,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 3),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
+  void _showSuccessToast(String message, ThemeData theme) {
+    showToast(
+      message,
+      context: context,
+      position: StyledToastPosition.top,
+      backgroundColor: Colors.green, // Warna sukses
       animation: StyledToastAnimation.scale,
       reverseAnimation: StyledToastAnimation.fade,
       animDuration: const Duration(milliseconds: 150),

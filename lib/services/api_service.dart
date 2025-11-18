@@ -1854,7 +1854,7 @@ class ApiService {
   }
 
   // =======================================================================
-  // --- API ONGKIR & PAYMENT METHODS ---
+  // --- API ONGKIR
   // =======================================================================
 
   Future<List<OngkirModel>> getOngkirOptions({
@@ -1883,6 +1883,87 @@ class ApiService {
     }
   }
 
+  /// POST: Menambahkan opsi ongkir baru
+  Future<Map<String, dynamic>> createOngkir({
+    required String token,
+    required int idToko,
+    required String daerah,
+    required double harga,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/ongkir/store', // Sesuai route Anda
+        data: {'id_toko': idToko, 'daerah': daerah, 'harga': harga},
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on createOngkir: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Gagal menambah ongkir');
+    }
+  }
+
+  /// PUT: Memperbarui opsi ongkir
+  Future<Map<String, dynamic>> updateOngkir({
+    required String token,
+    required int idToko,
+    required int ongkirId,
+    required String daerah,
+    required double harga,
+  }) async {
+    try {
+      final response = await _dio.put(
+        // Sesuai route (perbaikan)
+        '$_baseUrlBackend/ongkir/$idToko/$ongkirId',
+        data: {'daerah': daerah, 'harga': harga},
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on updateOngkir: ${e.response?.data}");
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal memperbarui ongkir',
+      );
+    }
+  }
+
+  /// DELETE: Menghapus opsi ongkir
+  Future<Map<String, dynamic>> deleteOngkir({
+    required String token,
+    required int idToko,
+    required int ongkirId,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        // Sesuai route (perbaikan)
+        '$_baseUrlBackend/ongkir/$idToko/$ongkirId',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on deleteOngkir: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Gagal menghapus ongkir');
+    }
+  }
+  // =======================================================================
+  // --- [FUNGSI BARU] API KELOLA METODE PEMBAYARAN ---
+  // =======================================================================
+
   Future<List<PaymentMethodModel>> getPaymentMethodsForToko({
     required String token,
     required int idToko,
@@ -1908,6 +1989,152 @@ class ApiService {
       throw Exception(
         e.response?.data['message'] ?? 'Gagal mengambil metode bayar',
       );
+    }
+  }
+
+  /// Menghapus metode pembayaran milik toko
+  Future<Map<String, dynamic>> deleteMetodePembayaran({
+    required String token,
+    required int idToko,
+    required int metodeId,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        '$_baseUrlBackend/metode/$idToko/$metodeId', // <-- Menggunakan route baru
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response
+            .data; // Mengembalikan {'status': true, 'message': '...'}
+      } else {
+        throw Exception('Gagal menghapus metode pembayaran');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Gagal terhubung',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  /// 1. POST: Menambahkan metode pembayaran baru
+  Future<Map<String, dynamic>> createMetodePembayaran({
+    required String token,
+    required int idToko,
+    required String namaMetode,
+    required String jenis,
+    String? namaPenerima,
+    String? nomorTujuan,
+    XFile? fotoQris,
+  }) async {
+    try {
+      // Kita butuh FormData untuk mengirim file
+      FormData formData = FormData.fromMap({
+        'id_toko': idToko,
+        'nama_metode': namaMetode,
+        'jenis': jenis,
+        'nama_penerima': namaPenerima,
+        'nomor_tujuan': nomorTujuan,
+      });
+
+      // Tambahkan file foto jika ada
+      if (fotoQris != null) {
+        formData.files.add(
+          MapEntry(
+            'foto_qris', // Nama field ini harus sama dengan di Laravel
+            await MultipartFile.fromFile(
+              fotoQris.path,
+              filename: fotoQris.name,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/metode/create', // Endpoint dari route Anda
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on createMetode: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Gagal menambah metode');
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  /// 2. PUT (via POST): Memperbarui metode pembayaran
+  Future<Map<String, dynamic>> updateMetodePembayaran({
+    required String token,
+    required int idToko,
+    required int metodeId,
+    required String namaMetode,
+    required String jenis,
+    String? namaPenerima,
+    String? nomorTujuan,
+    XFile? fotoQrisBaru,
+  }) async {
+    try {
+      // Kita butuh FormData untuk mengirim file
+      FormData formData = FormData.fromMap({
+        '_method': 'PUT', // <-- Kunci untuk update file di Laravel
+        'nama_metode': namaMetode,
+        'jenis': jenis,
+        'nama_penerima': namaPenerima,
+        'nomor_tujuan': nomorTujuan,
+      });
+
+      // Tambahkan file foto HANYA JIKA ada foto baru
+      if (fotoQrisBaru != null) {
+        formData.files.add(
+          MapEntry(
+            'foto_qris',
+            await MultipartFile.fromFile(
+              fotoQrisBaru.path,
+              filename: fotoQrisBaru.name,
+            ),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        // Endpoint dari route Anda
+        '$_baseUrlBackend/metode/update/$idToko/$metodeId',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      debugPrint("DioError on updateMetode: ${e.response?.data}");
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal memperbarui metode',
+      );
+    } catch (e) {
+      throw Exception('Terjadi kesalahan: $e');
     }
   }
 

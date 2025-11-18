@@ -4,6 +4,7 @@ import 'package:reang_app/providers/theme_provider.dart';
 import 'kelola_produk_view.dart';
 import 'umkm_analytics_dashboard.dart'; // <--- Tambahkan Import ini
 import 'pengaturan_toko_view.dart';
+import 'kelola_pesanan_screen.dart';
 
 class HomeAdminUmkmScreen extends StatefulWidget {
   const HomeAdminUmkmScreen({super.key});
@@ -20,7 +21,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
   void initState() {
     super.initState();
     // Inisialisasi TabController dengan 3 tab
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -56,16 +57,18 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
             indicatorSize: TabBarIndicatorSize.label,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             tabs: const [
+              Tab(text: 'Pesanan'),
               Tab(text: 'Analitik'),
               Tab(text: 'Profil Toko'),
               Tab(text: 'Produk'),
-              Tab(text: 'pengaturan toko'),
+              Tab(text: 'Pengaturan Toko'),
             ],
           ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
+                const KelolaPesananScreen(),
                 const UMKMAnalyticsDashboardContent(),
                 _buildStoreProfileTab(theme, cardColor),
                 const KelolaProdukView(),
