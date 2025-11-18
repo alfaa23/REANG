@@ -187,9 +187,12 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
           final theme = Theme.of(context);
 
           // Tentukan apakah tombol batal boleh tampil
-          final bool canCancel =
-              transaksi.status == 'menunggu_pembayaran' ||
-              transaksi.status == 'menunggu_konfirmasi';
+          final bool isForbidden =
+              transaksi.status == 'dikirim' ||
+              transaksi.status == 'selesai' ||
+              transaksi.status == 'dibatalkan';
+
+          final bool canCancel = !isForbidden;
 
           return Scaffold(
             appBar: AppBar(title: const Text('Detail Pesanan'), elevation: 1),

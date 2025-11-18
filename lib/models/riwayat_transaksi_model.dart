@@ -28,6 +28,7 @@ class RiwayatTransaksiModel {
   // Data dari JOIN (produk pertama)
   final String? fotoProduk;
   final String? namaProdukUtama;
+  final String? buktiPembayaran;
 
   RiwayatTransaksiModel({
     required this.id,
@@ -51,6 +52,7 @@ class RiwayatTransaksiModel {
     required this.namaToko,
     this.fotoProduk,
     this.namaProdukUtama,
+    this.buktiPembayaran,
   });
 
   factory RiwayatTransaksiModel.fromJson(Map<String, dynamic> json) {
@@ -90,6 +92,7 @@ class RiwayatTransaksiModel {
 
       fotoProduk: json['foto_produk'] as String?,
       namaProdukUtama: json['nama_produk_utama'] as String?,
+      buktiPembayaran: json['bukti_pembayaran'] as String?,
     );
   }
 

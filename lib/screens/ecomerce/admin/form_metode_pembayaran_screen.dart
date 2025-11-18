@@ -52,8 +52,8 @@ class _FormMetodePembayaranScreenState
     if (widget.isEditMode) {
       final m = widget.metode!;
       _namaMetodeC.text = m.namaMetode;
-      _namaPenerimaC.text = m.namaPenerima ?? '';
-      _nomorTujuanC.text = m.nomorTujuan ?? '';
+      _namaPenerimaC.text = m.namaPenerima;
+      _nomorTujuanC.text = m.nomorTujuan;
       _jenis = m.jenis;
       _existingQrisUrl = m.fotoQris;
     }

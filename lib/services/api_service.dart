@@ -33,6 +33,7 @@ import 'package:reang_app/models/payment_method_model.dart';
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/models/detail_transaksi_response.dart';
 import 'package:reang_app/models/produk_varian_model.dart';
+import 'package:reang_app/models/admin_pesanan_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -2572,6 +2573,108 @@ class ApiService {
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Kesalahan jaringan.');
+    }
+  }
+  // =======================================================================
+  // --- [BARU] API KELOLA PESANAN ADMIN ---
+  // =======================================================================
+
+  /// 1. GET: Mengambil semua pesanan untuk toko admin
+  Future<List<AdminPesananModel>> fetchAdminPesanan({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/admin/pesanan/$idToko', // <-- Endpoint baru
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        final List<dynamic> dataList = response.data;
+        return dataList
+            .map((json) => AdminPesananModel.fromJson(json))
+            .toList();
+      } else {
+        return []; // Kembalikan list kosong jika data bukan list
+      }
+    } on DioException catch (e) {
+      // Jika 404 (toko belum punya pesanan), kembalikan list kosong
+      if (e.response?.statusCode == 404) {
+        return [];
+      }
+      throw Exception(e.response?.data['message'] ?? 'Gagal memuat pesanan');
+    }
+  }
+
+  /// 2. POST: Konfirmasi pembayaran
+  Future<Map<String, dynamic>> adminKonfirmasiPembayaran({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/pesanan/konfirmasi/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal konfirmasi');
+    }
+  }
+
+  /// 3. POST: Tolak pembayaran
+  Future<Map<String, dynamic>> adminTolakPembayaran({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/pesanan/tolak/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal menolak');
+    }
+  }
+
+  /// 4. POST: Kirim pesanan (dengan nomor resi)
+  Future<Map<String, dynamic>> adminKirimPesanan({
+    required String token,
+    required String noTransaksi,
+    required String nomorResi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/pesanan/kirim/$noTransaksi',
+        data: {'nomor_resi': nomorResi},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal kirim');
+    }
+  }
+
+  /// 5. POST: Tandai pesanan selesai
+  Future<Map<String, dynamic>> adminTandaiSelesai({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/pesanan/selesai/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal');
     }
   }
 }

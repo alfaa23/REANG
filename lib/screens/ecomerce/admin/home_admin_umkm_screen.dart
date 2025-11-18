@@ -57,9 +57,9 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
             indicatorSize: TabBarIndicatorSize.label,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             tabs: const [
+              Tab(text: 'Profil Toko'),
               Tab(text: 'Pesanan'),
               Tab(text: 'Analitik'),
-              Tab(text: 'Profil Toko'),
               Tab(text: 'Produk'),
               Tab(text: 'Pengaturan Toko'),
             ],
@@ -68,9 +68,9 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
+                _buildStoreProfileTab(theme, cardColor),
                 const KelolaPesananScreen(),
                 const UMKMAnalyticsDashboardContent(),
-                _buildStoreProfileTab(theme, cardColor),
                 const KelolaProdukView(),
                 const PengaturanTokoView(), // <-- menuju halaman pengaturan toko
               ],
