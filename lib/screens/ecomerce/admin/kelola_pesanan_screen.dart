@@ -9,7 +9,6 @@ import 'package:flutter_styled_toast/flutter_styled_toast.dart'; // <-- Tambahka
 // Ganti import dialog dengan halaman detail
 import 'detail_pesanan_admin_screen.dart';
 // Import dialog untuk input resi
-import 'dialog_input_resi.dart';
 
 class KelolaPesananScreen extends StatefulWidget {
   const KelolaPesananScreen({super.key});
@@ -151,7 +150,6 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
   }
 
   Widget _buildChipFilters(ThemeData theme, Map<String, int> counts) {
-    // ... (Tidak ada perubahan di sini)
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
@@ -160,8 +158,13 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
         children: _statusFilters.map((status) {
           final bool isSelected = _selectedStatus == status;
           final count = counts[status] ?? 0;
+
+          // [PERBAIKAN DI SINI]
+          // Saya tambahkan "|| status == 'Dikirim'"
           final bool showBadge =
-              (status == 'Perlu Dikonfirmasi' || status == 'Siap Dikemas') &&
+              (status == 'Perlu Dikonfirmasi' ||
+                  status == 'Siap Dikemas' ||
+                  status == 'Dikirim') &&
               count > 0;
 
           return Padding(
@@ -179,6 +182,8 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(status),
+
+                  // Ini logika untuk memunculkan badge angka
                   if (showBadge) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -362,78 +367,117 @@ class _PesananAdminCard extends StatelessWidget {
     );
   }
 
-  // --- [BARU] Fungsi Buka Dialog Resi ---
-  void _showInputResiDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return DialogInputResi(
-          onSubmit: (nomorResi) async {
-            Navigator.pop(ctx); // Tutup modal resi
-            try {
-              final api = ctx.read<ApiService>();
-              final token = ctx.read<AuthProvider>().token!;
-              final response = await api.adminKirimPesanan(
-                token: token,
-                noTransaksi: pesanan.noTransaksi,
-                nomorResi: nomorResi,
-              );
-              _showToast(ctx, response['message'] ?? 'Pesanan dikirim!');
-              onActionSuccess(); // Refresh list
-            } catch (e) {
-              _showToast(
-                ctx,
-                e.toString().replaceAll("Exception: ", ""),
-                isError: true,
-              );
-            }
-          },
-        );
-      },
-    );
-  }
-
   // --- [BARU] Fungsi Konfirmasi Selesai ---
   void _showSelesaiDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Konfirmasi Pesanan'),
-        content: const Text(
-          'Anda yakin ingin menandai pesanan ini telah selesai?',
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: Colors.orange,
+          size: 50,
+        ),
+        title: const Text(
+          'Hati-hati!',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Apakah Anda yakin barang SUDAH SAMPAI di tangan pembeli?",
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Tindakan ini akan menyelesaikan pesanan secara otomatis dan tidak dapat dibatalkan lagi.",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
+            style: OutlinedButton.styleFrom(
+              // Gunakan 'onSurface' agar otomatis Hitam/Putih sesuai tema
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+
+              // Garis pinggir juga menyesuaikan tema (tidak terlalu pudar)
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                width: 1,
+              ),
+
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Batal',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // Tutup dialog
+              Navigator.pop(ctx); // Tutup Dialog
+
               try {
-                final api = ctx.read<ApiService>();
-                final token = ctx.read<AuthProvider>().token!;
+                final api = ApiService();
+                // Ambil token dari context card
+                final token = context.read<AuthProvider>().token!;
+
+                // Panggil API
                 final response = await api.adminTandaiSelesai(
                   token: token,
-                  noTransaksi: pesanan.noTransaksi,
+                  noTransaksi: pesanan.noTransaksi, // <-- Pakai pesanan.
                 );
-                _showToast(ctx, response['message'] ?? 'Pesanan selesai!');
-                onActionSuccess(); // Refresh list
+
+                if (!context.mounted) return;
+
+                // Gunakan _showToast helper yang ada di _PesananAdminCard
+                _showToast(context, response['message'] ?? 'Pesanan selesai!');
+                onActionSuccess(); // <-- Pakai onActionSuccess langsung
               } catch (e) {
+                if (!context.mounted) return;
                 _showToast(
-                  ctx,
+                  context,
                   e.toString().replaceAll("Exception: ", ""),
                   isError: true,
                 );
               }
             },
-            child: const Text('Ya, Tandai Selesai'),
-            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Ya, Saya Yakin'),
           ),
         ],
       ),
@@ -470,8 +514,7 @@ class _PesananAdminCard extends StatelessWidget {
         );
       case 'diproses':
         return ElevatedButton.icon(
-          onPressed: () =>
-              _showInputResiDialog(context), // <-- Buka Dialog Resi
+          onPressed: () => _goToDetail(context), // <-- Buka Dialog Resi
           icon: const Icon(Icons.local_shipping_outlined, size: 18),
           label: const Text('Proses Kirim'),
         );

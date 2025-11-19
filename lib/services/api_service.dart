@@ -2355,6 +2355,24 @@ class ApiService {
       throw Exception('Terjadi kesalahan: $e');
     }
   }
+
+  // User menyelesaikan pesanan fungsi baru selesaikan pesanan dari user
+  Future<Map<String, dynamic>> userSelesaikanPesanan({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/transaksi/selesai/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal menyelesaikan pesanan',
+      );
+    }
+  }
   // =======================================================================
   // --- [PERBAIKAN TOTAL] FUNGSI KELOLA PRODUK (CRUD) ---
   // =======================================================================
@@ -2580,13 +2598,17 @@ class ApiService {
   // =======================================================================
 
   /// 1. GET: Mengambil semua pesanan untuk toko admin
+  // Ambil list pesanan (dengan parameter status opsional)
   Future<List<AdminPesananModel>> fetchAdminPesanan({
     required String token,
     required int idToko,
+    String? status, // <-- Parameter ini PENTING untuk Lazy Load
   }) async {
     try {
       final response = await _dio.get(
-        '$_baseUrlBackend/admin/pesanan/$idToko', // <-- Endpoint baru
+        '$_baseUrlBackend/admin/pesanan/$idToko',
+        // Kirim status ke backend sebagai query param (?status=dikirim)
+        queryParameters: status != null ? {'status': status} : null,
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -2601,7 +2623,7 @@ class ApiService {
             .map((json) => AdminPesananModel.fromJson(json))
             .toList();
       } else {
-        return []; // Kembalikan list kosong jika data bukan list
+        return [];
       }
     } on DioException catch (e) {
       // Jika 404 (toko belum punya pesanan), kembalikan list kosong
@@ -2649,11 +2671,12 @@ class ApiService {
     required String token,
     required String noTransaksi,
     required String nomorResi,
+    required String jasaPengiriman,
   }) async {
     try {
       final response = await _dio.post(
         '$_baseUrlBackend/admin/pesanan/kirim/$noTransaksi',
-        data: {'nomor_resi': nomorResi},
+        data: {'nomor_resi': nomorResi, 'jasa_pengiriman': jasaPengiriman},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       return response.data;

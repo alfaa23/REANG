@@ -393,8 +393,7 @@ class _OrderListTabViewState extends State<OrderListTabView>
 
 class OrderCard extends StatelessWidget {
   final RiwayatTransaksiModel order;
-  final VoidCallback
-  onPaymentSuccess; // Berganti nama menjadi onOrderActionSuccess
+  final VoidCallback onPaymentSuccess;
 
   const OrderCard({
     required this.order,
@@ -402,7 +401,6 @@ class OrderCard extends StatelessWidget {
     super.key,
   });
 
-  // Helper untuk menampilkan StyledToast
   void _showToast(
     BuildContext context,
     String message, {
@@ -419,7 +417,6 @@ class OrderCard extends StatelessWidget {
       duration: const Duration(seconds: 2),
       borderRadius: BorderRadius.circular(25),
       textStyle: const TextStyle(color: Colors.white),
-      curve: Curves.fastOutSlowIn,
       backgroundColor: isError
           ? theme.colorScheme.error
           : Colors.black.withOpacity(0.8),
@@ -433,8 +430,6 @@ class OrderCard extends StatelessWidget {
         builder: (context) => DetailOrderScreen(noTransaksi: order.noTransaksi),
       ),
     ).then((result) {
-      // Jika DetailOrderScreen mengembalikan hasil 'true' (misal: setelah pembayaran berhasil),
-      // panggil callback untuk refresh OrderListTabView (dan ProcessOrderScreen)
       if (result == true) {
         onPaymentSuccess();
       }
@@ -462,60 +457,88 @@ class OrderCard extends StatelessWidget {
       final Map<String, dynamic> paymentMap = response.transaksi.toJson();
       final List<Map<String, dynamic>> paymentData = [paymentMap];
 
-      Navigator.pop(context); // Tutup loading
-
-      // Tunggu hingga PaymentInstructionScreen selesai (pop)
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentInstructionScreen(
-            paymentData: paymentData,
-
-            // --- [INI ADALAH PERUBAHANNYA] ---
-            // Kita berikan fungsi 'onCustomClose' ke layar instruksi.
-            // Saat tombol 'Back' di AppBar (atau swipe back)
-            // di PaymentInstructionScreen ditekan, fungsi ini akan dijalankan.
-            onCustomClose: () {
-              Navigator.pop(context); // Cukup tutup layar instruksi
-            },
-
-            // --- [SELESAI PERUBAHAN] ---
+      if (context.mounted) {
+        Navigator.pop(context); // Tutup loading
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentInstructionScreen(
+              paymentData: paymentData,
+              onCustomClose: () {
+                Navigator.pop(context);
+              },
+            ),
           ),
-        ),
-      );
-
-      // Panggil refresh setelah kembali dari instruksi pembayaran
-      // untuk update status pesanan
-      onPaymentSuccess();
+        );
+        onPaymentSuccess();
+      }
     } catch (e) {
-      Navigator.pop(context); // Tutup loading
-      _showToast(
-        context,
-        'Gagal memuat detail pembayaran: ${e.toString().replaceAll("Exception: ", "")}',
-        isError: true,
-      );
+      if (context.mounted) {
+        Navigator.pop(context); // Tutup loading
+        _showToast(
+          context,
+          'Gagal memuat: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
     }
   }
 
-  // TODO: Buat fungsi _goToReview untuk Beri Ulasan
+  // Fungsi Konfirmasi Selesai (User)
+  void _konfirmasiSelesai(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Pesanan Diterima?"),
+        content: const Text(
+          "Pastikan produk sudah sesuai dan tidak rusak. Dana akan diteruskan ke penjual.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Batal"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Tutup dialog
+              try {
+                final auth = context.read<AuthProvider>();
+                final api = ApiService();
+
+                await api.userSelesaikanPesanan(
+                  token: auth.token!,
+                  noTransaksi: order.noTransaksi,
+                );
+
+                if (context.mounted) {
+                  _showToast(context, "Pesanan Selesai. Terima kasih!");
+                  onPaymentSuccess(); // Refresh halaman
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  _showToast(
+                    context,
+                    e.toString().replaceAll("Exception: ", ""),
+                    isError: true,
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            child: const Text("Ya, Diterima"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Placeholder Navigasi Lain
   void _goToReview(BuildContext context) {
-    // Navigasi ke halaman ulasan (Rating Screen)
-    _showToast(context, 'TODO: Buka halaman Beri Ulasan', isError: false);
-    // Di sini Anda akan push ke ReviewScreen
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => ReviewScreen(order: order)));
-    // Jika ulasan berhasil, panggil onPaymentSuccess() untuk refresh
+    _showToast(context, 'TODO: Buka halaman Beri Ulasan');
   }
 
-  // TODO: Buat fungsi _goToTracking untuk Lacak
-  void _goToTracking(BuildContext context) {
-    // Navigasi ke halaman lacak (Tracking Screen)
-    _showToast(context, 'TODO: Buka halaman Lacak Pesanan', isError: false);
-  }
-
-  // TODO: Buat fungsi _goToChat untuk Hubungi Penjual
   void _goToChat(BuildContext context) {
-    // Navigasi ke halaman chat
-    _showToast(context, 'TODO: Buka halaman Chat Penjual', isError: false);
+    _showToast(context, 'TODO: Buka halaman Chat Penjual');
   }
 
   @override
@@ -541,18 +564,26 @@ class OrderCard extends StatelessWidget {
         statusColor = primaryColor;
     }
 
-    // Tentukan aksi untuk tombol kedua
+    // --- [BAGIAN INI YANG ANDA LEWATKAN TADI] ---
+    // Deklarasi variabel harus ada sebelum blok if/else
     VoidCallback? secondaryAction;
     String secondaryText = 'Hubungi Penjual';
+
+    // Tambahkan 2 baris ini agar tidak error "Undefined name":
+    Color? secondaryColor;
+    Color? secondaryTextColor;
+    // --------------------------------------------
 
     if (tabKategori == 'Selesai') {
       secondaryAction = () => _goToReview(context);
       secondaryText = 'Beri Ulasan';
     } else if (tabKategori == 'Dikirim') {
-      secondaryAction = () => _goToTracking(context);
-      secondaryText = 'Lacak';
+      // Logika tombol hijau untuk user
+      secondaryAction = () => _konfirmasiSelesai(context);
+      secondaryText = 'Pesanan Diterima';
+      secondaryColor = Colors.green;
+      secondaryTextColor = Colors.white;
     } else {
-      // Dikemas, dll.
       secondaryAction = () => _goToChat(context);
       secondaryText = 'Hubungi Penjual';
     }
@@ -567,6 +598,7 @@ class OrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header Toko & Status
             Row(
               children: [
                 Icon(
@@ -594,6 +626,8 @@ class OrderCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 20, thickness: 0.5),
+
+            // Produk Info
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -604,18 +638,16 @@ class OrderCard extends StatelessWidget {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 80,
-                        height: 80,
-                        color: theme.colorScheme.surfaceContainer,
-                        child: Icon(
-                          Icons.shopping_bag_outlined,
-                          color: theme.hintColor.withOpacity(0.7),
-                          size: 36,
-                        ),
-                      );
-                    },
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 80,
+                      height: 80,
+                      color: theme.colorScheme.surfaceContainer,
+                      child: Icon(
+                        Icons.shopping_bag_outlined,
+                        color: theme.hintColor.withOpacity(0.7),
+                        size: 36,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -659,6 +691,8 @@ class OrderCard extends StatelessWidget {
                 ),
               ],
             ),
+
+            // Footer: Tanggal & Tombol Aksi
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
@@ -668,66 +702,30 @@ class OrderCard extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 14,
-                        color: theme.hintColor,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Tanggal Pesanan:',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.hintColor,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        DateFormat(
-                          'dd MMM yyyy, HH:mm',
-                          'id_ID',
-                        ).format(order.createdAt.toLocal()),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 14,
+                    color: theme.hintColor,
                   ),
-                  if (isUnpaid)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6.0),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.access_time_filled_outlined,
-                            size: 14,
-                            color: theme.hintColor,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Batas Pembayaran:',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.hintColor,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(
-                              order.createdAt.toLocal().add(
-                                const Duration(days: 1),
-                              ),
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.error,
-                            ),
-                          ),
-                        ],
-                      ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tanggal Pesanan:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
                     ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateFormat(
+                      'dd MMM yyyy, HH:mm',
+                      'id_ID',
+                    ).format(order.createdAt.toLocal()),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -735,17 +733,44 @@ class OrderCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
+                    // [GANTI JADI .icon]
                     onPressed: () => _goToDetail(context),
+
+                    // 1. Tambahkan Ikon biar manis
+                    icon: Icon(
+                      Icons.receipt_long_rounded,
+                      size: 18,
+                      color:
+                          theme.colorScheme.primary, // Warna ikon ngikut tema
+                    ),
+
+                    // 2. Label Teks
+                    label: const Text(
+                      'Lihat Detail',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+
+                    // 3. Style yang lebih jelas
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.onSurface,
-                      side: BorderSide(color: theme.dividerColor),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      // Warna Teks & Ikon (Primary)
+                      foregroundColor: theme.colorScheme.primary,
+
+                      // Warna Garis Pinggir (Primary juga, dan agak tebal)
+                      side: BorderSide(
+                        color: theme.colorScheme.primary,
+                        width: 1.5,
+                      ),
+
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                      ), // Sedikit lebih tinggi
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      // Efek saat ditekan (opsional, biar kerasa)
+                      overlayColor: theme.colorScheme.primary.withOpacity(0.1),
                     ),
-                    child: const Text('Lihat Detail'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -765,20 +790,19 @@ class OrderCard extends StatelessWidget {
                           child: const Text('Bayar Sekarang'),
                         )
                       : ElevatedButton(
-                          onPressed:
-                              secondaryAction, // Menggunakan aksi dinamis
+                          onPressed: secondaryAction,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: onPrimaryColor,
+                            // Gunakan variabel yang sudah dideklarasikan mundur dulu
+                            backgroundColor: secondaryColor ?? primaryColor,
+                            foregroundColor:
+                                secondaryTextColor ?? onPrimaryColor,
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             elevation: 1,
                           ),
-                          child: Text(
-                            secondaryText,
-                          ), // Menggunakan teks dinamis
+                          child: Text(secondaryText),
                         ),
                 ),
               ],

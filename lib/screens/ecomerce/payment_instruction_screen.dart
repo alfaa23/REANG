@@ -228,15 +228,28 @@ class _PaymentInstructionCardState extends State<PaymentInstructionCard> {
     String message, {
     bool isError = false,
   }) {
+    final theme = Theme.of(context); // Mengambil tema dari context
+
     showToast(
       message,
       context: context,
       position: StyledToastPosition.bottom,
-      backgroundColor: isError
-          ? widget.theme.colorScheme.error
-          : Colors.black.withOpacity(0.7),
-      textStyle: TextStyle(color: widget.theme.colorScheme.onError),
+
+      // [UBAH DI SINI]
+      // Jika sukses: Hijau Solid (Colors.green).
+      // Jika error: Merah (theme error).
+      backgroundColor: isError ? theme.colorScheme.error : Colors.green,
+
+      // Teks Putih agar kontras dengan Hijau/Merah
+      textStyle: const TextStyle(color: Colors.white),
+
+      // [STYLE ANIMASI ANDA]
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 2),
       borderRadius: BorderRadius.circular(25),
+      curve: Curves.fastOutSlowIn,
     );
   }
 

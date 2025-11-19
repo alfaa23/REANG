@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Pastikan import ini ada untuk Clipboard
+import 'package:flutter/services.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +7,6 @@ import 'package:reang_app/models/detail_transaksi_response.dart';
 import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'dialog_input_resi.dart';
 import 'package:reang_app/models/user_model.dart';
 
 class DetailPesananAdminScreen extends StatefulWidget {
@@ -31,6 +30,9 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   late String _token;
   late AuthProvider _authProvider;
 
+  final TextEditingController _resiController = TextEditingController();
+  final TextEditingController _jasaKirimController = TextEditingController();
+
   bool _isLoading = false;
   bool _isConfirming = false;
   bool _isRejecting = false;
@@ -41,6 +43,18 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     _authProvider = context.read<AuthProvider>();
     _token = _authProvider.token ?? '';
     _loadDetails();
+
+    // Listener untuk update UI saat Jasa Kirim diketik (untuk buka/tutup akses Resi)
+    _jasaKirimController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _resiController.dispose();
+    _jasaKirimController.dispose();
+    super.dispose();
   }
 
   void _loadDetails() {
@@ -48,6 +62,12 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
       token: _token,
       noTransaksi: widget.noTransaksi,
     );
+  }
+
+  // Mengisi data otomatis (Hanya dipanggil jika Anda ingin pre-fill dari pilihan user)
+  // Saat ini dikosongkan agar admin mengisi manual sesuai permintaan
+  void _prefillData(RiwayatTransaksiModel transaksi) {
+    // Biarkan kosong agar admin input manual
   }
 
   void _showToast(String message, {bool isError = false}) {
@@ -74,7 +94,6 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     Function(bool) setLoading,
   ) {
     setLoading(true);
-
     return apiCall()
         .then((response) {
           _showToast(response['message'] ?? successMessage);
@@ -85,9 +104,7 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
           _showToast(e.toString().replaceAll("Exception: ", ""), isError: true);
         })
         .whenComplete(() {
-          if (mounted) {
-            setLoading(false);
-          }
+          if (mounted) setLoading(false);
         });
   }
 
@@ -113,12 +130,21 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     );
   }
 
-  void _onKirim(String nomorResi) {
+  void _onKirim() {
+    String resi = _resiController.text.trim();
+    String jasaKirim = _jasaKirimController.text.trim();
+
+    // [LOGIKA BARU]
+    // Jika kosong, isi dengan "-" agar backend menerima
+    if (jasaKirim.isEmpty) jasaKirim = "-";
+    if (resi.isEmpty) resi = "-";
+
     _runApiAction(
       () => _apiService.adminKirimPesanan(
         token: _token,
         noTransaksi: widget.noTransaksi,
-        nomorResi: nomorResi,
+        nomorResi: resi,
+        jasaPengiriman: jasaKirim,
       ),
       'Pesanan ditandai terkirim!',
       (isLoading) => setState(() => _isLoading = isLoading),
@@ -126,32 +152,115 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   }
 
   void _onSelesai() {
-    _runApiAction(
-      () => _apiService.adminTandaiSelesai(
-        token: _token,
-        noTransaksi: widget.noTransaksi,
-      ),
-      'Pesanan ditandai selesai!',
-      (isLoading) => setState(() => _isLoading = isLoading),
-    );
-  }
-
-  void _showInputResiDialog() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: Colors.orange,
+          size: 50,
+        ),
+        title: const Text(
+          'Hati-hati!',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Apakah Anda yakin barang SUDAH SAMPAI di tangan pembeli?",
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Tindakan ini akan menyelesaikan pesanan secara otomatis dan tidak dapat dibatalkan lagi.",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              // Gunakan 'onSurface' agar otomatis Hitam/Putih sesuai tema
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+
+              // Garis pinggir juga menyesuaikan tema (tidak terlalu pudar)
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                width: 1,
+              ),
+
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Batal',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Tutup Dialog
+
+              try {
+                final api = ApiService();
+                final token = context.read<AuthProvider>().token!;
+
+                // Panggil API
+                final response = await api.adminTandaiSelesai(
+                  token: token,
+                  noTransaksi: widget.noTransaksi, // <-- Pakai widget.
+                );
+
+                if (!context.mounted) return;
+
+                _showToast(response['message'] ?? 'Pesanan selesai!');
+                widget.onActionSuccess(); // <-- Pakai widget.
+              } catch (e) {
+                if (!context.mounted) return;
+                _showToast(
+                  e.toString().replaceAll("Exception: ", ""),
+                  isError: true,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Ya, Saya Yakin'),
+          ),
+        ],
       ),
-      builder: (ctx) {
-        return DialogInputResi(
-          onSubmit: (nomorResi) {
-            Navigator.pop(ctx);
-            _onKirim(nomorResi);
-          },
-        );
-      },
     );
   }
 
@@ -191,6 +300,8 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
           final items = snapshot.data!.items;
           final String? buktiBayarUrl = transaksi.buktiPembayaran;
 
+          _prefillData(transaksi);
+
           body = SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             child: Column(
@@ -198,10 +309,18 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
               children: [
                 _buildStatusCard(theme, transaksi, _authProvider.user),
                 const SizedBox(height: 16),
+
                 if (transaksi.status == 'menunggu_konfirmasi') ...[
                   _buildPaymentProofCard(theme, buktiBayarUrl, transaksi),
                   const SizedBox(height: 16),
                 ],
+
+                // Card Input Resi (Tampil saat 'diproses')
+                if (transaksi.status == 'diproses') ...[
+                  _buildInputResiCard(theme),
+                  const SizedBox(height: 16),
+                ],
+
                 _buildProductListCard(theme, items),
                 const SizedBox(height: 16),
                 _buildCostCard(theme, transaksi),
@@ -233,6 +352,109 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
 
   // --- WIDGET BUILDER ---
 
+  Widget _buildInputResiCard(ThemeData theme) {
+    // Cek apakah jasa kirim diisi
+    bool isJasaKirimFilled = _jasaKirimController.text.trim().isNotEmpty;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.blue.shade200, width: 1),
+      ),
+      color: Colors.blue.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.local_shipping, color: Colors.blue.shade800),
+                const SizedBox(width: 8),
+                Text(
+                  'Informasi Pengiriman',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Input Jasa Pengiriman (Opsional di Backend, tapi kunci untuk UI Resi)
+            TextField(
+              controller: _jasaKirimController,
+              decoration: InputDecoration(
+                labelText: 'Jasa Pengiriman (Opsional)',
+                labelStyle: TextStyle(color: Colors.blue.shade800),
+                hintText: 'Cth: JNE, Kurir Toko',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: Icon(
+                  Icons.directions_car,
+                  color: Colors.blue.shade300,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Input Nomor Resi (Hanya aktif jika Jasa Kirim terisi)
+            TextField(
+              controller: _resiController,
+              enabled: isJasaKirimFilled, // <-- Terkunci jika Jasa Kirim kosong
+              decoration: InputDecoration(
+                labelText: 'Nomor Resi (Opsional)',
+                labelStyle: TextStyle(
+                  color: isJasaKirimFilled ? Colors.blue.shade800 : Colors.grey,
+                ),
+                hintText: isJasaKirimFilled
+                    ? 'Masukkan nomor resi...'
+                    : 'Isi Jasa Pengiriman dulu untuk input resi', // Hint jelas
+                filled: true,
+                fillColor: isJasaKirimFilled
+                    ? Colors.white
+                    : Colors.grey.shade300,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: Icon(
+                  Icons.receipt,
+                  color: isJasaKirimFilled ? Colors.blue.shade300 : Colors.grey,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+            Text(
+              isJasaKirimFilled
+                  ? '*Kosongkan resi jika tidak ada (misal: kurir internal).'
+                  : '*Anda bisa langsung tekan "Kirim" jika tanpa jasa pengiriman.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.blue.shade800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatusCard(
     ThemeData theme,
     RiwayatTransaksiModel transaksi,
@@ -254,6 +476,38 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 color: theme.colorScheme.primary,
               ),
             ),
+            if (transaksi.status == 'dikirim' ||
+                transaksi.status == 'selesai') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+                    0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _InfoRow(
+                      theme: theme,
+                      label: "Jasa Kirim",
+                      value: transaksi.jasaPengiriman,
+                      valueWeight: FontWeight.bold,
+                    ),
+                    const SizedBox(height: 4),
+                    _InfoRow(
+                      theme: theme,
+                      label: "Resi",
+                      value: transaksi.nomorResi ?? "-",
+                      valueWeight: FontWeight.bold,
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const Divider(height: 24),
             Text('Info Pelanggan', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
@@ -264,16 +518,12 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
               value: user?.phone ?? '...',
             ),
             const SizedBox(height: 8),
-            Text('Alamat Pengiriman:', style: theme.textTheme.bodySmall),
-
-            // [PERBAIKAN ADA DI SINI]
-            // Bungkus alamat dengan InkWell untuk aksi copy
             InkWell(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: transaksi.alamat));
                 _showToast('Alamat pengiriman disalin');
               },
-              borderRadius: BorderRadius.circular(4.0), // Untuk ripple effect
+              borderRadius: BorderRadius.circular(4.0),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Row(
@@ -281,21 +531,28 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        transaksi.alamat,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Alamat Pengiriman:',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          Text(
+                            transaksi.alamat,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.copy_outlined, size: 16, color: theme.hintColor),
+                    Icon(Icons.copy_outlined, size: 18, color: theme.hintColor),
                   ],
                 ),
               ),
             ),
-
-            // [SELESAI PERBAIKAN]
           ],
         ),
       ),
@@ -307,7 +564,6 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     String? buktiBayarUrl,
     RiwayatTransaksiModel transaksi,
   ) {
-    // (Tidak ada perubahan di sini)
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -337,7 +593,7 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 }
               },
               child: Container(
-                height: 300,
+                height: 250,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
@@ -429,7 +685,6 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   }
 
   Widget _buildProductListCard(ThemeData theme, List<ItemDetailModel> items) {
-    // (Tidak ada perubahan di sini)
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -461,7 +716,6 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   }
 
   Widget _buildCostCard(ThemeData theme, RiwayatTransaksiModel transaksi) {
-    // (Tidak ada perubahan di sini)
     double biayaLayanan =
         transaksi.total - transaksi.subtotal - transaksi.ongkir;
     if (biayaLayanan < 0) biayaLayanan = 0;
@@ -519,7 +773,6 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     ThemeData theme,
     RiwayatTransaksiModel transaksi,
   ) {
-    // (Tidak ada perubahan di sini)
     bool isActionLoading = _isLoading || _isConfirming || _isRejecting;
     Widget content;
 
@@ -560,8 +813,9 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 onPressed: isActionLoading ? null : _onConfirm,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: Colors.green,
+                  backgroundColor: Colors.green.shade600,
                   foregroundColor: Colors.white,
+                  elevation: 2,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -587,11 +841,17 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
 
       case 'diproses':
         content = ElevatedButton.icon(
-          onPressed: isActionLoading ? null : _showInputResiDialog,
-          icon: const Icon(Icons.local_shipping_outlined),
-          label: const Text("Input Resi & Kirim Pesanan"),
+          onPressed: isActionLoading ? null : _onKirim,
+          icon: const Icon(Icons.local_shipping),
+          label: const Text(
+            "Kirim Pesanan Sekarang",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
+            backgroundColor: Colors.blue.shade700,
+            foregroundColor: Colors.white,
+            elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -604,18 +864,22 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
           onPressed: isActionLoading ? null : _onSelesai,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.green.shade800,
             foregroundColor: Colors.white,
+            elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text("Tandai Pesanan Selesai"),
+          child: const Text(
+            "Tandai Pesanan Selesai",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
         break;
 
       default:
-        return null; // Tidak ada tombol
+        return null;
     }
 
     return Container(
@@ -623,23 +887,25 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
         16,
         12,
         16,
-        12 + MediaQuery.of(context).padding.bottom, // Safe area
+        12 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         border: Border(top: BorderSide(color: theme.dividerColor, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, -2),
+          ),
+        ],
       ),
       child: content,
     );
   }
 }
 
-// ===============================================
-// --- Widget Helper Internal (TIDAK BERUBAH) ---
-// ===============================================
-
 class _ProductDetailRow extends StatelessWidget {
-  // (Tidak ada perubahan di sini)
   const _ProductDetailRow({
     required this.theme,
     required this.item,
@@ -725,18 +991,19 @@ class _ProductDetailRow extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  // (Tidak ada perubahan di sini)
   const _InfoRow({
     required this.theme,
     required this.label,
     required this.value,
     this.isTotal = false,
+    this.valueWeight,
   });
 
   final ThemeData theme;
   final String label;
   final String value;
   final bool isTotal;
+  final FontWeight? valueWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -762,7 +1029,7 @@ class _InfoRow extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   )
                 : theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: valueWeight ?? FontWeight.w600,
                   ),
           ),
         ),
@@ -772,7 +1039,6 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _ImagePreviewScreen extends StatelessWidget {
-  // (Tidak ada perubahan di sini)
   final String imageUrl;
   const _ImagePreviewScreen({required this.imageUrl});
 

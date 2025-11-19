@@ -260,13 +260,14 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              transaksi.getUiStatus, // 'Menunggu Konfirmasi', 'Dikemas', dll.
+              transaksi.getUiStatus,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: statusColor,
               ),
             ),
             const Divider(height: 24),
+
             _InfoRow(
               theme: theme,
               icon: Icons.store_outlined,
@@ -274,6 +275,7 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
               value: transaksi.namaToko,
             ),
             const SizedBox(height: 12),
+
             _InfoRow(
               theme: theme,
               icon: Icons.receipt_long_outlined,
@@ -284,7 +286,48 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
                 _showToast(context, 'No. Transaksi disalin');
               },
             ),
+
+            // [PERBAIKAN: TAMBAHKAN LOGIKA RESI DI SINI]
+            // Tampilkan hanya jika status 'dikirim' atau 'selesai' DAN resi ada
+            if ((transaksi.status == 'dikirim' ||
+                    transaksi.status == 'selesai') &&
+                transaksi.nomorResi != null &&
+                transaksi.nomorResi!.isNotEmpty &&
+                transaksi.nomorResi != '-') ...[
+              const SizedBox(height: 12),
+              _InfoRow(
+                theme: theme,
+                icon: Icons.local_shipping_outlined,
+                label: 'Jasa Kirim',
+                value: transaksi.jasaPengiriman, // <-- Data dari backend
+                valueWeight: FontWeight.bold,
+              ),
+
+              // 2. Tampilkan Resi (Jika ada dan bukan '-')
+              if (transaksi.nomorResi != null &&
+                  transaksi.nomorResi!.isNotEmpty &&
+                  transaksi.nomorResi != '-') ...[
+                const SizedBox(height: 8),
+                _InfoRow(
+                  theme: theme,
+                  icon: Icons.confirmation_number_outlined, // Ikon Resi
+                  label: 'No. Resi',
+                  value: transaksi.nomorResi!,
+                  valueColor: Colors.blue.shade800,
+                  valueWeight: FontWeight.bold,
+                  onCopy: () {
+                    Clipboard.setData(
+                      ClipboardData(text: transaksi.nomorResi!),
+                    );
+                    _showToast(context, 'No. Resi disalin');
+                  },
+                ),
+              ],
+            ],
+
+            // [SELESAI PERBAIKAN]
             const SizedBox(height: 12),
+
             _InfoRow(
               theme: theme,
               icon: Icons.calendar_today_outlined,
