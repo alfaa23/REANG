@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/providers/theme_provider.dart';
+import 'package:reang_app/services/api_service.dart'; // Import API
+
 import 'kelola_produk_view.dart';
-import 'umkm_analytics_dashboard.dart'; // <--- Tambahkan Import ini
+import 'umkm_analytics_dashboard.dart';
 import 'pengaturan_toko_view.dart';
 import 'kelola_pesanan_screen.dart';
 
@@ -17,11 +20,45 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // State untuk notifikasi
+  int _notificationCount = 0;
+  final ApiService _apiService = ApiService();
+
   @override
   void initState() {
     super.initState();
-    // Inisialisasi TabController dengan 3 tab
+    // Inisialisasi TabController dengan 5 tab
     _tabController = TabController(length: 5, vsync: this);
+
+    // Panggil fungsi hitung notifikasi saat halaman dibuka
+    _fetchNotificationCount();
+  }
+
+  // Fungsi mengambil jumlah pesanan yang butuh perhatian (Konfirmasi + Dikemas/COD)
+  Future<void> _fetchNotificationCount() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn && auth.user?.idToko != null) {
+        try {
+          final counts = await _apiService.fetchOrderCounts(
+            token: auth.token!,
+            idToko: auth.user!.idToko!,
+          );
+
+          if (mounted) {
+            setState(() {
+              // HITUNG: Menunggu Konfirmasi + Diproses (Siap Dikemas/COD)
+              int waiting = counts['menunggu_konfirmasi'] ?? 0;
+              int processing = counts['diproses'] ?? 0;
+
+              _notificationCount = waiting + processing;
+            });
+          }
+        } catch (e) {
+          debugPrint("Gagal load notif home: $e");
+        }
+      }
+    });
   }
 
   @override
@@ -36,7 +73,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
     final themeProvider = Provider.of<ThemeProvider>(context);
     final bool isDarkMode = themeProvider.isDarkMode;
     final Color cardColor = isDarkMode
-        ? theme.colorScheme.surfaceVariant
+        ? theme.colorScheme.surfaceContainerHighest
         : theme.colorScheme.surface;
 
     return Scaffold(
@@ -45,6 +82,13 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
           'Toko Saya',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchNotificationCount, // Refresh manual
+            tooltip: 'Segarkan Notifikasi',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -56,12 +100,40 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
             labelStyle: const TextStyle(fontWeight: FontWeight.bold),
             indicatorSize: TabBarIndicatorSize.label,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            tabs: const [
-              Tab(text: 'Profil Toko'),
-              Tab(text: 'Pesanan'),
-              Tab(text: 'Analitik'),
-              Tab(text: 'Produk'),
-              Tab(text: 'Pengaturan Toko'),
+            tabs: [
+              const Tab(text: 'Profil Toko'),
+
+              // [MODIFIKASI TAB PESANAN]
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Pesanan'),
+                    if (_notificationCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          _notificationCount.toString(),
+                          style: TextStyle(
+                            color: theme.colorScheme.onError,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const Tab(text: 'Analitik'),
+              const Tab(text: 'Produk'),
+              const Tab(text: 'Pengaturan Toko'),
             ],
           ),
           Expanded(
@@ -72,7 +144,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
                 const KelolaPesananScreen(),
                 const UMKMAnalyticsDashboardContent(),
                 const KelolaProdukView(),
-                const PengaturanTokoView(), // <-- menuju halaman pengaturan toko
+                const PengaturanTokoView(),
               ],
             ),
           ),
@@ -252,7 +324,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
                   ),
                   const SizedBox(height: 24),
 
-                  // --- GANTI BAGIAN INI DENGAN IDENTITAS PENJUALAN TOKO ---
+                  // Identitas Penjualan Toko
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -328,7 +400,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
     );
   }
 
-  // --- Helper Widgets (TETAP SAMA) ---
+  // --- Helper Widgets ---
 
   Widget _buildProfileActionButton(
     BuildContext context, {
@@ -387,7 +459,6 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
     );
   }
 
-  // 🔹 Widget baru untuk identitas toko
   Widget _buildIdentityItem(IconData icon, String title, String value) {
     return Row(
       children: [

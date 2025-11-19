@@ -553,6 +553,19 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, thickness: 0.5),
+            const SizedBox(height: 16),
+
+            // [TAMBAHAN BARU: METODE PEMBAYARAN]
+            _InfoRow(
+              theme: theme,
+              label: 'Metode Pembayaran',
+              value: transaksi.metodePembayaran ?? 'Tidak Diketahui',
+              valueWeight: FontWeight.bold, // Teks tebal agar jelas
+              valueColor:
+                  theme.colorScheme.primary, // Warna primary agar menonjol
+            ),
           ],
         ),
       ),
@@ -997,6 +1010,7 @@ class _InfoRow extends StatelessWidget {
     required this.value,
     this.isTotal = false,
     this.valueWeight,
+    this.valueColor, // [1. TAMBAHKAN INI DI CONSTRUCTOR]
   });
 
   final ThemeData theme;
@@ -1004,6 +1018,7 @@ class _InfoRow extends StatelessWidget {
   final String value;
   final bool isTotal;
   final FontWeight? valueWeight;
+  final Color? valueColor; // [2. TAMBAHKAN VARIABEL INI]
 
   @override
   Widget build(BuildContext context) {
@@ -1017,7 +1032,7 @@ class _InfoRow extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Flexible(
           flex: 3,
           child: Text(
@@ -1030,6 +1045,7 @@ class _InfoRow extends StatelessWidget {
                   )
                 : theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: valueWeight ?? FontWeight.w600,
+                    color: valueColor, // [3. GUNAKAN DI SINI]
                   ),
           ),
         ),
