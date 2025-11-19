@@ -2700,4 +2700,32 @@ class ApiService {
       throw Exception(e.response?.data['message'] ?? 'Gagal');
     }
   }
+
+  /// Mengambil jumlah pesanan per status (untuk Badge Notifikasi)
+  Future<Map<String, int>> fetchOrderCounts({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/admin/pesanan/counts/$idToko',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        // Konversi JSON ke Map<String, int>
+        return Map<String, int>.from(response.data);
+      } else {
+        return {};
+      }
+    } catch (e) {
+      debugPrint('Error fetching counts: $e');
+      return {}; // Kembalikan map kosong jika gagal (agar aplikasi tidak crash)
+    }
+  }
 }

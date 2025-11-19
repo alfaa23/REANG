@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
-import 'package:flutter_styled_toast/flutter_styled_toast.dart'; // <-- Tambahkan ini
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 
-// Ganti import dialog dengan halaman detail
+// Import halaman detail
 import 'detail_pesanan_admin_screen.dart';
-// Import dialog untuk input resi
 
+// =============================================================================
+// 1. PARENT WIDGET: Mengelola Badge, Chip, dan PageView
+// =============================================================================
 class KelolaPesananScreen extends StatefulWidget {
   const KelolaPesananScreen({super.key});
 
@@ -19,10 +21,15 @@ class KelolaPesananScreen extends StatefulWidget {
 
 class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
   final ApiService _apiService = ApiService();
-  late Future<List<AdminPesananModel>> _pesananFuture;
   late AuthProvider _authProvider;
 
-  String _selectedStatus = 'Perlu Dikonfirmasi';
+  // Controller untuk geser halaman (Ganti TabController manual)
+  final PageController _pageController = PageController();
+  int _selectedIndex = 0; // Untuk menandai Chip mana yang aktif
+
+  // State untuk Badge (Counts)
+  Map<String, int> _counts = {};
+  // bool _isLoadingCounts = true; // Tidak dipakai di UI, jadi opsional
 
   final List<String> _statusFilters = const [
     'Perlu Dikonfirmasi',
@@ -32,53 +39,45 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
     'Dibatalkan',
   ];
 
+  // Mapping untuk API
+  final List<String> _apiStatusKeys = const [
+    'menunggu_konfirmasi',
+    'diproses',
+    'dikirim',
+    'selesai',
+    'dibatalkan',
+  ];
+
   @override
   void initState() {
     super.initState();
     _authProvider = context.read<AuthProvider>();
-    _pesananFuture = _fetchData();
+    _fetchBadgeCounts();
   }
 
-  Future<List<AdminPesananModel>> _fetchData() {
-    if (!_authProvider.isLoggedIn || _authProvider.user?.idToko == null) {
-      throw Exception('ID Toko Anda tidak ditemukan di data login.');
-    }
-    return _apiService.fetchAdminPesanan(
-      token: _authProvider.token!,
-      idToko: _authProvider.user!.idToko!,
-    );
-  }
+  // Ambil badge saja (Ringan)
+  Future<void> _fetchBadgeCounts() async {
+    if (!_authProvider.isLoggedIn || _authProvider.user?.idToko == null) return;
 
-  Future<void> _refreshData() async {
-    setState(() {
-      _pesananFuture = _fetchData();
-    });
-  }
-
-  // --- Fungsi Helper untuk Filter dan Badge ---
-  // (Fungsi-fungsi ini tidak berubah)
-  Map<String, int> _getStatusCounts(List<AdminPesananModel> pesanan) {
-    final counts = {
-      'Perlu Dikonfirmasi': 0,
-      'Siap Dikemas': 0,
-      'Dikirim': 0,
-      'Selesai': 0,
-      'Dibatalkan': 0,
-    };
-    for (var p in pesanan) {
-      final tab = p.getTabKategori;
-      if (counts.containsKey(tab)) {
-        counts[tab] = counts[tab]! + 1;
+    try {
+      final data = await _apiService.fetchOrderCounts(
+        token: _authProvider.token!,
+        idToko: _authProvider.user!.idToko!,
+      );
+      if (mounted) {
+        setState(() {
+          _counts = data;
+        });
       }
+    } catch (e) {
+      debugPrint("Gagal load badge: $e");
     }
-    return counts;
   }
 
-  List<AdminPesananModel> _filterPesanan(
-    List<AdminPesananModel> pesanan,
-    String status,
-  ) {
-    return pesanan.where((p) => p.getTabKategori == status).toList();
+  // Refresh badge dan halaman aktif
+  void _globalRefresh() {
+    _fetchBadgeCounts();
+    setState(() {}); // Trigger rebuild untuk update badge di chip
   }
 
   IconData _getIconForStatus(String status) {
@@ -97,237 +96,310 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
         return Icons.receipt_long_outlined;
     }
   }
-  // --- Akhir Fungsi Helper ---
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Judul (Padding sama persis dengan code lama)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Text(
+            'Kelola Pesanan Masuk',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // 2. Chip Filters (Scrollable Horizontal)
+        // Menggunakan SizedBox height agar pas dengan ukuran chip
+        SizedBox(
+          height: 40, // Tinggi standar chip + padding
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+            ), // Padding kiri kanan sama
+            scrollDirection: Axis.horizontal,
+            itemCount: _statusFilters.length,
+            separatorBuilder: (ctx, index) =>
+                const SizedBox(width: 8), // Jarak antar chip
+            itemBuilder: (context, index) {
+              final status = _statusFilters[index];
+              final apiStatus = _apiStatusKeys[index];
+
+              final bool isSelected = _selectedIndex == index;
+              final int count = _counts[apiStatus] ?? 0;
+
+              // Logika badge sama persis
+              final bool showBadge =
+                  (status == 'Perlu Dikonfirmasi' ||
+                      status == 'Siap Dikemas' ||
+                      status == 'Dikirim') &&
+                  count > 0;
+
+              return ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getIconForStatus(status),
+                      size: 18,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(status),
+
+                    if (showBadge) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.colorScheme.onPrimary
+                              : theme.colorScheme.error,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          count.toString(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onError,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                labelStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? theme.colorScheme.onPrimary
+                      : theme.colorScheme.onSurface,
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() => _selectedIndex = index);
+                    _pageController.jumpToPage(index); // Geser PageView
+                  }
+                },
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                selectedColor: theme.colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25.0),
+                  side: isSelected
+                      ? BorderSide.none
+                      : BorderSide(
+                          color: theme.colorScheme.outline.withOpacity(0.3),
+                        ),
+                ),
+                showCheckmark: false,
+                elevation: 1,
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // 3. Konten List (PageView untuk Lazy Load)
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _statusFilters.length,
+            onPageChanged: (index) {
+              setState(() => _selectedIndex = index);
+            },
+            itemBuilder: (context, index) {
+              // Panggil Widget Anak Per-Tab
+              return OrderListTab(
+                apiStatus: _apiStatusKeys[index],
+                onUpdate: _globalRefresh, // Callback refresh
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// 2. CHILD WIDGET: List Pesanan Per Tab (Lazy Load)
+// =============================================================================
+class OrderListTab extends StatefulWidget {
+  final String apiStatus;
+  final VoidCallback onUpdate;
+
+  const OrderListTab({
+    super.key,
+    required this.apiStatus,
+    required this.onUpdate,
+  });
+
+  @override
+  State<OrderListTab> createState() => _OrderListTabState();
+}
+
+class _OrderListTabState extends State<OrderListTab>
+    with AutomaticKeepAliveClientMixin {
+  // Agar tab tidak reload saat digeser
+
+  late Future<List<AdminPesananModel>> _futurePesanan;
+  final ApiService _apiService = ApiService();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData(); // Hanya dipanggil saat tab dibuka pertama kali (Lazy)
+  }
+
+  void _loadData() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isLoggedIn && auth.user?.idToko != null) {
+      _futurePesanan = _apiService.fetchAdminPesanan(
+        token: auth.token!,
+        idToko: auth.user!.idToko!,
+        status: widget.apiStatus, // Filter spesifik tab
+      );
+    } else {
+      _futurePesanan = Future.error("Data toko tidak ditemukan");
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loadData();
+    });
+    widget.onUpdate(); // Update badge di parent
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final theme = Theme.of(context);
+
     return FutureBuilder<List<AdminPesananModel>>(
-      future: _pesananFuture,
+      future: _futurePesanan,
       builder: (context, snapshot) {
+        // 1. Loading
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        // 2. Error
         if (snapshot.hasError) {
-          return _buildErrorState(theme, snapshot.error.toString());
-        }
-
-        final allPesanan = snapshot.data ?? [];
-        final filteredList = _filterPesanan(allPesanan, _selectedStatus);
-        final statusCounts = _getStatusCounts(allPesanan);
-
-        return RefreshIndicator(
-          onRefresh: _refreshData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(vertical: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Text(
-                    'Kelola Pesanan Masuk',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildChipFilters(theme, statusCounts),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: _buildPesananList(context, theme, filteredList),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildChipFilters(ThemeData theme, Map<String, int> counts) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        children: _statusFilters.map((status) {
-          final bool isSelected = _selectedStatus == status;
-          final count = counts[status] ?? 0;
-
-          // [PERBAIKAN DI SINI]
-          // Saya tambahkan "|| status == 'Dikirim'"
-          final bool showBadge =
-              (status == 'Perlu Dikonfirmasi' ||
-                  status == 'Siap Dikemas' ||
-                  status == 'Dikirim') &&
-              count > 0;
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: ChoiceChip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _getIconForStatus(status),
-                    size: 18,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(status),
-
-                  // Ini logika untuk memunculkan badge angka
-                  if (showBadge) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.error,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        count.toString(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onError,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.5,
+                child: _buildErrorState(theme, snapshot.error.toString()),
               ),
-              labelStyle: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isSelected
-                    ? theme.colorScheme.onPrimary
-                    : theme.colorScheme.onSurface,
-              ),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() {
-                    _selectedStatus = status;
-                  });
-                }
-              },
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              selectedColor: theme.colorScheme.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25.0),
-                side: isSelected
-                    ? BorderSide.none
-                    : BorderSide(
-                        color: theme.colorScheme.outline.withOpacity(0.3),
-                      ),
-              ),
-              showCheckmark: false,
-              elevation: 1,
             ),
           );
-        }).toList(),
-      ),
-    );
-  }
+        }
 
-  Widget _buildPesananList(
-    BuildContext context,
-    ThemeData theme,
-    List<AdminPesananModel> pesananList,
-  ) {
-    if (pesananList.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 64.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 80,
-                color: theme.hintColor.withOpacity(0.5),
+        final list = snapshot.data ?? [];
+
+        // 3. Kosong
+        if (list.isEmpty) {
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.5,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 80,
+                        color: theme.hintColor.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Tidak ada pesanan di status ini.',
+                        style: TextStyle(color: theme.hintColor),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Tidak ada pesanan di status ini.',
-                style: TextStyle(color: theme.hintColor),
-              ),
-            ],
+            ),
+          );
+        }
+
+        // 4. Ada Data
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView.builder(
+            // Padding sama persis dengan code lama
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0),
+            itemCount: list.length,
+            itemBuilder: (ctx, index) {
+              return _PesananAdminCard(
+                pesanan: list[index],
+                onActionSuccess: _refresh,
+              );
+            },
           ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: pesananList.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        return _PesananAdminCard(
-          pesanan: pesananList[index],
-          onActionSuccess: _refreshData, // <-- Kirim fungsi refresh
         );
       },
     );
   }
 
   Widget _buildErrorState(ThemeData theme, String error) {
-    // ... (Tidak ada perubahan di sini)
-    return RefreshIndicator(
-      onRefresh: _refreshData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 80,
-                color: theme.colorScheme.error,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 80, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal Memuat Pesanan',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Gagal Memuat Pesanan',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error.replaceAll("Exception: ", ""),
-                style: TextStyle(color: theme.hintColor),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.replaceAll("Exception: ", ""),
+              style: TextStyle(color: theme.hintColor),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ==========================================================
-// KARTU PESANAN KHUSUS ADMIN (DI SINI PERUBAHANNYA)
-// ==========================================================
+// =============================================================================
+// 3. KARTU PESANAN (SAMA PERSIS SEPERTI CODE LAMA)
+// =============================================================================
 class _PesananAdminCard extends StatelessWidget {
   final AdminPesananModel pesanan;
   final VoidCallback onActionSuccess;
@@ -345,7 +417,6 @@ class _PesananAdminCard extends StatelessWidget {
     ).format(value);
   }
 
-  // --- [BARU] Fungsi Toast Helper ---
   void _showToast(
     BuildContext context,
     String message, {
@@ -367,7 +438,18 @@ class _PesananAdminCard extends StatelessWidget {
     );
   }
 
-  // --- [BARU] Fungsi Konfirmasi Selesai ---
+  void _goToDetail(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DetailPesananAdminScreen(
+          noTransaksi: pesanan.noTransaksi,
+          onActionSuccess: onActionSuccess,
+        ),
+      ),
+    );
+  }
+
   void _showSelesaiDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -425,15 +507,11 @@ class _PesananAdminCard extends StatelessWidget {
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
             style: OutlinedButton.styleFrom(
-              // Gunakan 'onSurface' agar otomatis Hitam/Putih sesuai tema
               foregroundColor: Theme.of(context).colorScheme.onSurface,
-
-              // Garis pinggir juga menyesuaikan tema (tidak terlalu pudar)
               side: BorderSide(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                 width: 1,
               ),
-
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -446,24 +524,21 @@ class _PesananAdminCard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // Tutup Dialog
+              Navigator.pop(ctx);
 
               try {
                 final api = ApiService();
-                // Ambil token dari context card
                 final token = context.read<AuthProvider>().token!;
 
-                // Panggil API
                 final response = await api.adminTandaiSelesai(
                   token: token,
-                  noTransaksi: pesanan.noTransaksi, // <-- Pakai pesanan.
+                  noTransaksi: pesanan.noTransaksi,
                 );
 
                 if (!context.mounted) return;
 
-                // Gunakan _showToast helper yang ada di _PesananAdminCard
                 _showToast(context, response['message'] ?? 'Pesanan selesai!');
-                onActionSuccess(); // <-- Pakai onActionSuccess langsung
+                onActionSuccess();
               } catch (e) {
                 if (!context.mounted) return;
                 _showToast(
@@ -484,27 +559,13 @@ class _PesananAdminCard extends StatelessWidget {
     );
   }
 
-  // --- [BARU] Fungsi Navigasi ke Halaman Detail ---
-  void _goToDetail(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DetailPesananAdminScreen(
-          noTransaksi: pesanan.noTransaksi,
-          onActionSuccess: onActionSuccess, // Kirim callback refresh
-        ),
-      ),
-    );
-  }
-
-  // --- [PERBAIKAN] Logika Tombol Aksi ---
   Widget _buildAksiButton(BuildContext context, String status) {
     final theme = Theme.of(context);
 
     switch (status) {
       case 'menunggu_konfirmasi':
         return ElevatedButton.icon(
-          onPressed: () => _goToDetail(context), // <-- Buka Halaman Detail
+          onPressed: () => _goToDetail(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.error,
             foregroundColor: theme.colorScheme.onError,
@@ -514,14 +575,13 @@ class _PesananAdminCard extends StatelessWidget {
         );
       case 'diproses':
         return ElevatedButton.icon(
-          onPressed: () => _goToDetail(context), // <-- Buka Dialog Resi
+          onPressed: () => _goToDetail(context),
           icon: const Icon(Icons.local_shipping_outlined, size: 18),
           label: const Text('Proses Kirim'),
         );
       case 'dikirim':
         return OutlinedButton(
-          onPressed: () =>
-              _showSelesaiDialog(context), // <-- Buka Dialog Selesai
+          onPressed: () => _showSelesaiDialog(context),
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.green.shade700,
             side: BorderSide(color: Colors.green.shade700),
@@ -529,10 +589,8 @@ class _PesananAdminCard extends StatelessWidget {
           child: const Text('Tandai Selesai'),
         );
       default:
-        // Status 'selesai' atau 'dibatalkan'
         return OutGarisButton(
-          // Menggunakan widget custom Anda
-          onPressed: () => _goToDetail(context), // <-- Buka Halaman Detail
+          onPressed: () => _goToDetail(context),
           child: const Text('Lihat Detail'),
         );
     }
@@ -548,14 +606,12 @@ class _PesananAdminCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        // <-- [BONUS] Buat seluruh kartu bisa diklik
         onTap: () => _goToDetail(context),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Column(
             children: [
-              // Header: Info Pemesan
               Row(
                 children: [
                   Icon(
@@ -585,7 +641,6 @@ class _PesananAdminCard extends StatelessWidget {
               ),
               const Divider(height: 20, thickness: 0.5),
 
-              // Body: Info Produk
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -642,7 +697,6 @@ class _PesananAdminCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Footer: Total & Aksi
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -671,7 +725,6 @@ class _PesananAdminCard extends StatelessWidget {
   }
 }
 
-// Widget custom Anda (pastikan ini ada)
 class OutGarisButton extends StatelessWidget {
   final VoidCallback onPressed;
   final Widget child;
