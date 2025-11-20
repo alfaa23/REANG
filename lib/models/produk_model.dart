@@ -49,6 +49,7 @@ class ProdukModel {
 
   final List<ProdukVarianModel> varians;
   final List<GaleriFotoModel> galeriFoto; // <-- [BARU] Menampung galeri
+  final int terjual;
 
   ProdukModel({
     required this.id,
@@ -62,6 +63,7 @@ class ProdukModel {
     this.namaToko,
     this.varians = const [],
     this.galeriFoto = const [], // <-- [BARU]
+    this.terjual = 0,
   });
 
   // --- [Getter "Palsu" untuk UI Lama] ---
@@ -125,6 +127,9 @@ class ProdukModel {
       namaToko: json['nama_toko'],
       varians: parsedVarians,
       galeriFoto: parsedGaleri, // <-- [BARU]
+      terjual: json['terjual'] != null
+          ? (int.tryParse(json['terjual'].toString()) ?? 0)
+          : 0,
     );
   }
 

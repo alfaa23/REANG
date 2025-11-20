@@ -24,6 +24,7 @@ class RiwayatTransaksiModel {
 
   // Data dari JOIN (tabel toko)
   final String namaToko;
+  final String? noHpToko;
 
   // Data dari JOIN (produk pertama)
   final String? fotoProduk;
@@ -55,6 +56,7 @@ class RiwayatTransaksiModel {
     this.namaProdukUtama,
     this.buktiPembayaran,
     this.nomorResi,
+    this.noHpToko,
   });
 
   factory RiwayatTransaksiModel.fromJson(Map<String, dynamic> json) {
@@ -96,6 +98,7 @@ class RiwayatTransaksiModel {
       namaProdukUtama: json['nama_produk_utama'] as String?,
       buktiPembayaran: json['bukti_pembayaran'] as String?,
       nomorResi: json['nomor_resi'] as String?,
+      noHpToko: json['no_hp_toko'] as String?,
     );
   }
 
@@ -128,6 +131,7 @@ class RiwayatTransaksiModel {
 
       'foto_produk': fotoProduk,
       'nama_produk_utama': namaProdukUtama,
+      'no_hp_toko': noHpToko,
     };
   }
 

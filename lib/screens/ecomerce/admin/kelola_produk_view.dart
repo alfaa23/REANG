@@ -473,7 +473,11 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
                                 _getTotalStok(produk.varians),
                                 "Total Stok",
                               ),
-                              _buildStatItem(theme, "0", "Terjual"),
+                              _buildStatItem(
+                                theme,
+                                produk.terjual.toString(),
+                                "Terjual",
+                              ),
                             ],
                           ),
                         ),

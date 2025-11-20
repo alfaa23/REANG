@@ -278,6 +278,23 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
 
             _InfoRow(
               theme: theme,
+              icon: Icons.phone_outlined, // Ikon telepon
+              label: 'No. HP Toko',
+              value: transaksi.noHpToko ?? '-', // Tampilkan nomor
+              onCopy: () {
+                // Fitur copy agar mudah disalin
+                if (transaksi.noHpToko != null) {
+                  Clipboard.setData(ClipboardData(text: transaksi.noHpToko!));
+                  _showToast(context, 'Nomor HP Toko disalin');
+                }
+              },
+            ),
+
+            // [SELESAI TAMBAHAN]
+            const SizedBox(height: 12),
+
+            _InfoRow(
+              theme: theme,
               icon: Icons.receipt_long_outlined,
               label: 'No. Transaksi',
               value: transaksi.noTransaksi,
