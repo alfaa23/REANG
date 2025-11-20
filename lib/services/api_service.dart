@@ -2602,13 +2602,16 @@ class ApiService {
   Future<List<AdminPesananModel>> fetchAdminPesanan({
     required String token,
     required int idToko,
-    String? status, // <-- Parameter ini PENTING untuk Lazy Load
+    String? status,
+    int page = 1, // [BARU] Tambah parameter page
   }) async {
     try {
       final response = await _dio.get(
         '$_baseUrlBackend/admin/pesanan/$idToko',
-        // Kirim status ke backend sebagai query param (?status=dikirim)
-        queryParameters: status != null ? {'status': status} : null,
+        queryParameters: {
+          if (status != null) 'status': status,
+          'page': page, // [BARU] Kirim page ke backend
+        },
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -2617,8 +2620,11 @@ class ApiService {
         ),
       );
 
-      if (response.statusCode == 200 && response.data is List) {
-        final List<dynamic> dataList = response.data;
+      if (response.statusCode == 200) {
+        // [PERBAIKAN] Karena paginate, data ada di dalam key ['data']
+        // Respon Laravel: { "current_page": 1, "data": [...], ... }
+        final List<dynamic> dataList = response.data['data'] ?? [];
+
         return dataList
             .map((json) => AdminPesananModel.fromJson(json))
             .toList();
@@ -2626,7 +2632,6 @@ class ApiService {
         return [];
       }
     } on DioException catch (e) {
-      // Jika 404 (toko belum punya pesanan), kembalikan list kosong
       if (e.response?.statusCode == 404) {
         return [];
       }

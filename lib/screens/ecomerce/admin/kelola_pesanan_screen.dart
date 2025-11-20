@@ -5,12 +5,10 @@ import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-
-// Import halaman detail
 import 'detail_pesanan_admin_screen.dart';
 
 // =============================================================================
-// 1. PARENT WIDGET: Mengelola Badge, Chip, dan PageView
+// PARENT WIDGET
 // =============================================================================
 class KelolaPesananScreen extends StatefulWidget {
   const KelolaPesananScreen({super.key});
@@ -23,15 +21,13 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
   final ApiService _apiService = ApiService();
   late AuthProvider _authProvider;
 
-  // Controller untuk geser halaman (Ganti TabController manual)
   final PageController _pageController = PageController();
-  int _selectedIndex = 0; // Untuk menandai Chip mana yang aktif
+  int _selectedIndex = 0;
 
-  // State untuk Badge (Counts)
+  // Badge State
   Map<String, int> _counts = {};
-  // bool _isLoadingCounts = true; // Tidak dipakai di UI, jadi opsional
 
-  final List<String> _statusFilters = const [
+  final List<String> _statusFilters = [
     'Perlu Dikonfirmasi',
     'Siap Dikemas',
     'Dikirim',
@@ -39,8 +35,7 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
     'Dibatalkan',
   ];
 
-  // Mapping untuk API
-  final List<String> _apiStatusKeys = const [
+  final List<String> _apiStatusKeys = [
     'menunggu_konfirmasi',
     'diproses',
     'dikirim',
@@ -55,7 +50,6 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
     _fetchBadgeCounts();
   }
 
-  // Ambil badge saja (Ringan)
   Future<void> _fetchBadgeCounts() async {
     if (!_authProvider.isLoggedIn || _authProvider.user?.idToko == null) return;
 
@@ -64,20 +58,15 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
         token: _authProvider.token!,
         idToko: _authProvider.user!.idToko!,
       );
-      if (mounted) {
-        setState(() {
-          _counts = data;
-        });
-      }
+      if (mounted) setState(() => _counts = data);
     } catch (e) {
       debugPrint("Gagal load badge: $e");
     }
   }
 
-  // Refresh badge dan halaman aktif
   void _globalRefresh() {
     _fetchBadgeCounts();
-    setState(() {}); // Trigger rebuild untuk update badge di chip
+    setState(() {});
   }
 
   IconData _getIconForStatus(String status) {
@@ -104,9 +93,8 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Judul (Padding sama persis dengan code lama)
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
           child: Text(
             'Kelola Pesanan Masuk',
             style: theme.textTheme.headlineSmall?.copyWith(
@@ -115,37 +103,28 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
           ),
         ),
 
-        const SizedBox(height: 20),
-
-        // 2. Chip Filters (Scrollable Horizontal)
-        // Menggunakan SizedBox height agar pas dengan ukuran chip
         SizedBox(
-          height: 40, // Tinggi standar chip + padding
+          height: 50, // Tinggi Chip
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-            ), // Padding kiri kanan sama
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
             itemCount: _statusFilters.length,
-            separatorBuilder: (ctx, index) =>
-                const SizedBox(width: 8), // Jarak antar chip
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final status = _statusFilters[index];
               final apiStatus = _apiStatusKeys[index];
-
               final bool isSelected = _selectedIndex == index;
               final int count = _counts[apiStatus] ?? 0;
 
-              // Logika badge sama persis
               final bool showBadge =
-                  (status == 'Perlu Dikonfirmasi' ||
-                      status == 'Siap Dikemas' ||
-                      status == 'Dikirim') &&
-                  count > 0;
+                  count > 0 &&
+                  (apiStatus == 'menunggu_konfirmasi' ||
+                      apiStatus == 'diproses' ||
+                      apiStatus == 'dikirim');
 
               return ChoiceChip(
+                showCheckmark: false,
                 label: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       _getIconForStatus(status),
@@ -156,7 +135,6 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(status),
-
                     if (showBadge) ...[
                       const SizedBox(width: 8),
                       Container(
@@ -168,55 +146,46 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
                           color: isSelected
                               ? theme.colorScheme.onPrimary
                               : theme.colorScheme.error,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           count.toString(),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                             color: isSelected
                                 ? theme.colorScheme.primary
-                                : theme.colorScheme.onError,
-                            fontWeight: FontWeight.bold,
+                                : Colors.white,
                           ),
                         ),
                       ),
                     ],
                   ],
                 ),
+                selected: isSelected,
+                onSelected: (val) {
+                  _pageController.jumpToPage(index);
+                  setState(() => _selectedIndex = index);
+                },
                 labelStyle: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isSelected
                       ? theme.colorScheme.onPrimary
                       : theme.colorScheme.onSurface,
                 ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  if (selected) {
-                    setState(() => _selectedIndex = index);
-                    _pageController.jumpToPage(index); // Geser PageView
-                  }
-                },
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 selectedColor: theme.colorScheme.primary,
+                side: BorderSide.none,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                  side: isSelected
-                      ? BorderSide.none
-                      : BorderSide(
-                          color: theme.colorScheme.outline.withOpacity(0.3),
-                        ),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                showCheckmark: false,
-                elevation: 1,
               );
             },
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 10),
 
-        // 3. Konten List (PageView untuk Lazy Load)
         Expanded(
           child: PageView.builder(
             controller: _pageController,
@@ -225,10 +194,9 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
               setState(() => _selectedIndex = index);
             },
             itemBuilder: (context, index) {
-              // Panggil Widget Anak Per-Tab
               return OrderListTab(
                 apiStatus: _apiStatusKeys[index],
-                onUpdate: _globalRefresh, // Callback refresh
+                onUpdate: _globalRefresh,
               );
             },
           ),
@@ -239,7 +207,7 @@ class _KelolaPesananScreenState extends State<KelolaPesananScreen> {
 }
 
 // =============================================================================
-// 2. CHILD WIDGET: List Pesanan Per Tab (Lazy Load)
+// CHILD WIDGET: List Pesanan Per Tab (INFINITE SCROLL)
 // =============================================================================
 class OrderListTab extends StatefulWidget {
   final String apiStatus;
@@ -257,10 +225,16 @@ class OrderListTab extends StatefulWidget {
 
 class _OrderListTabState extends State<OrderListTab>
     with AutomaticKeepAliveClientMixin {
-  // Agar tab tidak reload saat digeser
-
-  late Future<List<AdminPesananModel>> _futurePesanan;
   final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  // State Data List
+  List<AdminPesananModel> _items = [];
+  bool _isFirstLoading = true; // Loading awal
+  bool _isLoadMoreRunning = false; // Loading bawah (pagination)
+  bool _hasNextPage = true; // Masih ada data lagi?
+  int _page = 1; // Halaman saat ini
+  String? _errorMessage;
 
   @override
   bool get wantKeepAlive => true;
@@ -268,27 +242,104 @@ class _OrderListTabState extends State<OrderListTab>
   @override
   void initState() {
     super.initState();
-    _loadData(); // Hanya dipanggil saat tab dibuka pertama kali (Lazy)
+    _loadFirstData();
+
+    // Listener Scroll
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        _loadMoreData();
+      }
+    });
   }
 
-  void _loadData() {
-    final auth = context.read<AuthProvider>();
-    if (auth.isLoggedIn && auth.user?.idToko != null) {
-      _futurePesanan = _apiService.fetchAdminPesanan(
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Reset dan Load Awal
+  Future<void> _loadFirstData() async {
+    if (!mounted) return;
+    setState(() {
+      _isFirstLoading = true;
+      _errorMessage = null;
+      _page = 1;
+      _hasNextPage = true;
+      _items = [];
+    });
+
+    try {
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) throw Exception("Belum login");
+
+      final data = await _apiService.fetchAdminPesanan(
         token: auth.token!,
         idToko: auth.user!.idToko!,
-        status: widget.apiStatus, // Filter spesifik tab
+        status: widget.apiStatus,
+        page: _page,
       );
-    } else {
-      _futurePesanan = Future.error("Data toko tidak ditemukan");
+
+      if (mounted) {
+        setState(() {
+          _items = data;
+          _isFirstLoading = false;
+          // Jika data kurang dari 10, berarti ini halaman terakhir
+          if (data.length < 10) {
+            _hasNextPage = false;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFirstLoading = false;
+          _errorMessage = e.toString().replaceAll("Exception: ", "");
+        });
+      }
     }
   }
 
-  Future<void> _refresh() async {
-    setState(() {
-      _loadData();
-    });
-    widget.onUpdate(); // Update badge di parent
+  // Load Page Berikutnya
+  Future<void> _loadMoreData() async {
+    if (_hasNextPage && !_isFirstLoading && !_isLoadMoreRunning) {
+      setState(() => _isLoadMoreRunning = true);
+
+      try {
+        final auth = context.read<AuthProvider>();
+        _page += 1; // Naikkan halaman
+
+        final data = await _apiService.fetchAdminPesanan(
+          token: auth.token!,
+          idToko: auth.user!.idToko!,
+          status: widget.apiStatus,
+          page: _page,
+        );
+
+        if (mounted) {
+          setState(() {
+            if (data.isNotEmpty) {
+              _items.addAll(data); // Tambahkan ke list
+            }
+
+            // Cek jika data habis
+            if (data.length < 10) {
+              _hasNextPage = false;
+            }
+            _isLoadMoreRunning = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isLoadMoreRunning = false);
+      }
+    }
+  }
+
+  // Fungsi Refresh Tarik Turun
+  Future<void> _handleRefresh() async {
+    widget.onUpdate(); // Refresh badge parent
+    await _loadFirstData();
   }
 
   @override
@@ -296,109 +347,98 @@ class _OrderListTabState extends State<OrderListTab>
     super.build(context);
     final theme = Theme.of(context);
 
-    return FutureBuilder<List<AdminPesananModel>>(
-      future: _futurePesanan,
-      builder: (context, snapshot) {
-        // 1. Loading
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        // 2. Error
-        if (snapshot.hasError) {
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.5,
-                child: _buildErrorState(theme, snapshot.error.toString()),
-              ),
-            ),
-          );
-        }
+    // 1. Loading Awal
+    if (_isFirstLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        final list = snapshot.data ?? [];
-
-        // 3. Kosong
-        if (list.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.5,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.inbox_outlined,
-                        size: 80,
-                        color: theme.hintColor.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Tidak ada pesanan di status ini.',
-                        style: TextStyle(color: theme.hintColor),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        // 4. Ada Data
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView.builder(
-            // Padding sama persis dengan code lama
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0),
-            itemCount: list.length,
-            itemBuilder: (ctx, index) {
-              return _PesananAdminCard(
-                pesanan: list[index],
-                onActionSuccess: _refresh,
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildErrorState(ThemeData theme, String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+    // 2. Error Awal
+    if (_errorMessage != null) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 80, color: theme.colorScheme.error),
+            Icon(Icons.error_outline, size: 60, color: theme.colorScheme.error),
             const SizedBox(height: 16),
-            Text(
-              'Gagal Memuat Pesanan',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.replaceAll("Exception: ", ""),
-              style: TextStyle(color: theme.hintColor),
-              textAlign: TextAlign.center,
+            Text("Gagal Memuat Data", style: theme.textTheme.titleMedium),
+            Text(_errorMessage!, style: TextStyle(color: theme.hintColor)),
+            TextButton(
+              onPressed: _loadFirstData,
+              child: const Text("Coba Lagi"),
             ),
           ],
         ),
+      );
+    }
+
+    // 3. Kosong
+    if (_items.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+            Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 80,
+                    color: theme.hintColor.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Tidak ada pesanan di status ini.",
+                    style: TextStyle(color: theme.hintColor),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 4. List Data (Infinite Scroll)
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: ListView.builder(
+        controller: _scrollController, // Controller Penting
+        padding: const EdgeInsets.all(16),
+        // Tambah 1 item di bawah untuk indikator loading bawah
+        itemCount: _items.length + 1,
+        itemBuilder: (ctx, index) {
+          // Jika di paling bawah
+          if (index == _items.length) {
+            if (_isLoadMoreRunning) {
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            } else if (!_hasNextPage && _items.length > 5) {
+              // Tanda sudah mentok (opsional)
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: Text("Semua data telah dimuat")),
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
+          }
+
+          return _PesananAdminCard(
+            pesanan: _items[index],
+            onActionSuccess: _handleRefresh, // Refresh list setelah aksi
+          );
+        },
       ),
     );
   }
 }
 
 // =============================================================================
-// 3. KARTU PESANAN (SAMA PERSIS SEPERTI CODE LAMA)
+// KARTU PESANAN (SAMA SEPERTI SEBELUMNYA - TIDAK BERUBAH)
 // =============================================================================
 class _PesananAdminCard extends StatelessWidget {
   final AdminPesananModel pesanan;
@@ -524,7 +564,7 @@ class _PesananAdminCard extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx);
+              Navigator.pop(ctx); // Tutup Dialog
 
               try {
                 final api = ApiService();
