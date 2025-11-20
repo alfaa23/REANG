@@ -34,7 +34,8 @@ class _UmkmScreenState extends State<UmkmScreen>
   List<Map<String, dynamic>> _filteredProducts = [];
 
   // State untuk notifikasi "Belum Dibayar"
-  int _unpaidOrderCount = 0;
+  int _userUnpaidCount = 0; // Khusus user
+  int _adminTaskCount = 0; // Khusus admin
 
   // State Paginasi & Error
   int _currentPage = 1;
@@ -104,22 +105,44 @@ class _UmkmScreenState extends State<UmkmScreen>
   Future<void> _fetchUnpaidCount() async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
-      if (mounted) setState(() => _unpaidOrderCount = 0);
+      if (mounted)
+        setState(() {
+          _userUnpaidCount = 0;
+          _adminTaskCount = 0;
+        });
       return;
     }
+
     try {
+      // 1. User Count
       final List<RiwayatTransaksiModel> allOrders = await _apiService
           .fetchRiwayatTransaksi(token: auth.token!, userId: auth.user!.id);
-      final count = allOrders
+      final userCount = allOrders
           .where((order) => order.getTabKategori == 'Belum Dibayar')
           .length;
+
+      // 2. Admin Count
+      int adminCount = 0;
+      if (auth.user!.idToko != null && auth.user!.idToko != 0) {
+        try {
+          final adminCounts = await _apiService.fetchOrderCounts(
+            token: auth.token!,
+            idToko: auth.user!.idToko!,
+          );
+          adminCount =
+              (adminCounts['menunggu_konfirmasi'] ?? 0) +
+              (adminCounts['diproses'] ?? 0);
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
-          _unpaidOrderCount = count;
+          _userUnpaidCount = userCount;
+          _adminTaskCount = adminCount;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _unpaidOrderCount = 0);
+    } catch (_) {
+      // Error handling
     }
   }
 
@@ -303,9 +326,14 @@ class _UmkmScreenState extends State<UmkmScreen>
                   Icons.store_outlined,
                   color: theme.colorScheme.primary,
                 ),
-                title: const Text(
-                  'Toko Saya',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                title: _buildNotificationBadge(
+                  // Bungkus title dengan badge
+                  _adminTaskCount, // Gunakan count admin
+                  const Text(
+                    'Toko Saya',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  isDense: true,
                 ),
                 subtitle: Text(
                   authProvider.isLoggedIn
@@ -349,7 +377,7 @@ class _UmkmScreenState extends State<UmkmScreen>
                   color: theme.hintColor,
                 ),
                 title: _buildNotificationBadge(
-                  _unpaidOrderCount,
+                  _userUnpaidCount, // Gunakan count user
                   const Text('Pesanan Saya'),
                   isDense: true,
                 ),
@@ -646,7 +674,8 @@ class _UmkmScreenState extends State<UmkmScreen>
                 width: 55.0,
                 height: 55.0,
                 child: _buildNotificationBadge(
-                  _unpaidOrderCount, // Gunakan state count
+                  _userUnpaidCount +
+                      _adminTaskCount, // [JUMLAHKAN KEDUANYA DISINI]
                   FloatingActionButton(
                     onPressed: _showFabMenu,
                     backgroundColor: theme.colorScheme.primary,

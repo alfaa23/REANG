@@ -8,7 +8,9 @@ import 'package:reang_app/screens/ecomerce/payment_instruction_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/ecomerce/detail_order_screen.dart';
 
-// [PERUBAHAN] ProsesOrderScreen kembali ke implementasi yang lebih sederhana.
+// =============================================================================
+// PARENT WIDGET (Hanya mengurus Tab, Badge, dan PageView)
+// =============================================================================
 class ProsesOrderScreen extends StatefulWidget {
   const ProsesOrderScreen({super.key});
 
@@ -21,6 +23,9 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
   late TabController _tabController;
   final ApiService _apiService = ApiService();
 
+  // Badge Counts State
+  Map<String, int> _counts = {};
+
   final List<String> _tabs = const [
     'Belum Dibayar',
     'Dikemas',
@@ -29,15 +34,44 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
     'Dibatalkan',
   ];
 
-  // [BARU] Kita hanya menyimpan daftar pesanan lengkap secara global
-  List<RiwayatTransaksiModel> _allOrders = [];
+  // Mapping API Status Keys
+  final List<String> _apiStatusKeys = const [
+    'belum_dibayar',
+    'dikemas',
+    'dikirim',
+    'selesai',
+    'dibatalkan',
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    // [PERUBAHAN] Kita memuat data awal di sini agar badge terisi
-    _fetchAllOrders();
+    _fetchBadgeCounts();
+  }
+
+  // [FITUR BARU] Ambil Badge Cepat (Ringan)
+  Future<void> _fetchBadgeCounts() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn || auth.user == null) return;
+
+    try {
+      final data = await _apiService.fetchUserOrderCounts(
+        token: auth.token!,
+        userId: auth.user!.id,
+      );
+      if (mounted) {
+        setState(() => _counts = data);
+      }
+    } catch (e) {
+      debugPrint("Gagal load badge user: $e");
+    }
+  }
+
+  // Refresh Global (Hanya update Badge)
+  void _globalRefresh() {
+    _fetchBadgeCounts();
+    setState(() {});
   }
 
   @override
@@ -46,64 +80,9 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
     super.dispose();
   }
 
-  // [BARU] Fungsi global untuk memuat semua data
-  Future<List<RiwayatTransaksiModel>> _fetchAllOrders() async {
-    // Gunakan FutureBuilder di OrderListTabView untuk menunjukkan loading/error
-    // Tapi data tetap diambil di sini agar badge update
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
-      // Melemparkan pengecualian agar FutureBuilder di OrderListTabView menangkapnya
-      throw Exception('Anda harus login untuk melihat pesanan.');
-    }
-
-    try {
-      final List<RiwayatTransaksiModel> orders = await _apiService
-          .fetchRiwayatTransaksi(token: auth.token!, userId: auth.user!.id);
-
-      // Simpan di state global untuk update badge dan untuk diakses oleh OrderListTabView
-      if (mounted) {
-        setState(() {
-          _allOrders = orders;
-        });
-      }
-      return orders;
-    } catch (e) {
-      // Biarkan exception diteruskan ke FutureBuilder di OrderListTabView
-      rethrow;
-    }
-  }
-
-  // [BARU] Fungsi refresh global yang memicu pembaruan
-  void _globalRefresh() {
-    // Kita panggil API dan minta setiap tab untuk rebuild
-    // Ini akan memperbarui _allOrders dan memicu rebuild TabBar
-    _fetchAllOrders();
-  }
-
-  // Fungsi penghitung tab tetap sama, tapi sekarang menggunakan data global
-  Map<String, int> _getTabCounts() {
-    final counts = {
-      'Belum Dibayar': 0,
-      'Dikemas': 0,
-      'Dikirim': 0,
-      'Selesai': 0,
-      'Dibatalkan': 0,
-    };
-    for (var order in _allOrders) {
-      final tab = order.getTabKategori;
-      if (counts.containsKey(tab)) {
-        counts[tab] = counts[tab]! + 1;
-      }
-    }
-    return counts;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Filter hitungan dari data global
-    final tabCounts = _getTabCounts();
 
     return Scaffold(
       appBar: AppBar(
@@ -123,18 +102,21 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
             unselectedLabelStyle: const TextStyle(
               fontWeight: FontWeight.normal,
             ),
-            tabs: _tabs.map((tab) {
-              final count = tabCounts[tab] ?? 0;
+            tabs: List.generate(_tabs.length, (index) {
+              final tabLabel = _tabs[index];
+              final apiStatus = _apiStatusKeys[index];
+              final count = _counts[apiStatus] ?? 0;
+
               final bool showBadge =
-                  (tab == 'Belum Dibayar' ||
-                      tab == 'Dikemas' ||
-                      tab == 'Dikirim') &&
+                  (apiStatus == 'belum_dibayar' ||
+                      apiStatus == 'dikemas' ||
+                      apiStatus == 'dikirim') &&
                   count > 0;
 
               return Tab(
                 child: Row(
                   children: [
-                    Text(tab),
+                    Text(tabLabel),
                     if (showBadge)
                       Row(
                         children: [
@@ -162,235 +144,240 @@ class _ProsesOrderScreenState extends State<ProsesOrderScreen>
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ),
         ),
       ),
-      // [PERUBAHAN UTAMA] Body: Cukup TabBarView tanpa FutureBuilder global
+      // [PERUBAHAN] Body sekarang menggunakan TabBarView + Widget Anak Lazy Load
       body: TabBarView(
         controller: _tabController,
-        children: _tabs.map((tab) {
-          return OrderListTabView(
-            key: ValueKey(tab), // Memberi key unik penting untuk tab
-            tabCategory: tab,
-            // Kirim future untuk memuat semua data
-            ordersFuture: _fetchAllOrders,
-            onRefresh: _globalRefresh,
-            // Hapus parameter 'allOrders' yang statis
+        children: List.generate(_tabs.length, (index) {
+          return UserOrderListTab(
+            apiStatus: _apiStatusKeys[index],
+            onUpdate: _globalRefresh,
           );
-        }).toList(),
+        }),
       ),
     );
   }
 }
 
-// ===============================================
-// --- [WIDGET BARU] Order List Tab View (Lazy Load Murni) ---
-// (Tidak ada perubahan di sini)
-// ===============================================
-class OrderListTabView extends StatefulWidget {
-  final String tabCategory;
-  final Future<List<RiwayatTransaksiModel>> Function() ordersFuture;
-  final VoidCallback onRefresh;
+// =============================================================================
+// CHILD WIDGET: List Pesanan Per Tab (Lazy Load + Infinite Scroll)
+// =============================================================================
+class UserOrderListTab extends StatefulWidget {
+  final String apiStatus;
+  final VoidCallback onUpdate;
 
-  const OrderListTabView({
+  const UserOrderListTab({
     super.key,
-    required this.tabCategory,
-    required this.ordersFuture,
-    required this.onRefresh,
+    required this.apiStatus,
+    required this.onUpdate,
   });
 
   @override
-  State<OrderListTabView> createState() => _OrderListTabViewState();
+  State<UserOrderListTab> createState() => _UserOrderListTabState();
 }
 
-class _OrderListTabViewState extends State<OrderListTabView>
+class _UserOrderListTabState extends State<UserOrderListTab>
     with AutomaticKeepAliveClientMixin {
-  // [KUNCI 1] Tentukan Future hanya di tab ini
-  late Future<List<RiwayatTransaksiModel>> _tabOrdersFuture;
+  // [1] Keep Alive
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
 
-  // [KUNCI 2] Ini yang menjaga tab di memori setelah dimuat
+  List<RiwayatTransaksiModel> _items = [];
+  bool _isFirstLoading = true;
+  bool _isLoadMoreRunning = false;
+  bool _hasNextPage = true;
+  int _page = 1;
+  String? _errorMessage;
+
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => true; // [2] Data tidak hilang saat geser tab
 
   @override
   void initState() {
     super.initState();
-    // [KUNCI 3] Panggil Future dari Induk, tapi simpan di state anak.
-    // Future ini akan dijalankan HANYA saat tab ini pertama kali di-build.
-    _tabOrdersFuture = widget.ordersFuture();
+    _loadFirstData(); // [3] Lazy Load (Hanya dipanggil saat tab dibuka)
+
+    // [4] Infinite Scroll Listener
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        _loadMoreData();
+      }
+    });
   }
 
-  // Fungsi filtering lokal
-  List<RiwayatTransaksiModel> _filterOrders(
-    List<RiwayatTransaksiModel> orders,
-  ) {
-    return orders
-        .where((order) => order.getTabKategori == widget.tabCategory)
-        .toList();
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadFirstData() async {
+    if (!mounted) return;
+    setState(() {
+      _isFirstLoading = true;
+      _errorMessage = null;
+      _page = 1;
+      _hasNextPage = true;
+      _items = [];
+    });
+
+    try {
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) throw Exception("Belum login");
+
+      // Panggil API dengan Status Spesifik
+      final data = await _apiService.fetchRiwayatTransaksi(
+        token: auth.token!,
+        userId: auth.user!.id,
+        status: widget.apiStatus,
+        page: _page,
+      );
+
+      if (mounted) {
+        setState(() {
+          _items = data;
+          _isFirstLoading = false;
+          if (data.length < 10) _hasNextPage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFirstLoading = false;
+          _errorMessage = e.toString().replaceAll("Exception: ", "");
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_hasNextPage && !_isFirstLoading && !_isLoadMoreRunning) {
+      setState(() => _isLoadMoreRunning = true);
+      try {
+        final auth = context.read<AuthProvider>();
+        _page += 1;
+        final data = await _apiService.fetchRiwayatTransaksi(
+          token: auth.token!,
+          userId: auth.user!.id,
+          status: widget.apiStatus,
+          page: _page,
+        );
+
+        if (mounted) {
+          setState(() {
+            if (data.isNotEmpty) {
+              _items.addAll(data);
+            }
+            if (data.length < 10) {
+              _hasNextPage = false;
+            }
+            _isLoadMoreRunning = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isLoadMoreRunning = false);
+      }
+    }
+  }
+
+  Future<void> _handleRefresh() async {
+    widget.onUpdate(); // Refresh Badge di Parent
+    await _loadFirstData();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Penting untuk AutomaticKeepAliveClientMixin
+    super.build(context); // Wajib panggil super.build
     final theme = Theme.of(context);
 
-    // [LOGIKA LAZY LOAD & PENGELOLAAN DATA] Gunakan FutureBuilder sebagai sumber data
-    return FutureBuilder<List<RiwayatTransaksiModel>>(
-      future: _tabOrdersFuture,
-      builder: (context, snapshot) {
-        // --- 1. Saat Loading ---
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          // Hanya tampilkan loading jika belum ada data, dan bukan saat refresh
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-        }
+    // 1. Loading
+    if (_isFirstLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        // --- 2. Jika Gagal (Error) ---
-        if (snapshot.hasError) {
-          return _buildErrorState(context, theme, snapshot.error.toString());
-        }
+    // 2. Error
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 60, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            Text("Gagal Memuat Pesanan", style: theme.textTheme.titleMedium),
+            TextButton(
+              onPressed: _loadFirstData,
+              child: const Text("Coba Lagi"),
+            ),
+          ],
+        ),
+      );
+    }
 
-        // --- 3. Jika Berhasil (Punya Data) ---
-        if (snapshot.hasData && snapshot.data != null) {
-          List<RiwayatTransaksiModel> finalFilteredList = _filterOrders(
-            snapshot.data!,
-          );
+    // 3. Kosong
+    if (_items.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 80,
+                    color: theme.hintColor.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Tidak ada pesanan di sini.",
+                    style: TextStyle(color: theme.hintColor),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-          if (finalFilteredList.isEmpty) {
-            return _buildEmptyState(
-              context,
-              "Tidak ada pesanan di status ini.",
-            );
-          }
-
-          return _buildOrderList(context, finalFilteredList, theme);
-        }
-
-        // --- 4. Jika Data Kosong (Awal & tidak ada error) ---
-        // Ini adalah fallback state, biasanya tidak tercapai jika loading ditangani
-        return _buildEmptyState(context, "Tidak ada pesanan di status ini.");
-      },
-    );
-  }
-
-  // Widget untuk Daftar Pesanan
-  Widget _buildOrderList(
-    BuildContext context,
-    List<RiwayatTransaksiModel> orders,
-    ThemeData theme,
-  ) {
+    // 4. List Data (Infinite Scroll)
     return RefreshIndicator(
-      onRefresh: () async {
-        // [PERUBAHAN] Panggil ulang Future di tab ini saat Refresh
-        setState(() {
-          _tabOrdersFuture = widget.ordersFuture(); // Ambil data baru
-        });
-        widget
-            .onRefresh(); // Panggil refresh global untuk update badge di parent
-      },
+      onRefresh: _handleRefresh,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: orders.length,
+        controller: _scrollController,
+        padding: const EdgeInsets.all(16),
+        itemCount: _items.length + 1, // +1 untuk loading bawah
         itemBuilder: (context, index) {
+          if (index == _items.length) {
+            if (_isLoadMoreRunning) {
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return const SizedBox.shrink();
+          }
+
           return OrderCard(
-            order: orders[index],
-            onPaymentSuccess: widget.onRefresh, // Menggunakan onRefresh global
+            order: _items[index],
+            onPaymentSuccess: _handleRefresh,
           );
         },
       ),
     );
   }
-
-  // Widget untuk Error State
-  Widget _buildErrorState(
-    BuildContext context,
-    ThemeData theme,
-    String errorMessage,
-  ) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        // [PERBAHAN] Panggil ulang Future di tab ini saat tarik untuk refresh
-        setState(() {
-          _tabOrdersFuture = widget.ordersFuture(); // Ambil data baru
-        });
-        widget.onRefresh(); // Refresh global untuk update badge
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: MediaQuery.of(context).size.height - kToolbarHeight * 3,
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: theme.colorScheme.error,
-                size: 60,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Gagal Memuat',
-                style: theme.textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                errorMessage.replaceAll("Exception: ", ""),
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Widget untuk Empty State
-  Widget _buildEmptyState(BuildContext context, String message) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        // [PERUBAHAN] Panggil ulang Future di tab ini saat Refresh
-        setState(() {
-          _tabOrdersFuture = widget.ordersFuture();
-        });
-        widget.onRefresh(); // Refresh global untuk update badge
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: MediaQuery.of(context).size.height - kToolbarHeight * 3,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.receipt_long_outlined,
-                  size: 80,
-                  color: Theme.of(context).hintColor.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  message,
-                  style: TextStyle(color: Theme.of(context).hintColor),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ===============================================
-// --- Komponen Kartu Pesanan (OrderCard) ---
-// (Perubahan ada di dalam sini)
+// --- KARTU PESANAN (DESAIN 100% SAMA) ---
 // ===============================================
-
 class OrderCard extends StatelessWidget {
   final RiwayatTransaksiModel order;
   final VoidCallback onPaymentSuccess;
@@ -484,7 +471,6 @@ class OrderCard extends StatelessWidget {
     }
   }
 
-  // Fungsi Konfirmasi Selesai (User)
   void _konfirmasiSelesai(BuildContext context) {
     showDialog(
       context: context,
@@ -532,7 +518,6 @@ class OrderCard extends StatelessWidget {
     );
   }
 
-  // Placeholder Navigasi Lain
   void _goToReview(BuildContext context) {
     _showToast(context, 'TODO: Buka halaman Beri Ulasan');
   }
@@ -544,12 +529,14 @@ class OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final Color primaryColor = theme.colorScheme.primary;
-    final Color onPrimaryColor = theme.colorScheme.onPrimary;
+    // --- [DEFINISI WARNA] ---
+    final primaryColor = theme.colorScheme.primary;
+    final onPrimaryColor = theme.colorScheme.onPrimary;
+    // -----------------------
 
-    final String uiStatus = order.getUiStatus;
-    final String tabKategori = order.getTabKategori;
-    final bool isUnpaid = tabKategori == 'Belum Dibayar';
+    final uiStatus = order.getUiStatus;
+    final tabKategori = order.getTabKategori;
+    final isUnpaid = tabKategori == 'Belum Dibayar';
 
     Color statusColor;
     switch (tabKategori) {
@@ -564,21 +551,15 @@ class OrderCard extends StatelessWidget {
         statusColor = primaryColor;
     }
 
-    // --- [BAGIAN INI YANG ANDA LEWATKAN TADI] ---
-    // Deklarasi variabel harus ada sebelum blok if/else
     VoidCallback? secondaryAction;
     String secondaryText = 'Hubungi Penjual';
-
-    // Tambahkan 2 baris ini agar tidak error "Undefined name":
     Color? secondaryColor;
     Color? secondaryTextColor;
-    // --------------------------------------------
 
     if (tabKategori == 'Selesai') {
       secondaryAction = () => _goToReview(context);
       secondaryText = 'Beri Ulasan';
     } else if (tabKategori == 'Dikirim') {
-      // Logika tombol hijau untuk user
       secondaryAction = () => _konfirmasiSelesai(context);
       secondaryText = 'Pesanan Diterima';
       secondaryColor = Colors.green;
@@ -596,7 +577,6 @@ class OrderCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Toko & Status
             Row(
@@ -692,7 +672,7 @@ class OrderCard extends StatelessWidget {
               ],
             ),
 
-            // Footer: Tanggal & Tombol Aksi
+            // Footer: Tanggal
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
@@ -730,46 +710,32 @@ class OrderCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+
+            // Tombol Aksi
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    // [GANTI JADI .icon]
                     onPressed: () => _goToDetail(context),
-
-                    // 1. Tambahkan Ikon biar manis
                     icon: Icon(
                       Icons.receipt_long_rounded,
                       size: 18,
-                      color:
-                          theme.colorScheme.primary, // Warna ikon ngikut tema
+                      color: theme.colorScheme.primary,
                     ),
-
-                    // 2. Label Teks
                     label: const Text(
                       'Lihat Detail',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-
-                    // 3. Style yang lebih jelas
                     style: OutlinedButton.styleFrom(
-                      // Warna Teks & Ikon (Primary)
                       foregroundColor: theme.colorScheme.primary,
-
-                      // Warna Garis Pinggir (Primary juga, dan agak tebal)
                       side: BorderSide(
                         color: theme.colorScheme.primary,
                         width: 1.5,
                       ),
-
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                      ), // Sedikit lebih tinggi
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      // Efek saat ditekan (opsional, biar kerasa)
-                      overlayColor: theme.colorScheme.primary.withOpacity(0.1),
                     ),
                   ),
                 ),
@@ -792,7 +758,6 @@ class OrderCard extends StatelessWidget {
                       : ElevatedButton(
                           onPressed: secondaryAction,
                           style: ElevatedButton.styleFrom(
-                            // Gunakan variabel yang sudah dideklarasikan mundur dulu
                             backgroundColor: secondaryColor ?? primaryColor,
                             foregroundColor:
                                 secondaryTextColor ?? onPrimaryColor,

@@ -2249,14 +2249,17 @@ class ApiService {
   // --- [FUNGSI BARU] API RIWAYAT TRANSAKSI ---
   // =======================================================================
 
-  /// Mengambil daftar semua riwayat transaksi pengguna
+  // [UPDATE] Fetch Riwayat dengan Pagination & Filter
   Future<List<RiwayatTransaksiModel>> fetchRiwayatTransaksi({
     required String token,
     required int userId,
+    String? status, // Parameter Filter
+    int page = 1, // Parameter Halaman
   }) async {
     try {
       final response = await _dio.get(
-        '$_baseUrlBackend/transaksi/riwayat/$userId', // Endpoint dari TransaksiController
+        '$_baseUrlBackend/transaksi/riwayat/$userId',
+        queryParameters: {if (status != null) 'status': status, 'page': page},
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -2265,9 +2268,9 @@ class ApiService {
         ),
       );
 
-      if (response.statusCode == 200 && response.data is List) {
-        // Ubah List<dynamic> menjadi List<RiwayatTransaksiModel>
-        final List<dynamic> responseData = response.data;
+      if (response.statusCode == 200) {
+        // Ambil data dari key 'data' karena pagination Laravel
+        final List<dynamic> responseData = response.data['data'] ?? [];
         return responseData
             .map((json) => RiwayatTransaksiModel.fromJson(json))
             .toList();
@@ -2280,8 +2283,6 @@ class ApiService {
             e.response?.data['error'] ??
             'Gagal terhubung',
       );
-    } catch (e) {
-      throw Exception('Terjadi kesalahan: $e');
     }
   }
 
@@ -2316,6 +2317,25 @@ class ApiService {
       );
     } catch (e) {
       throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  // [BARU] Ambil Badge User buat hitung notffikasi pesanan
+  Future<Map<String, int>> fetchUserOrderCounts({
+    required String token,
+    required int userId,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/transaksi/counts/$userId',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200) {
+        return Map<String, int>.from(response.data);
+      }
+      return {};
+    } catch (e) {
+      return {};
     }
   }
 
