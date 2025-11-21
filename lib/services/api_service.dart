@@ -43,7 +43,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://4a390294776c.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -2479,35 +2479,36 @@ class ApiService {
     required List<ProdukVarianModel> varians,
     XFile? fotoBaru,
     bool hapusFoto = false,
-    List<XFile>? galeriBaru, // Foto galeri baru
+    List<XFile>? galeriBaru,
     List<int>? hapusGaleriIds, // ID galeri yang ingin dihapus
   }) async {
     try {
       // Convert varian ke JSON
       final listVarianJson = varians.map((v) => v.toJson()).toList();
 
-      // ===============================
-      // FORM DATA
-      // ===============================
-      FormData formData = FormData.fromMap({
+      // 1. Siapkan Map dasar
+      Map<String, dynamic> mapData = {
         '_method': 'PUT',
         'nama': dataProduk.nama,
         'deskripsi': dataProduk.deskripsi,
         'spesifikasi': dataProduk.spesifikasi,
         'fitur': dataProduk.fitur,
         'varians': listVarianJson,
+      };
 
-        // Hapus galeri tertentu (jika ada)
-        if (hapusGaleriIds != null && hapusGaleriIds.isNotEmpty)
-          'hapus_galeri_ids': hapusGaleriIds,
-      });
+      // 2. Buat FormData
+      FormData formData = FormData.fromMap(mapData);
 
-      // ===============================
-      // FOTO UTAMA (hapus atau upload baru)
-      // ===============================
+      // [PERBAIKAN UTAMA DI SINI]
+      // Masukkan array hapus_galeri_ids secara manual dengan tanda []
+      if (hapusGaleriIds != null && hapusGaleriIds.isNotEmpty) {
+        for (var id in hapusGaleriIds) {
+          formData.fields.add(MapEntry('hapus_galeri_ids[]', id.toString()));
+        }
+      }
 
+      // 3. Handle Foto Utama
       if (hapusFoto == true) {
-        // Kirim string kosong → Laravel akan menghapus foto utama
         formData.fields.add(const MapEntry('foto', ''));
       } else if (fotoBaru != null) {
         formData.files.add(
@@ -2521,14 +2522,12 @@ class ApiService {
         );
       }
 
-      // ===============================
-      // GALERI BARU (array)
-      // ===============================
+      // 4. Handle Galeri Baru
       if (galeriBaru != null && galeriBaru.isNotEmpty) {
         for (var file in galeriBaru) {
           formData.files.add(
             MapEntry(
-              'galeri_foto[]', // wajib array []
+              'galeri_foto[]', // Wajib array []
               await MultipartFile.fromFile(file.path, filename: file.name),
             ),
           );
