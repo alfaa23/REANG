@@ -27,6 +27,8 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
   late TextEditingController _namaController;
   late TextEditingController _deskripsiController;
   late TextEditingController _spesifikasiController;
+  AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
+  bool _fotoError = false;
 
   // State Utama
   String? _selectedFitur;
@@ -204,13 +206,28 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
     }
   }
 
-  // --- Fungsi Simpan (Tambah/Edit) ---
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      _showToast("Harap isi semua field wajib (*)", isError: true);
+    // [LANGKAH 1] Cek dulu apakah foto sudah ada
+    // fotoValid bernilai true jika ada foto baru ATAU ada foto lama (url)
+    bool fotoValid = (_fotoUtamaBaru != null || _fotoUtamaLamaUrl != null);
+
+    // [LANGKAH 2] Update tampilan (Nyalakan merah-merah jika error)
+    setState(() {
+      // Nyalakan validasi otomatis untuk TextFormFields
+      _autoValidateMode = AutovalidateMode.onUserInteraction;
+
+      // Nyalakan border merah foto jika tidak valid
+      _fotoError = !fotoValid;
+    });
+
+    // [LANGKAH 3] Cek Validasi Total (Form + Foto)
+    // Jika form tidak valid ATAU foto tidak valid, hentikan proses
+    if (!_formKey.currentState!.validate() || !fotoValid) {
+      _showToast("Harap lengkapi kolom yang berwarna merah!", isError: true);
       return;
     }
 
+    // --- Validasi Varian (Lanjutan) ---
     bool allVariansValid = true;
     for (var key in _varianFormKeys) {
       if (!key.currentState!.validate()) {
@@ -225,7 +242,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       return;
     }
 
-    // Update model _varians dari controllers sebelum submit
+    // --- Update Model Varian ---
     for (int i = 0; i < _varians.length; i++) {
       _varians[i] = ProdukVarianModel(
         id: _varians[i].id,
@@ -236,6 +253,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       );
     }
 
+    // --- Cek Auth ---
     final auth = context.read<AuthProvider>();
     if (auth.token == null ||
         auth.user?.idToko == null ||
@@ -284,7 +302,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
         _showToast("Produk berhasil ditambahkan!");
       }
 
-      Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _showToast(e.toString().replaceAll("Exception: ", ""), isError: true);
     } finally {
@@ -303,6 +321,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
+          autovalidateMode: _autoValidateMode,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -322,7 +341,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                 ),
               ),
 
-              // --- Card untuk Info Utama ---
+              // 2. CARD INFORMASI UTAMA
               _buildSectionCard(
                 theme,
                 title: "Informasi Utama",
@@ -332,25 +351,17 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                     _buildLabel("Nama Produk*"),
                     TextFormField(
                       controller: _namaController,
-                      decoration: const InputDecoration(
-                        hintText: 'Misal: Kaos Polos Premium',
-                      ),
+                      decoration: _inputDecoration('Misal: Kaos Polos Premium'),
                       validator: (value) => (value == null || value.isEmpty)
                           ? 'Nama produk tidak boleh kosong'
                           : null,
                     ),
                     const SizedBox(height: 16),
-
-                    _buildLabel("Kategori"),
+                    _buildLabel("Kategori*"),
                     DropdownButtonFormField<String>(
                       value: _selectedFitur,
                       hint: const Text('Pilih Kategori'),
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
+                      decoration: _inputDecoration(''),
                       items: _kategoriList.map((String kategori) {
                         return DropdownMenuItem<String>(
                           value: kategori,
@@ -360,47 +371,48 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                       onChanged: (newValue) {
                         setState(() => _selectedFitur = newValue);
                       },
+                      validator: (value) =>
+                          value == null ? 'Pilih kategori' : null,
                     ),
                   ],
                 ),
               ),
 
-              // --- Card untuk Deskripsi ---
+              // 3. CARD DETAIL / DESKRIPSI
               _buildSectionCard(
                 theme,
                 title: "Detail Produk",
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLabel("Deskripsi"),
+                    _buildLabel("Deskripsi*"),
                     TextFormField(
                       controller: _deskripsiController,
-                      decoration: const InputDecoration(
-                        hintText: 'Jelaskan produk Anda...',
-                      ),
+                      decoration: _inputDecoration('Jelaskan produk Anda...'),
                       maxLines: 5,
                       minLines: 3,
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Deskripsi wajib diisi'
+                          : null,
                     ),
                     const SizedBox(height: 16),
-
                     _buildLabel("Spesifikasi (Opsional)"),
                     TextFormField(
                       controller: _spesifikasiController,
-                      decoration: const InputDecoration(
-                        hintText:
-                            'Pisahkan dengan koma, misal: Bahan Katun, Adem',
+                      decoration: _inputDecoration(
+                        'Pisahkan dengan koma, misal: Bahan Katun, Adem',
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // --- Varian Produk ---
+              // 4. CARD VARIAN & STOK
               _buildSectionCard(
                 theme,
                 title: "Varian & Stok",
                 subtitle:
-                    "Jika produk Anda tidak memiliki varian (misal: beda ukuran/warna), isi 1 saja.",
+                    "Jika produk tidak memiliki varian, cukup isi 1 varian default.",
                 child: Column(
                   children: [
                     ListView.builder(
@@ -412,7 +424,6 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    // [PERBAIKAN] Tombol Tambah Varian lebih jelas
                     _buildAddVarianButton(theme),
                   ],
                 ),
@@ -445,7 +456,7 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                         ),
                       ),
               ),
-              const SizedBox(height: 20), // Padding Bawah
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -541,7 +552,13 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
+          // PENTING: Kita gunakan key lokal ini untuk validasi per-card jika diperlukan,
+          // tapi autovalidateMode akan mengikuti parent jika dipanggil di build()
           key: _varianFormKeys[index],
+
+          // [PERBAIKAN] Tambahkan ini agar Varian ikut merah otomatis
+          autovalidateMode: _autoValidateMode,
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -569,9 +586,8 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
               _buildLabel("Nama Varian*"),
               TextFormField(
                 controller: namaController,
-                decoration: const InputDecoration(
-                  hintText: 'Misal: Merah, Ukuran L',
-                ),
+                // [PERBAIKAN] Gunakan _inputDecoration
+                decoration: _inputDecoration('Misal: Merah, Ukuran L'),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Wajib diisi' : null,
               ),
@@ -587,9 +603,8 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                         _buildLabel("Harga (Rp)*"),
                         TextFormField(
                           controller: hargaController,
-                          decoration: const InputDecoration(
-                            hintText: 'Misal: 50000',
-                          ),
+                          // [PERBAIKAN] Gunakan _inputDecoration
+                          decoration: _inputDecoration('Misal: 50000'),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -612,9 +627,8 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                         _buildLabel("Stok*"),
                         TextFormField(
                           controller: stokController,
-                          decoration: const InputDecoration(
-                            hintText: 'Misal: 10',
-                          ),
+                          // [PERBAIKAN] Gunakan _inputDecoration
+                          decoration: _inputDecoration('Misal: 10'),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -635,6 +649,29 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
     );
   }
 
+  // [FUNGSI BARU] Helper untuk style input biar merahnya kelihatan
+  // [TAMBAHAN 1] Fungsi Helper agar border merahnya tebal
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      // Border Merah Tebal saat Error
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.red, width: 2.0),
+      ),
+    );
+  }
+
   Widget _buildImagePicker(ThemeData theme) {
     return Center(
       child: Stack(
@@ -645,7 +682,11 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor),
+              // [PERBAIKAN] Border jadi Merah jika error
+              border: Border.all(
+                color: _fotoError ? Colors.red : theme.dividerColor,
+                width: _fotoError ? 2.0 : 1.0,
+              ),
             ),
             clipBehavior: Clip.antiAlias,
             child: _fotoUtamaBaru != null
@@ -724,11 +765,15 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
+
+        // [PERBAIKAN] Hapus logika _fotoError disini.
+        // Gunakan warna divider biasa karena ini OPSIONAL.
         border: Border.all(color: theme.dividerColor),
       ),
       height: 120,
       child: Row(
         children: [
+          // ... (Isi Row sama seperti sebelumnya, tidak perlu diubah)
           // Tombol Tambah
           GestureDetector(
             onTap: _pickGaleriFoto,
@@ -757,18 +802,15 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              // [PERBAIKAN] Hitung item dari kedua list
               itemCount: _galeriLama.length + _galeriBaru.length,
               itemBuilder: (context, index) {
                 Widget imageWidget;
                 bool isFotoBaru = index >= _galeriLama.length;
 
                 if (isFotoBaru) {
-                  // Ambil dari file baru (XFile)
                   final file = _galeriBaru[index - _galeriLama.length];
                   imageWidget = Image.file(File(file.path), fit: BoxFit.cover);
                 } else {
-                  // [PERBAIKAN] Ambil dari URL lama (GaleriFotoModel)
                   final url = _galeriLama[index].pathFoto;
                   imageWidget = Image.network(
                     url,
@@ -792,7 +834,6 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                         ),
                         child: imageWidget,
                       ),
-                      // Tombol Hapus per foto
                       Positioned(
                         top: -8,
                         right: -8,
@@ -808,7 +849,6 @@ class _FormProdukScreenState extends State<FormProdukScreen> {
                                     index - _galeriLama.length,
                                   );
                                 } else {
-                                  // Tandai ID ini untuk dihapus di API
                                   final id = _galeriLama[index].id;
                                   _hapusGaleriIds.add(id);
                                   _galeriLama.removeAt(index);
