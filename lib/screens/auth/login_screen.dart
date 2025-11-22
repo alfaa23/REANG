@@ -6,8 +6,6 @@ import 'package:reang_app/screens/main_screen.dart';
 import 'package:reang_app/screens/auth/register_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
-
-// --- TAMBAHAN: Import halaman login dokter ---
 import 'package:reang_app/screens/auth/admin_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -33,23 +31,71 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // --- FUNGSI LOGIN GOOGLE (LOGIKA UTAMA) ---
+  Future<void> _performGoogleLogin() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Panggil Provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      // 2. Definisi Variabel 'user' (Ini yang tadi error undefined)
+      final UserModel? user = await authProvider.loginWithGoogle();
+
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // 3. Cek Data
+      if (user.noKtp.isEmpty || user.phone.isEmpty) {
+        if (mounted) {
+          _showToast("Silakan lengkapi data diri Anda", Colors.blue);
+
+          // 4. Pindah ke Register & Tunggu Hasilnya (await)
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RegisterScreen(
+                popOnSuccess: widget.popOnSuccess,
+                googleUser: user, // Mengirim data user
+              ),
+            ),
+          );
+
+          // 5. Jika Register Berhasil (result == true)
+          if (result == true && mounted) {
+            if (widget.popOnSuccess) {
+              Navigator.pop(context, true); // Tutup LoginScreen
+            } else {
+              _handleSuccessLogin(isGoogle: true); // Masuk MainScreen
+            }
+          }
+        }
+      } else {
+        // User Lama (Data Lengkap) -> Langsung Masuk
+        if (mounted) {
+          _handleSuccessLogin(isGoogle: true);
+        }
+      }
+    } catch (e) {
+      print("Google Login Error: $e");
+      if (!e.toString().contains("Null check")) {
+        _showToast("Gagal masuk dengan Google.", Colors.red);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- FUNGSI LOGIN BIASA (TIDAK BERUBAH) ---
   Future<void> _performLogin() async {
     if (_isLoading) return;
 
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      showToast(
-        "Email dan password tidak boleh kosong.",
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale, // efek "pop"
-        reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-        animDuration: const Duration(milliseconds: 150), // animasi cepat
-        duration: const Duration(seconds: 2), // tampil 2 detik
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+      _showToast("Email dan password tidak boleh kosong.", Colors.red);
       return;
     }
 
@@ -68,60 +114,53 @@ class _LoginScreenState extends State<LoginScreen> {
       if (token != null && userData != null) {
         final user = UserModel.fromMap(userData);
         if (mounted) {
-          // Ganti 'user_token' agar konsisten
           await Provider.of<AuthProvider>(
             context,
             listen: false,
           ).login(user, token);
         }
-
-        showToast(
-          'Login Berhasil!',
-          context: context,
-          backgroundColor: Colors.green,
-          position: StyledToastPosition.bottom,
-          animation: StyledToastAnimation.scale, // efek "pop"
-          reverseAnimation: StyledToastAnimation.fade, // pas hilang fade out
-          animDuration: const Duration(milliseconds: 150), // animasi cepat
-          duration: const Duration(seconds: 2), // tampil 2 detik
-          borderRadius: BorderRadius.circular(25),
-          textStyle: const TextStyle(color: Colors.white),
-          curve: Curves.fastOutSlowIn,
-        );
-
-        if (mounted) {
-          if (widget.popOnSuccess) {
-            Navigator.pop(context, true);
-          } else {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const MainScreen()),
-              (Route<dynamic> route) => false,
-            );
-          }
-        }
+        _handleSuccessLogin();
       } else {
         throw Exception("Token atau data pengguna tidak ditemukan.");
       }
     } catch (e) {
-      showToast(
-        e.toString(),
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+      _showToast(e.toString(), Colors.red);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _handleSuccessLogin({bool isGoogle = false}) {
+    _showToast(
+      isGoogle ? 'Login Google Berhasil!' : 'Login Berhasil!',
+      Colors.green,
+    );
+
+    if (widget.popOnSuccess) {
+      Navigator.pop(context, true);
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+        (Route<dynamic> route) => false,
+      );
+    }
+  }
+
+  void _showToast(String message, Color color) {
+    showToast(
+      message,
+      context: context,
+      backgroundColor: color,
+      position: StyledToastPosition.bottom,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 2),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   @override
@@ -147,12 +186,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // --- TOMBOL GOOGLE (SUDAH DIAKTIFKAN) ---
                 ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Google Sign-In
-                  },
-                  icon: Image.asset('assets/google_icon.webp', height: 24),
-                  label: const Text('Google'),
+                  onPressed: _isLoading
+                      ? null
+                      : _performGoogleLogin, // Panggil fungsi baru
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : Image.asset('assets/google_icon.webp', height: 24),
+                  label: Text(_isLoading ? 'Memproses...' : 'Google'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F2F3),
                     foregroundColor: Colors.black,
@@ -163,6 +213,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     elevation: 1,
                   ),
                 ),
+
+                // ----------------------------------------
                 const SizedBox(height: 20),
                 const Row(
                   children: [
@@ -178,6 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     labelText: 'Email',
                     border: OutlineInputBorder(
@@ -189,6 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     border: OutlineInputBorder(
@@ -251,20 +305,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text('Belum punya akun? '),
                     GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RegisterScreen(
-                              popOnSuccess: widget.popOnSuccess,
-                            ),
-                          ),
-                        );
+                      onTap: _isLoading
+                          ? null
+                          : () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RegisterScreen(
+                                    popOnSuccess: widget.popOnSuccess,
+                                    // googleUser: user, <--- HAPUS BARIS INI (KARENA INI DAFTAR MANUAL)
+                                  ),
+                                ),
+                              );
 
-                        if (result == true && mounted) {
-                          Navigator.of(context).pop(true);
-                        }
-                      },
+                              if (result == true && mounted) {
+                                Navigator.of(context).pop(true);
+                              }
+                            },
                       child: const Text(
                         'Daftar di sini',
                         style: TextStyle(
@@ -275,21 +332,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-
-                // --- TAMBAHAN: Tombol untuk navigasi ke Login Dokter ---
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const DokterLoginScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DokterLoginScreen(),
+                            ),
+                          );
+                        },
                   child: const Text('Masuk sebagai Admin'),
                 ),
-                // ---------------------------------------------------
               ],
             ),
           ),

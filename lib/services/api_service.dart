@@ -830,6 +830,47 @@ class ApiService {
   }
 
   // =======================================================================
+  // API UPDATE PROFILE (TAMBAHAN UNTUK GOOGLE LOGIN)
+  // =======================================================================
+  Future<Map<String, dynamic>> updateProfile({
+    required String token,
+    required String name,
+    required String noKtp,
+    required String phone,
+    String? email,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/auth/update-profile', // Route Laravel Mas
+        data: {
+          'name': name,
+          'no_ktp': noKtp,
+          'phone': phone,
+          'email': email,
+          // Password tidak dikirim
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token', // Wajib pakai Token
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Gagal memperbarui profil.');
+      }
+    } on DioException catch (e) {
+      // Handle error ...
+      throw Exception(
+        'Gagal update: ${e.response?.data['message'] ?? e.message}',
+      );
+    }
+  }
+
+  // =======================================================================
   // API LOGIN (BARU)
   // =======================================================================
   Future<Map<String, dynamic>> loginUser({
@@ -861,6 +902,29 @@ class ApiService {
     } catch (e) {
       // Menangani error tak terduga lainnya
       throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+    }
+  }
+
+  // =======================================================================
+  // API GOOGLE LOGIN (BARU - DITAMBAHKAN)
+  // =======================================================================
+  Future<Map<String, dynamic>> loginByGoogle(String idToken) async {
+    try {
+      // Mengirim ID Token ke Laravel
+      final response = await _dio.post(
+        '$_baseUrlBackend/auth/google-callback', // Route yang Mas buat di Laravel
+        data: {'id_token': idToken},
+        options: Options(headers: {'Accept': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Gagal verifikasi Google Login di server.');
+      }
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data['message'] ?? 'Gagal login Google.';
+      throw Exception(errorMessage);
     }
   }
   //login admin

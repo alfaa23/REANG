@@ -7,11 +7,13 @@ import 'package:reang_app/models/puskesmas_model.dart';
 import 'package:reang_app/models/user_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_sign_in/google_sign_in.dart'; // <--- TAMBAHKAN INI
 
 // Kita gabungkan UserSecureService ke sini agar rapi
 // (Anda bisa hapus file user_secure_service.dart jika mau)
 class _AuthStorageService {
   final _storage = const FlutterSecureStorage();
+
   static const String _tokenKey = 'user_token';
   static const String _roleKey = 'user_role';
   static const String _userKey = 'user_data';
@@ -92,7 +94,73 @@ class AuthProvider with ChangeNotifier {
     }
     return false;
   }
+
   // ------------------------------------
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'], // <--- JANGAN LUPA KOMA DI SINI
+    // Masukkan Web Client ID di bawah ini (Pakai tanda kutip satu)
+    serverClientId:
+        '703588825307-l90opqjg6ksp50683jd9kf99uhl7803a.apps.googleusercontent.com',
+  );
+
+  // 2. Fungsi Login Google
+  Future<UserModel?> loginWithGoogle() async {
+    try {
+      // ============================================================
+      // [PENTING] PAKSA KELUAR DULU AGAR MUNCUL PILIHAN AKUN
+      // ============================================================
+      await _googleSignIn.signOut();
+      // ============================================================
+
+      // A. Trigger Pop-up Login Google di HP
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        return null; // Batal login
+      }
+
+      // B. Ambil Token Google
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // C. Tukar Tiket ke Firebase
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential);
+
+      final String? firebaseToken = await userCredential.user?.getIdToken();
+
+      if (firebaseToken == null) {
+        throw Exception("Gagal mendapatkan Token Firebase.");
+      }
+
+      // D. Kirim TOKEN ke Laravel
+      final response = await _apiService.loginByGoogle(firebaseToken);
+
+      // E. Parsing Data
+      final userMap = response['user'];
+      final tokenLaravel = response['access_token'];
+      final userModel = UserModel.fromMap(userMap);
+
+      // F. Cek Data (Register/Login)
+      if (userModel.noKtp.isEmpty || userModel.phone.isEmpty) {
+        await _storage.saveToken(tokenLaravel);
+        return userModel;
+      }
+
+      // G. Login Normal
+      await login(userModel, tokenLaravel);
+
+      return userModel;
+    } catch (e) {
+      debugPrint("Error Google Login: $e");
+      rethrow;
+    }
+  }
 
   // --- FUNGSI LOGIN (Sama seperti kode Anda, tapi di-refactor) ---
   Future<void> login(
@@ -180,6 +248,7 @@ class AuthProvider with ChangeNotifier {
       if (FirebaseAuth.instance.currentUser != null) {
         await FirebaseAuth.instance.signOut();
       }
+      await _googleSignIn.signOut();
     } catch (e) {
       debugPrint("Error saat logout dari Firebase: $e");
     } finally {

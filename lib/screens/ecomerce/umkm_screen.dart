@@ -311,11 +311,11 @@ class _UmkmScreenState extends State<UmkmScreen>
       builder: (ctx) {
         return Container(
           // [PERBAIKAN] Padding untuk menaikkan menu
-          padding: const EdgeInsets.only(
+          padding: EdgeInsets.only(
             top: 16,
             left: 16,
             right: 16,
-            bottom: 24,
+            bottom: 24 + MediaQuery.of(context).padding.bottom,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

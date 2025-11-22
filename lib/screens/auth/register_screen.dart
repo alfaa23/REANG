@@ -10,7 +10,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class RegisterScreen extends StatefulWidget {
   final bool popOnSuccess;
-  const RegisterScreen({super.key, this.popOnSuccess = false});
+  final UserModel? googleUser; // <--- Variable Penampung
+
+  const RegisterScreen({
+    super.key,
+    this.popOnSuccess = false,
+    this.googleUser, // <--- Tambahkan di constructor
+  });
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -77,6 +83,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     _passwordController.addListener(passwordListener);
     _passwordConfirmationController.addListener(passwordListener);
+
+    if (widget.googleUser != null) {
+      _nameController.text = widget.googleUser!.name;
+      _emailController.text = widget.googleUser!.email;
+
+      // Set status validasi jadi true agar tombol "Lanjut" nyala
+      _isNameValid = true;
+      _isEmailValid = true;
+      // Password dianggap valid (karena di-skip)
+      _isPasswordValid = true;
+    }
   }
 
   @override
@@ -95,15 +112,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_currentPage == 1) isValid = _ktpFormKey.currentState!.validate();
     if (_currentPage == 2) isValid = _phoneFormKey.currentState!.validate();
     if (_currentPage == 3) isValid = _emailFormKey.currentState!.validate();
-    if (_currentPage == 4) isValid = _passwordFormKey.currentState!.validate();
+
+    // Hapus validasi password jika user Google
+    if (_currentPage == 4) {
+      if (widget.googleUser != null) {
+        isValid = true; // Anggap valid selalu
+      } else {
+        isValid = _passwordFormKey.currentState!.validate();
+      }
+    }
 
     if (isValid) {
-      // --- TAMBAHKAN BARIS INI UNTUK MENUTUP KEYBOARD ---
       FocusScope.of(context).unfocus();
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
+
+      // --- LOGIKA SKIP PASSWORD ---
+      // Jika sekarang di halaman Email (index 3) DAN ini user Google,
+      // Lompat langsung ke Terms (index 5), lewati Password (index 4)
+      if (_currentPage == 3 && widget.googleUser != null) {
+        _pageController.jumpToPage(5);
+      } else {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
+        );
+      }
     }
   }
 
@@ -114,14 +146,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final apiService = ApiService();
-      final response = await apiService.registerUser(
-        name: _nameController.text,
-        noKtp: _ktpController.text,
-        phone: _phoneController.text,
-        email: _emailController.text,
-        password: _passwordController.text,
-        passwordConfirmation: _passwordConfirmationController.text,
-      );
+      Map<String, dynamic> response;
+
+      // CEK: Jalur Google (Update) atau Jalur Biasa (Register)
+      if (widget.googleUser != null) {
+        // 1. Ambil Token Sementara (Tadi disimpan di AuthProvider saat Login)
+        const storage = FlutterSecureStorage();
+        String? tempToken = await storage.read(key: 'user_token');
+
+        if (tempToken == null)
+          throw Exception("Token hilang, silakan login ulang.");
+
+        // 2. Panggil Update Profile
+        response = await apiService.updateProfile(
+          token: tempToken,
+          name: _nameController.text,
+          noKtp: _ktpController.text,
+          phone: _phoneController.text,
+          email: _emailController.text,
+        );
+      } else {
+        // 3. Jalur Register Biasa
+        response = await apiService.registerUser(
+          name: _nameController.text,
+          noKtp: _ktpController.text,
+          phone: _phoneController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          passwordConfirmation: _passwordConfirmationController.text,
+        );
+      }
 
       final token = response['access_token'];
       final userData = response['user'];
@@ -291,10 +345,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     title: 'Alamat email kamu?',
                     child: TextFormField(
                       controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: _buildInputDecoration(
-                        context: context,
-                        hintText: 'Email',
+                      // Jika googleUser ada, jadikan ReadOnly (Gak bisa diedit)
+                      readOnly: widget.googleUser != null,
+                      style: TextStyle(
+                        // Kasih warna abu-abu biar kelihatan kalau dikunci
+                        color: widget.googleUser != null
+                            ? Colors.grey
+                            : Colors.black,
                       ),
                       validator: (value) {
                         if (value == null ||

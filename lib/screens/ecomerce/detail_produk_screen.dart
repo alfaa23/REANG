@@ -631,7 +631,11 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                   left: 16.0,
                   right: 16.0,
                   top: 16.0,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 16.0,
+                  // [PERBAIKAN] Tambahkan padding.bottom agar naik di iPhone X / Android Full Screen
+                  bottom:
+                      MediaQuery.of(context).viewInsets.bottom +
+                      MediaQuery.of(context).padding.bottom +
+                      16.0,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
