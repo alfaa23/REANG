@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+// Gunakan alias untuk package location agar tidak bentrok
+import 'package:location/location.dart' as loc;
+
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/screens/layanan/dumas/dumas_yu_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 
 class FormLaporanScreen extends StatefulWidget {
-  // --- PENAMBAHAN: Parameter untuk menerima gambar dari alur kamera ---
   final File? initialImage;
 
   const FormLaporanScreen({Key? key, this.initialImage}) : super(key: key);
@@ -33,7 +37,17 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   bool _isStatementChecked = false;
   bool _isSubmitting = false;
 
-  // --- TAMBAHAN: FocusNodes untuk tiap TextField agar bisa di-unfocus dengan akurat ---
+  // --- VARIABEL BARU UNTUK LOKASI ---
+  bool _useCurrentLocation = false; // Status switch
+  bool _isGettingLocation = false; // Status loading lokasi
+
+  // --- VARIABEL BARU UNTUK VALIDASI MERAH ---
+  bool _isJudulEmpty = false;
+  bool _isKategoriEmpty = false;
+  bool _isLokasiEmpty = false;
+  bool _isImageEmpty = false;
+  bool _isDeskripsiEmpty = false;
+
   final FocusNode _jenisFocus = FocusNode();
   final FocusNode _lokasiFocus = FocusNode();
   final FocusNode _deskripsiFocus = FocusNode();
@@ -41,15 +55,12 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   @override
   void initState() {
     super.initState();
-    // --- PENAMBAHAN: Set gambar awal jika ada ---
     if (widget.initialImage != null) {
       _pickedImage = widget.initialImage;
     }
-    // Memuat daftar kategori saat halaman dibuka
     _fetchKategori();
   }
 
-  // --- FUNGSI BARU: Mengambil kategori di latar belakang ---
   Future<void> _fetchKategori() async {
     try {
       final kategori = await _apiService.fetchDumasKategori();
@@ -62,30 +73,120 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isKategoriLoading = false; // Hentikan loading meskipun error
+          _isKategoriLoading = false;
         });
-        showToast(
-          "Gagal memuat daftar kategori.",
-          context: context,
-          position: StyledToastPosition.bottom,
-          animation: StyledToastAnimation.scale,
-          reverseAnimation: StyledToastAnimation.fade,
-          animDuration: const Duration(milliseconds: 150),
-          duration: const Duration(seconds: 2),
-          borderRadius: BorderRadius.circular(25),
-          textStyle: const TextStyle(color: Colors.white),
-          curve: Curves.fastOutSlowIn,
+        _showCustomToast("Gagal memuat daftar kategori.", Colors.red);
+      }
+    }
+  }
+
+  // --- LOGIKA GEOLOCATOR & LOCATION ---
+  Future<void> _handleLocationSwitch(bool value) async {
+    setState(() {
+      _useCurrentLocation = value;
+      // Jika user mengaktifkan lokasi, anggap error lokasi hilang
+      if (value) _isLokasiEmpty = false;
+    });
+
+    if (value) {
+      await _getCurrentLocation();
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isGettingLocation = true);
+    _unfocusGlobal();
+
+    try {
+      final loc.Location locationService = loc.Location();
+      bool serviceEnabled = await locationService.serviceEnabled();
+
+      if (!serviceEnabled) {
+        serviceEnabled = await locationService.requestService();
+        if (!serviceEnabled) {
+          throw Exception('GPS tidak diaktifkan oleh pengguna.');
+        }
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Izin lokasi ditolak.');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Izin lokasi ditolak permanen.');
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final Placemark p = placemarks.first;
+        final addressParts = [
+          p.street,
+          p.subLocality,
+          p.locality,
+          p.subAdministrativeArea,
+          p.postalCode,
+        ];
+        final String fullAddress = addressParts
+            .where((part) => part != null && part.isNotEmpty)
+            .join(', ');
+
+        if (mounted) {
+          setState(() {
+            _lokasiController.text = fullAddress;
+            _isGettingLocation = false;
+            _isLokasiEmpty = false; // Hapus error merah jika lokasi ditemukan
+          });
+        }
+      } else {
+        throw Exception('Alamat tidak ditemukan.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGettingLocation = false;
+          _useCurrentLocation = false;
+        });
+
+        _showCustomToast(
+          "Gagal mendapatkan lokasi. Aktifkan GPS atau ketik alamat secara manual.",
+          Colors.red,
         );
       }
     }
   }
 
-  // Helper: unfocus global (tutup keyboard)
+  void _showCustomToast(String msg, Color bgColor) {
+    showToast(
+      msg,
+      context: context,
+      backgroundColor: bgColor,
+      position: StyledToastPosition.bottom,
+      animation: StyledToastAnimation.scale,
+      reverseAnimation: StyledToastAnimation.fade,
+      animDuration: const Duration(milliseconds: 150),
+      duration: const Duration(seconds: 2),
+      borderRadius: BorderRadius.circular(25),
+      textStyle: const TextStyle(color: Colors.white),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
   void _unfocusGlobal() {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  // Helper untuk un/focus hanya jika ketukan di luar widget fokus
   void _handleTapDown(TapDownDetails details) {
     final focused = FocusManager.instance.primaryFocus;
     if (focused != null && focused.context != null) {
@@ -99,15 +200,12 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
             FocusManager.instance.primaryFocus?.unfocus();
           }
         } else {
-          // fallback: unfocus
           FocusManager.instance.primaryFocus?.unfocus();
         }
       } catch (_) {
-        // fallback safety
         FocusManager.instance.primaryFocus?.unfocus();
       }
     } else {
-      // tidak ada yang fokus -> panggil unfocus (safety)
       FocusManager.instance.primaryFocus?.unfocus();
     }
   }
@@ -115,9 +213,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   Future<void> _pickImage() async {
     if (_isPickingImage) return;
     try {
-      // Pastikan keyboard tertutup sebelum membuka picker
       _unfocusGlobal();
-
       setState(() => _isPickingImage = true);
       final picker = ImagePicker();
       final XFile? img = await picker.pickImage(
@@ -127,7 +223,10 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         imageQuality: 80,
       );
       if (img != null) {
-        setState(() => _pickedImage = File(img.path));
+        setState(() {
+          _pickedImage = File(img.path);
+          _isImageEmpty = false; // Hapus error merah saat gambar dipilih
+        });
       }
     } finally {
       if (mounted) {
@@ -137,43 +236,31 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   }
 
   void _showConfirmationDialog() {
-    // Pastikan keyboard tertutup saat menampilkan dialog
     _unfocusGlobal();
 
-    if (_jenisController.text.isEmpty ||
-        _selectedKategori == null ||
-        _lokasiController.text.isEmpty ||
-        _deskripsiController.text.isEmpty ||
-        _pickedImage == null) {
-      showToast(
-        "Harap lengkapi semua kolom yang wajib diisi.",
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+    // --- LOGIKA VALIDASI MERAH ---
+    setState(() {
+      _isJudulEmpty = _jenisController.text.isEmpty;
+      _isKategoriEmpty = _selectedKategori == null;
+      _isLokasiEmpty = _lokasiController.text.isEmpty;
+      _isDeskripsiEmpty = _deskripsiController.text.isEmpty;
+      _isImageEmpty = _pickedImage == null;
+    });
+
+    // Cek apakah ada salah satu yang error (true)
+    if (_isJudulEmpty ||
+        _isKategoriEmpty ||
+        _isLokasiEmpty ||
+        _isDeskripsiEmpty ||
+        _isImageEmpty) {
+      _showCustomToast("Harap lengkapi kolom yang berwarna merah.", Colors.red);
       return;
     }
 
     if (!_isStatementChecked) {
-      showToast(
+      _showCustomToast(
         "Anda harus menyetujui pernyataan pertanggungjawaban.",
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
+        Colors.red,
       );
       return;
     }
@@ -211,17 +298,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isLoggedIn || authProvider.token == null) {
-      showToast(
+      _showCustomToast(
         "Sesi Anda telah berakhir, silakan login kembali.",
-        context: context,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
+        Colors.red,
       );
       setState(() => _isSubmitting = false);
       return;
@@ -244,20 +323,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         token: authProvider.token!,
       );
 
-      showToast(
-        "Laporan berhasil dikirim!",
-        context: context,
-        backgroundColor: Colors.green,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
-
+      _showCustomToast("Laporan berhasil dikirim!", Colors.green);
       _unfocusGlobal();
 
       Navigator.of(context).pushAndRemoveUntil(
@@ -267,19 +333,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         (Route<dynamic> route) => route.isFirst,
       );
     } catch (e) {
-      showToast(
-        "Gagal mengirim laporan: ${e.toString()}",
-        context: context,
-        backgroundColor: Colors.red,
-        position: StyledToastPosition.bottom,
-        animation: StyledToastAnimation.scale,
-        reverseAnimation: StyledToastAnimation.fade,
-        animDuration: const Duration(milliseconds: 150),
-        duration: const Duration(seconds: 2),
-        borderRadius: BorderRadius.circular(25),
-        textStyle: const TextStyle(color: Colors.white),
-        curve: Curves.fastOutSlowIn,
-      );
+      _showCustomToast("Gagal mengirim laporan: ${e.toString()}", Colors.red);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -306,14 +360,13 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
     super.deactivate();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
-    final boxDecoration = BoxDecoration(
+  // --- FUNGSI BANTU UNTUK DEKORASI ERROR ---
+  BoxDecoration _getBoxDecoration(ThemeData theme, bool isError) {
+    return BoxDecoration(
       color: theme.cardColor,
       borderRadius: BorderRadius.circular(12),
+      // Border merah jika error, transparan jika tidak
+      border: isError ? Border.all(color: Colors.red, width: 1.5) : null,
       boxShadow: [
         BoxShadow(
           color: theme.shadowColor.withOpacity(0.08),
@@ -322,6 +375,12 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     final inputDecoration = InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -355,30 +414,40 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // --- JUDUL LAPORAN ---
               Text('Judul Laporan', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Container(
-                decoration: boxDecoration,
+                decoration: _getBoxDecoration(theme, _isJudulEmpty),
                 child: TextField(
                   focusNode: _jenisFocus,
                   controller: _jenisController,
                   autofocus: false,
+                  onChanged: (value) {
+                    if (value.isNotEmpty && _isJudulEmpty) {
+                      setState(() => _isJudulEmpty = false);
+                    }
+                  },
                   decoration: inputDecoration.copyWith(
                     hintText: 'Contoh: Jalan Rusak, Sampah Menumpuk',
                   ),
                 ),
               ),
               const SizedBox(height: 24),
+
+              // --- KATEGORI ---
               Text('Kategori', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Container(
-                decoration: boxDecoration,
+                decoration: _getBoxDecoration(theme, _isKategoriEmpty),
                 child: DropdownMenu<String>(
                   initialSelection: _selectedKategori,
                   onSelected: (String? value) {
                     _unfocusGlobal();
                     setState(() {
                       _selectedKategori = value;
+                      _isKategoriEmpty = false; // Hapus error
                     });
                   },
                   expandedInsets: EdgeInsets.zero,
@@ -410,21 +479,65 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Lokasi Kejadian', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
+
+              // --- LOKASI KEJADIAN ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Lokasi Kejadian', style: theme.textTheme.titleMedium),
+                  Row(
+                    children: [
+                      Text(
+                        'Lokasi Saat Ini',
+                        style: TextStyle(fontSize: 12, color: theme.hintColor),
+                      ),
+                      const SizedBox(width: 4),
+                      Switch(
+                        value: _useCurrentLocation,
+                        onChanged: _isGettingLocation
+                            ? null
+                            : _handleLocationSwitch,
+                        activeColor: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Container(
-                decoration: boxDecoration,
+                decoration: _getBoxDecoration(theme, _isLokasiEmpty),
                 child: TextField(
                   focusNode: _lokasiFocus,
                   controller: _lokasiController,
                   maxLines: 3,
                   autofocus: false,
+                  readOnly: _isGettingLocation,
+                  onChanged: (value) {
+                    if (value.isNotEmpty && _isLokasiEmpty) {
+                      setState(() => _isLokasiEmpty = false);
+                    }
+                  },
                   decoration: inputDecoration.copyWith(
                     hintText: 'Masukkan alamat atau lokasi kejadian',
+                    suffixIcon: _isGettingLocation
+                        ? Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
               ),
               const SizedBox(height: 24),
+
+              // --- UPLOAD FOTO ---
               Text('Upload Foto', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               GestureDetector(
@@ -432,7 +545,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 child: Container(
                   height: 140,
                   width: double.infinity,
-                  decoration: boxDecoration,
+                  decoration: _getBoxDecoration(theme, _isImageEmpty),
                   child: Center(
                     child: _pickedImage == null
                         ? Column(
@@ -441,7 +554,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                               Icon(
                                 Icons.add_a_photo_outlined,
                                 size: 32,
-                                color: theme.hintColor,
+                                color: _isImageEmpty
+                                    ? Colors.red
+                                    : theme.hintColor,
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -449,7 +564,9 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: theme.hintColor,
+                                  color: _isImageEmpty
+                                      ? Colors.red
+                                      : theme.hintColor,
                                 ),
                               ),
                             ],
@@ -467,15 +584,22 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // --- DESKRIPSI ---
               Text('Deskripsi Laporan', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Container(
-                decoration: boxDecoration,
+                decoration: _getBoxDecoration(theme, _isDeskripsiEmpty),
                 child: TextField(
                   focusNode: _deskripsiFocus,
                   controller: _deskripsiController,
                   maxLines: 4,
                   autofocus: false,
+                  onChanged: (value) {
+                    if (value.isNotEmpty && _isDeskripsiEmpty) {
+                      setState(() => _isDeskripsiEmpty = false);
+                    }
+                  },
                   decoration: inputDecoration.copyWith(
                     hintText:
                         'Masukan deskripsi laporan dan berikan detail lokasi',
@@ -483,6 +607,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // --- PERNYATAAN ---
               CheckboxListTile(
                 value: _isStatementChecked,
                 onChanged: (bool? value) {
@@ -502,6 +628,8 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
                 activeColor: theme.colorScheme.primary,
               ),
               const SizedBox(height: 16),
+
+              // --- TOMBOL KIRIM ---
               SizedBox(
                 width: double.infinity,
                 height: 48,

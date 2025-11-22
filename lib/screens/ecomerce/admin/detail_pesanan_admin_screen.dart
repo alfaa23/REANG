@@ -32,6 +32,21 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
 
   final TextEditingController _resiController = TextEditingController();
   final TextEditingController _jasaKirimController = TextEditingController();
+  final List<String> _listKurir = [
+    'JNE',
+    'J&T Express',
+    'SiCepat',
+    'AnterAja',
+    'Pos Indonesia',
+    'Tiki',
+    'GoSend',
+    'GrabExpress',
+    'Kurir Toko (Internal)',
+    'Lainnya',
+  ];
+
+  // [BARU] Variabel untuk menyimpan pilihan
+  String? _selectedKurir;
 
   bool _isLoading = false;
   bool _isConfirming = false;
@@ -148,6 +163,39 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
       ),
       'Pesanan ditandai terkirim!',
       (isLoading) => setState(() => _isLoading = isLoading),
+    );
+  }
+
+  void _onBatalkan() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Batalkan Pesanan?'),
+        content: const Text(
+          'Apakah Anda yakin ingin membatalkan pesanan ini? Stok tidak otomatis kembali (manual).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tidak'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Tutup dialog
+              _runApiAction(
+                () => _apiService.adminBatalkanPesanan(
+                  token: _token,
+                  noTransaksi: widget.noTransaksi,
+                ),
+                'Pesanan berhasil dibatalkan.',
+                (isLoading) => setState(() => _isLoading = isLoading),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Ya, Batalkan'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -384,12 +432,12 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
             const SizedBox(height: 16),
 
             // Input Jasa Pengiriman (Opsional di Backend, tapi kunci untuk UI Resi)
-            TextField(
-              controller: _jasaKirimController,
+            DropdownButtonFormField<String>(
+              value: _selectedKurir,
+              hint: const Text('Pilih Jasa Pengiriman'),
               decoration: InputDecoration(
                 labelText: 'Jasa Pengiriman (Opsional)',
                 labelStyle: TextStyle(color: Colors.blue.shade800),
-                hintText: 'Cth: JNE, Kurir Toko',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -405,6 +453,19 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                   vertical: 14,
                 ),
               ),
+              items: _listKurir.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                setState(() {
+                  _selectedKurir = newValue;
+                  // Update controller juga agar logika backend sebelumnya tetap jalan (opsional)
+                  _jasaKirimController.text = newValue ?? "";
+                });
+              },
             ),
 
             const SizedBox(height: 12),
@@ -853,22 +914,50 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
         break;
 
       case 'diproses':
-        content = ElevatedButton.icon(
-          onPressed: isActionLoading ? null : _onKirim,
-          icon: const Icon(Icons.local_shipping),
-          label: const Text(
-            "Kirim Pesanan Sekarang",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            backgroundColor: Colors.blue.shade700,
-            foregroundColor: Colors.white,
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        content = Row(
+          children: [
+            // 1. Tombol Batalkan (Merah)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: isActionLoading ? null : _onBatalkan,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(color: theme.colorScheme.error, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  "Batalkan",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+
+            // 2. Tombol Input Resi (Biru)
+            Expanded(
+              flex: 2, // Lebih lebar
+              child: ElevatedButton.icon(
+                onPressed: isActionLoading ? null : _onKirim,
+                icon: const Icon(Icons.local_shipping),
+                label: const Text(
+                  "Kirim Pesanan",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
         break;
 

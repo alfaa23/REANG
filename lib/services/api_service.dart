@@ -43,7 +43,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
+  final String _baseUrlBackend = 'https://72ec59a5c57b.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -2686,6 +2686,24 @@ class ApiService {
       return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Gagal menolak');
+    }
+  }
+
+  // Admin Membatalkan Pesanan
+  Future<Map<String, dynamic>> adminBatalkanPesanan({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/admin/pesanan/batalkan/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Gagal membatalkan pesanan',
+      );
     }
   }
 
