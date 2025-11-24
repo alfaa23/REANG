@@ -37,7 +37,10 @@ class _UmkmScreenState extends State<UmkmScreen>
 
   // State untuk notifikasi "Belum Dibayar"
   int _userUnpaidCount = 0; // Khusus user
-  int _adminTaskCount = 0; // Khusus admin
+  int _adminOrderCount = 0; // Untuk Pesanan Masuk
+  int _adminChatCount = 0; // Untuk Chat Pelanggan
+
+  StreamSubscription? _adminChatSubscription; // Stream Listener
 
   // State Paginasi & Error
   int _currentPage = 1;
@@ -63,6 +66,7 @@ class _UmkmScreenState extends State<UmkmScreen>
     _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
     _fetchUnpaidCount();
+    _listenToAdminChats();
   }
 
   // --- Lifecycle untuk Auto-Refresh Notifikasi ---
@@ -79,8 +83,7 @@ class _UmkmScreenState extends State<UmkmScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    umkmRouteObserver.unsubscribe(this);
-    debugPrint("!!! UmkmScreen: Berhasil unsubscribe dari RouteObserver.");
+    _adminChatSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -101,6 +104,42 @@ class _UmkmScreenState extends State<UmkmScreen>
     }
   }
 
+  void _listenToAdminChats() {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn || auth.user == null) return;
+
+    final myId = auth.user!.id.toString();
+
+    _adminChatSubscription = FirebaseFirestore.instance
+        .collection('chats')
+        .where('participants', arrayContains: myId)
+        .where('isUmkmChat', isEqualTo: true)
+        .snapshots()
+        .listen((snapshot) {
+          int unreadTotal = 0;
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+
+            // FILTER: Ambil chat dimana SAYA ADALAH PENJUAL
+            // Artinya: userId (Pembeli) != myId (Saya)
+            final chatUserId = data['userId'].toString();
+            if (chatUserId == myId) continue; // Skip chat belanjaan sendiri
+
+            // Hitung unread
+            final unreadMap = data['unreadCount'] as Map<String, dynamic>?;
+            if (unreadMap != null) {
+              unreadTotal += (unreadMap[myId] as int? ?? 0);
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              _adminChatCount = unreadTotal;
+            });
+          }
+        });
+  }
+
   // =========================================================================
   // --- FUNGSI DATA & API ---
   // =========================================================================
@@ -110,8 +149,8 @@ class _UmkmScreenState extends State<UmkmScreen>
     if (!auth.isLoggedIn || auth.user == null || auth.token == null) {
       if (mounted)
         setState(() {
-          _userUnpaidCount = 0;
-          _adminTaskCount = 0;
+          _adminOrderCount = 0; // <--- GANTI JADI INI
+          _adminChatCount = 0; // <--- TAMBAHKAN INI (Biar chat juga ke-reset)
         });
       return;
     }
@@ -141,7 +180,7 @@ class _UmkmScreenState extends State<UmkmScreen>
       if (mounted) {
         setState(() {
           _userUnpaidCount = userCount;
-          _adminTaskCount = adminCount;
+          _adminOrderCount = adminCount;
         });
       }
     } catch (_) {
@@ -330,8 +369,8 @@ class _UmkmScreenState extends State<UmkmScreen>
                   color: theme.colorScheme.primary,
                 ),
                 title: _buildNotificationBadge(
-                  // Bungkus title dengan badge
-                  _adminTaskCount, // Gunakan count admin
+                  _adminOrderCount +
+                      _adminChatCount, // PENJUMLAHAN (Pesanan + Chat)
                   const Text(
                     'Toko Saya',
                     style: TextStyle(fontWeight: FontWeight.w600),
@@ -810,8 +849,11 @@ class _UmkmScreenState extends State<UmkmScreen>
                 width: 55.0,
                 height: 55.0,
                 child: _buildNotificationBadge(
-                  _userUnpaidCount +
-                      _adminTaskCount, // [JUMLAHKAN KEDUANYA DISINI]
+                  // TOTAL SEMUA NOTIFIKASI:
+                  // 1. Pesanan Saya (User)
+                  // 2. Pesanan Masuk (Admin)
+                  // 3. Chat Pelanggan (Admin)
+                  _userUnpaidCount + _adminOrderCount + _adminChatCount,
                   FloatingActionButton(
                     onPressed: _showFabMenu,
                     backgroundColor: theme.colorScheme.primary,

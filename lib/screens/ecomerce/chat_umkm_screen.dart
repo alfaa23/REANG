@@ -163,7 +163,17 @@ class _ChatUMKMScreenState extends State<ChatUMKMScreen>
                 _isLoading = false;
                 _errorMessage = null;
               });
-              _scrollToBottomAfterBuild(animated: false);
+
+              // ===========================================================
+              // [KUNCI UTAMA] AUTO READ SAAT CHAT AKTIF
+              // ===========================================================
+              // Setiap ada pesan baru (atau saat pertama buka),
+              // bersihkan angka notifikasi untuk DIRI SAYA (_myId).
+              // Ini berlaku baik untuk User maupun Admin.
+              _clearUnreadForChat(_chatId, _myId);
+              // ===========================================================
+
+              _scrollToBottomAfterBuild(animated: true);
               _updateCanScroll();
             }
           },
