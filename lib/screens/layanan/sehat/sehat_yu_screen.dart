@@ -131,7 +131,6 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 10.0),
             child: StreamBuilder<QuerySnapshot>(
-              // Gunakan _myId yang selalu di-update dari authStateChanges()
               stream: (_myId == null)
                   ? null
                   : FirebaseFirestore.instance
@@ -140,12 +139,22 @@ class _SehatYuScreenState extends State<SehatYuScreen> {
                         .snapshots(),
               builder: (context, snapshot) {
                 int totalUnread = 0;
+
                 if (snapshot.hasData &&
                     snapshot.data!.docs.isNotEmpty &&
                     _myId != null) {
                   final myIdLocal = _myId!;
+
                   for (var doc in snapshot.data!.docs) {
                     final data = doc.data() as Map<String, dynamic>;
+
+                    // --- FILTER: JANGAN HITUNG KALAU INI CHAT UMKM ---
+                    // Kita hanya menghitung chat Puskesmas (yang isUmkmChat-nya null/false)
+                    if (data['isUmkmChat'] == true) {
+                      continue; // Lewati (Skip) chat ini
+                    }
+                    // -------------------------------------------------
+
                     totalUnread +=
                         (((data['unreadCount'] ?? {})[myIdLocal] ?? 0) as num)
                             .toInt();

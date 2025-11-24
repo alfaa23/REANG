@@ -8,6 +8,8 @@ import 'kelola_produk_view.dart';
 import 'umkm_analytics_dashboard.dart';
 import 'pengaturan_toko_view.dart';
 import 'kelola_pesanan_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:reang_app/screens/ecomerce/admin/admin_umkm_chat_list_screen.dart'; // Pastikan path benar
 
 class HomeAdminUmkmScreen extends StatefulWidget {
   const HomeAdminUmkmScreen({super.key});
@@ -22,6 +24,7 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
 
   // State untuk notifikasi
   int _notificationCount = 0;
+  bool _isOpeningChat = false;
   final ApiService _apiService = ApiService();
 
   @override
@@ -83,9 +86,13 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          // 1. TOMBOL CHAT ADMIN (BARU)
+          _buildAdminChatButton(context),
+
+          // 2. TOMBOL REFRESH (LAMA)
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchNotificationCount, // Refresh manual
+            onPressed: _fetchNotificationCount,
             tooltip: 'Segarkan Notifikasi',
           ),
         ],
@@ -150,6 +157,129 @@ class _HomeAdminUmkmScreenState extends State<HomeAdminUmkmScreen>
           ),
         ],
       ),
+    );
+  }
+
+  // --- Widget Tombol Chat Admin ---
+  Widget _buildAdminChatButton(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    final theme = Theme.of(context);
+
+    if (!auth.isLoggedIn || auth.user == null) {
+      return const SizedBox.shrink(); // Sembunyikan jika belum login
+    }
+
+    final myId = auth.user!.id.toString();
+
+    // Stream Badge Notifikasi
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .where('participants', arrayContains: myId)
+          .where('isUmkmChat', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int unreadTotal = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+
+            // FILTER: Hanya hitung chat dari PELANGGAN
+            // Artinya: userId (Pembeli) != myId (Saya/Admin)
+            final chatUserId = data['userId'].toString();
+            if (chatUserId == myId) {
+              continue; // Skip chat belanja saya sendiri
+            }
+
+            final unreadMap = data['unreadCount'] as Map<String, dynamic>?;
+            if (unreadMap != null) {
+              unreadTotal += (unreadMap[myId] as int? ?? 0);
+            }
+          }
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: _isOpeningChat
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme
+                            .colorScheme
+                            .onPrimary, // Warna putih di AppBar
+                      ),
+                    )
+                  : const Icon(Icons.chat_bubble_outline),
+              tooltip: 'Chat Pelanggan',
+              onPressed: _isOpeningChat
+                  ? null
+                  : () async {
+                      setState(() => _isOpeningChat = true);
+                      try {
+                        // 1. Tukar Token / Pastikan Login Firebase
+                        await auth.ensureFirebaseLoggedIn();
+
+                        // 2. Buka Halaman List Chat Admin
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AdminUmkmChatListScreen(),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal membuka chat: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isOpeningChat = false);
+                        }
+                      }
+                    },
+            ),
+            // Badge Merah
+            if (unreadTotal > 0 && !_isOpeningChat)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadTotal > 99 ? '99+' : unreadTotal.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

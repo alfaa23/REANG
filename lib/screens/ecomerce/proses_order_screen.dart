@@ -7,6 +7,8 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/ecomerce/payment_instruction_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/ecomerce/detail_order_screen.dart';
+import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
+import 'package:reang_app/models/toko_model.dart';
 
 // =============================================================================
 // PARENT WIDGET (Hanya mengurus Tab, Badge, dan PageView)
@@ -522,8 +524,52 @@ class OrderCard extends StatelessWidget {
     _showToast(context, 'TODO: Buka halaman Beri Ulasan');
   }
 
-  void _goToChat(BuildContext context) {
-    _showToast(context, 'TODO: Buka halaman Chat Penjual');
+  void _goToChat(BuildContext context) async {
+    // 1. Ambil Auth Provider untuk dapatkan Token
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Cek Token dulu
+    if (authProvider.token == null) {
+      _showToast(context, 'Anda belum login', isError: true);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final apiService = ApiService();
+
+      // 2. Panggil API dengan Token (UPDATE DISINI)
+      final TokoModel tokoTarget = await apiService.fetchDetailToko(
+        idToko: order.idToko,
+        token: authProvider.token!, // <--- Masukkan Token disini
+      );
+
+      if (context.mounted) {
+        Navigator.pop(context); // Tutup Loading
+
+        // 3. Masuk Chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatUMKMScreen(toko: tokoTarget),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        _showToast(
+          context,
+          'Gagal: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
+    }
   }
 
   @override

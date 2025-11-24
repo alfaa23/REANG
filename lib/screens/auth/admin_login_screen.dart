@@ -55,28 +55,36 @@ class _DokterLoginScreenState extends State<DokterLoginScreen> {
 
       // --- LOGIKA UTAMA: HANYA IZINKAN 'puskesmas' ---
       if (admin.role == 'puskesmas') {
-        // Panggil API KEDUA untuk mengambil data puskesmas
+        // 1. Ambil Data Puskesmas
         final puskesmasData = await apiService.getPuskesmasByAdminId(
           admin.id.toString(),
         );
 
         if (puskesmasData == null) {
-          // Jika tidak ada data puskesmas, gagalkan login
           throw Exception(
             'Login gagal: Akun admin ini tidak terhubung ke data puskesmas.',
           );
         }
 
-        // Sukses, panggil provider dengan data puskesmas lengkap
+        // 2. Simpan ke Provider (Laravel Session)
         await authProvider.login(admin, token, puskesmas: puskesmasData);
 
-        // Arahkan ke Halaman Admin Puskesmas
-        navigator.pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const KonsultasiPasienScreen(),
-          ),
-          (route) => false,
-        );
+        // =================================================================
+        // [TAMBAHAN PENTING] Login Firebase SEKARANG JUGA
+        // Supaya saat masuk dashboard dokter, koneksi chat sudah siap 100%
+        // =================================================================
+        await authProvider.ensureFirebaseLoggedIn();
+        // =================================================================
+
+        // 3. Pindah Halaman
+        if (mounted) {
+          navigator.pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const KonsultasiPasienScreen(),
+            ),
+            (route) => false,
+          );
+        }
       } else {
         // --- JIKA ROLE BUKAN 'puskesmas' (misal: 'umkm', 'superadmin') ---
         // Tolak login karena ini adalah portal khusus dokter/puskesmas

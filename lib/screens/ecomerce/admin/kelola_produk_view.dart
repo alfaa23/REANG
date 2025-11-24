@@ -106,16 +106,62 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
   // NAVIGASI (Diperbarui untuk memanggil _onRefresh)
   // ===========================================================
 
-  void _goToAddProduk() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const FormProdukScreen(produk: null),
-      ),
-    ).then((result) {
-      // [PERUBAHAN 7]: Panggil _onRefresh jika ada perubahan data
-      if (result == true) _onRefresh();
-    });
+  void _goToAddProduk() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.token == null || auth.user?.idToko == null) return;
+
+    // 1. Tampilkan Loading (Opsional, biar user tau sedang mengecek)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 2. Panggil API Cek Kelengkapan
+      final status = await _apiService.checkTokoKelengkapan(
+        token: auth.token!,
+        idToko: auth.user!.idToko!,
+      );
+
+      // Tutup Loading
+      if (mounted) Navigator.pop(context);
+
+      // 3. Cek Hasilnya
+      if (status['is_ready'] == true) {
+        // --- LULUS: Boleh Masuk Form ---
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const FormProdukScreen(produk: null),
+          ),
+        ).then((result) {
+          if (result == true) _onRefresh();
+        });
+      } else {
+        // --- GAGAL: Tampilkan Pesan Error Spesifik ---
+        String message = "Lengkapi pengaturan toko terlebih dahulu!";
+
+        bool noOngkir = status['has_ongkir'] == false;
+        bool noMetode = status['has_metode'] == false;
+
+        if (noOngkir && noMetode) {
+          message =
+              "Wajib isi 'Opsi Pengiriman' & 'Metode Pembayaran' di Pengaturan Toko!";
+        } else if (noOngkir) {
+          message = "Anda belum mengatur 'Opsi Pengiriman' (Ongkir)!";
+        } else if (noMetode) {
+          message = "Anda belum mengatur 'Metode Pembayaran'!";
+        }
+
+        // Tampilkan Toast Merah
+        _showToast(message, isError: true);
+      }
+    } catch (e) {
+      // Tutup loading jika error
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      _showToast("Gagal mengecek status toko. Coba lagi.", isError: true);
+    }
   }
 
   void _editProduk(ProdukModel produk) {

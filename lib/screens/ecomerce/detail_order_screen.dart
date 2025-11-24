@@ -7,6 +7,8 @@ import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
+import 'package:reang_app/models/toko_model.dart';
+import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
 
 class DetailOrderScreen extends StatefulWidget {
   final String noTransaksi;
@@ -67,6 +69,58 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
                 .error // Merah untuk error
           : Colors.black.withOpacity(0.8), // Hitam transparan untuk info
     );
+  }
+
+  // --- FUNGSI MENUJU CHAT PENJUAL ---
+  Future<void> _goToChat(int idToko) async {
+    final authProvider = context.read<AuthProvider>();
+
+    // 1. Cek Login
+    if (!authProvider.isLoggedIn || authProvider.user == null) {
+      _showToast(context, 'Silakan login terlebih dahulu', isError: true);
+      // Opsional: Arahkan ke Login Screen
+      return;
+    }
+
+    // 2. Tampilkan Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 3. Pastikan Firebase Login (Tukar Token jika perlu)
+      await authProvider.ensureFirebaseLoggedIn();
+
+      // 4. Ambil Data Toko (untuk dapatkan ID Pemilik)
+      final apiService = ApiService();
+      final TokoModel tokoTarget = await apiService.fetchDetailToko(
+        idToko: idToko,
+        token: authProvider.token!,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+
+        // 5. Buka Halaman Chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatUMKMScreen(toko: tokoTarget),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+        _showToast(
+          context,
+          'Gagal membuka chat: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
+    }
   }
 
   // Fungsi untuk membatalkan pesanan
@@ -212,6 +266,8 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
                   _buildDaftarProdukCard(context, theme, items),
                   const SizedBox(height: 16),
                   _buildRincianPembayaranCard(context, theme, transaksi),
+                  const SizedBox(height: 16),
+                  _buildBantuanCard(context, theme, transaksi.idToko),
                 ],
               ),
             ),
@@ -514,6 +570,41 @@ class _DetailOrderScreenState extends State<DetailOrderScreen> {
               valueSize: 18,
               valueColor: theme.colorScheme.primary,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBantuanCard(BuildContext context, ThemeData theme, int idToko) {
+    return Card(
+      elevation: 1,
+      shadowColor: theme.shadowColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                'Butuh Bantuan?',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+
+            // --- HANYA TERSISA MENU HUBUNGI PENJUAL ---
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Hubungi Penjual'),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => _goToChat(idToko),
+            ),
+            // ------------------------------------------
           ],
         ),
       ),

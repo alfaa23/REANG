@@ -8,6 +8,8 @@ import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/models/user_model.dart';
+import 'package:reang_app/models/toko_model.dart';
+import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
 
 class DetailPesananAdminScreen extends StatefulWidget {
   final String noTransaksi;
@@ -101,6 +103,54 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
       borderRadius: BorderRadius.circular(25),
       curve: Curves.fastOutSlowIn,
     );
+  }
+
+  // --- FUNGSI HUBUNGI PEMBELI (KHUSUS ADMIN) ---
+  Future<void> _goToChatWithPembeli(
+    int idUserPembeli,
+    String namaPembeli,
+  ) async {
+    // 1. Tampilkan Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 2. [PENTING] Pastikan Admin sudah login Firebase (Tukar Token)
+      // Ini wajib karena admin biasanya login pakai username/password biasa
+      await _authProvider.ensureFirebaseLoggedIn();
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+
+        // 3. MANIPULASI DATA: Bungkus data Pembeli seolah-olah 'Toko'
+        // Supaya bisa pakai ChatUMKMScreen yang sudah ada tanpa bikin screen baru.
+        final buyerAsTarget = TokoModel(
+          id: 0, // ID Toko dummy (tidak dipakai untuk kirim pesan)
+          idUser: idUserPembeli, // <--- TARGET: ID USER PEMBELI
+          nama: namaPembeli, // <--- NAMA: NAMA PENERIMA
+          alamat: '',
+          noHp: '',
+          foto: null, // Foto null akan tampil inisial
+        );
+
+        // 4. Buka Halaman Chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                ChatUMKMScreen(toko: buyerAsTarget, isSeller: true),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+        _showToast('Gagal membuka chat: $e', isError: true);
+      }
+    }
   }
 
   Future<void> _runApiAction(
@@ -372,6 +422,8 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 _buildProductListCard(theme, items),
                 const SizedBox(height: 16),
                 _buildCostCard(theme, transaksi),
+                const SizedBox(height: 16),
+                _buildBantuanCard(theme, transaksi),
               ],
             ),
           );
@@ -399,6 +451,44 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   }
 
   // --- WIDGET BUILDER ---
+
+  // Card Bantuan (Versi Admin)
+  Widget _buildBantuanCard(ThemeData theme, RiwayatTransaksiModel transaksi) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                'Butuh Bantuan?',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+
+            // MENU: Hubungi Pembeli
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Hubungi Pembeli'),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                // Ambil nama penerima atau fallback ke 'Pembeli'
+                final namaTarget = transaksi.namaPenerima ?? 'Pembeli';
+                _goToChatWithPembeli(transaksi.idUser, namaTarget);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildInputResiCard(ThemeData theme) {
     // Cek apakah jasa kirim diisi

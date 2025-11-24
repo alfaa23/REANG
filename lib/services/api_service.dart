@@ -34,6 +34,7 @@ import 'package:reang_app/models/riwayat_transaksi_model.dart';
 import 'package:reang_app/models/detail_transaksi_response.dart';
 import 'package:reang_app/models/produk_varian_model.dart';
 import 'package:reang_app/models/admin_pesanan_model.dart';
+import 'package:reang_app/models/toko_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -43,7 +44,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://72ec59a5c57b.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://71b2178973fe.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -2831,6 +2832,63 @@ class ApiService {
     } catch (e) {
       debugPrint('Error fetching counts: $e');
       return {}; // Kembalikan map kosong jika gagal (agar aplikasi tidak crash)
+    }
+  }
+
+  // [TAMBAHKAN INI] Cek kelengkapan toko (Ongkir & Payment)
+  Future<Map<String, bool>> checkTokoKelengkapan({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/toko/cek-kelengkapan/$idToko',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
+        return {
+          'has_ongkir': data['has_ongkir'] ?? false,
+          'has_metode': data['has_metode'] ?? false,
+          'is_ready': data['is_ready'] ?? false,
+        };
+      }
+      return {'is_ready': false};
+    } catch (e) {
+      // Jika error koneksi, anggap belum siap demi keamanan
+      return {'is_ready': false, 'error': true};
+    }
+  }
+
+  // --- TAMBAHAN UNTUK AMBIL DATA TOKO (AGAR BISA CHAT) ---
+  Future<TokoModel> fetchDetailToko({
+    required int idToko,
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/toko/$idToko',
+        // --- PENTING: Tambahkan Options Header ---
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token', // Kirim Token Kunci
+            'Accept':
+                'application/json', // Kasih tahu Laravel ini API (Jangan Redirect)
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return TokoModel.fromJson(response.data['data']);
+      } else {
+        throw Exception('Gagal memuat data toko.');
+      }
+    } on DioException catch (e) {
+      // Agar error lebih jelas dibaca
+      throw Exception(
+        'Gagal detail toko: ${e.response?.data['message'] ?? e.message}',
+      );
     }
   }
 }

@@ -13,6 +13,8 @@ import 'form_toko_screen.dart';
 import 'package:reang_app/screens/auth/login_screen.dart';
 import 'package:reang_app/screens/ecomerce/admin/home_admin_umkm_screen.dart';
 import 'package:reang_app/screens/ecomerce/search_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Untuk cek notif
+import 'package:reang_app/screens/ecomerce/umkm_chat_list_screen.dart'; // Halaman List Chat
 
 final RouteObserver<ModalRoute<void>> umkmRouteObserver =
     RouteObserver<ModalRoute<void>>();
@@ -42,6 +44,7 @@ class _UmkmScreenState extends State<UmkmScreen>
   bool _hasMorePages = true;
   bool _isLoadingInitial = true;
   bool _isLoadingMore = false;
+  bool _isOpeningChat = false;
   String? _apiError;
 
   // State Kategori
@@ -442,6 +445,132 @@ class _UmkmScreenState extends State<UmkmScreen>
     );
   }
 
+  Widget _buildChatIconButton(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    final theme = Theme.of(context);
+
+    if (!auth.isLoggedIn || auth.user == null) {
+      return IconButton(
+        icon: const Icon(Icons.chat_bubble_outline),
+        iconSize: 26.0,
+        color: theme.hintColor,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          ).then((_) {
+            _fetchUnpaidCount();
+          });
+        },
+      );
+    }
+
+    final myId = auth.user!.id.toString();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          // 1. Syarat Keamanan (Participants)
+          .where('participants', arrayContains: myId)
+          // 2. FILTER BARU: Hanya hitung chat yang dibuat oleh SAYA (sebagai pembeli)
+          // Filter ini sama persis dengan yang ada di UmkmChatListScreen
+          .where('userId', isEqualTo: int.tryParse(myId) ?? 0)
+          // 3. Tipe Chat
+          .where('isUmkmChat', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int unreadTotal = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final unreadMap = data['unreadCount'] as Map<String, dynamic>?;
+            if (unreadMap != null) {
+              unreadTotal += (unreadMap[myId] as int? ?? 0);
+            }
+          }
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: _isOpeningChat
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.chat_bubble_outline),
+              iconSize: 26.0,
+              color: theme.hintColor,
+              onPressed: _isOpeningChat
+                  ? null
+                  : () async {
+                      setState(() => _isOpeningChat = true);
+                      try {
+                        await auth.ensureFirebaseLoggedIn();
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UmkmChatListScreen(),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Gagal membuka chat: ${e.toString()}',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isOpeningChat = false);
+                        }
+                      }
+                    },
+            ),
+            if (unreadTotal > 0 && !_isOpeningChat)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadTotal > 99 ? '99+' : unreadTotal.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   // =========================================================================
   // --- FUNGSI BUILD ---
   // =========================================================================
@@ -544,9 +673,16 @@ class _UmkmScreenState extends State<UmkmScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
+                  const SizedBox(width: 4),
+
+                  // 2. TOMBOL CHAT (Panggil fungsi yang kita buat tadi)
+                  _buildChatIconButton(context),
+
+                  // 3. TOMBOL KERANJANG (Geser dikit biar ga nempel)
                   IconButton(
                     icon: const Icon(Icons.shopping_cart_outlined),
-                    iconSize: 28.0,
+                    iconSize: 26.0, // Sesuaikan ukuran biar sama dengan chat
+                    color: theme.hintColor, // Pastikan warna seragam
                     onPressed: () {
                       Navigator.push(
                         context,

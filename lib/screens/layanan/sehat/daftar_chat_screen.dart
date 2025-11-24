@@ -150,8 +150,19 @@ class _DaftarChatScreenState extends State<DaftarChatScreen> {
             return const Center(child: Text('Anda belum memulai percakapan.'));
           }
 
-          final chatDocs = snapshot.data!.docs;
+          // --- FILTER BARU: Hapus chat yang bertipe UMKM ---
+          // Kita hanya ambil chat yang TIDAK PUNYA field 'isUmkmChat' atau nilainya false
+          final chatDocs = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            // Kalau isUmkmChat == true, berarti ini chat Toko -> JANGAN DIAMBIL
+            return data['isUmkmChat'] != true;
+          }).toList();
+          // --------------------------------------------------
 
+          // Cek lagi setelah difilter, kalau kosong -> Tampilkan pesan kosong
+          if (chatDocs.isEmpty) {
+            return const Center(child: Text('Anda belum memulai percakapan.'));
+          }
           return ListView.separated(
             itemCount: chatDocs.length,
             separatorBuilder: (context, index) =>

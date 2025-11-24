@@ -153,7 +153,7 @@ class AuthProvider with ChangeNotifier {
       }
 
       // G. Login Normal
-      await login(userModel, tokenLaravel);
+      await login(userModel, tokenLaravel, fromGoogle: true);
 
       return userModel;
     } catch (e) {
@@ -167,21 +167,18 @@ class AuthProvider with ChangeNotifier {
     Object userObject,
     String laravelToken, {
     PuskesmasModel? puskesmas,
+    bool fromGoogle = false, // <--- PARAMETER BARU
   }) async {
     _currentUser = userObject;
     _token = laravelToken;
-    _puskesmas = null; // Reset
+    _puskesmas = null;
 
-    // --- LOGIKA PENENTUAN ROLE ---
     if (userObject is UserModel) {
-      // Logika cerdas untuk memilih role
       _role = _getPrimaryRoleFromList(userObject.role);
     } else if (userObject is AdminModel) {
       _role = userObject.role;
     }
-    // ----------------------------
 
-    // Simpan data ke storage
     await _storage.saveUser(userObject);
     await _storage.saveToken(laravelToken);
     await _storage.saveRole(_role!);
@@ -189,11 +186,27 @@ class AuthProvider with ChangeNotifier {
     if (_role == 'puskesmas' && puskesmas != null) {
       _puskesmas = puskesmas;
       await _storage.savePuskesmas(puskesmas);
+    }
+
+    // =================================================================
+    // LOGIKA HEMAT FIREBASE:
+    // 1. Jika dari Google: WAJIB login sekarang (untuk fix UID).
+    // 2. Jika Manual: JANGAN login dulu (tunggu buka chat).
+    // =================================================================
+    if (fromGoogle) {
       await _loginToFirebase(laravelToken);
     }
 
     notifyListeners();
     await _registerFcmToken();
+  }
+
+  Future<void> ensureFirebaseLoggedIn() async {
+    // Jika User punya token Laravel TAPI belum connect Firebase
+    if (_token != null && FirebaseAuth.instance.currentUser == null) {
+      debugPrint("Lazy Login Firebase dimulai...");
+      await _loginToFirebase(_token!);
+    }
   }
 
   // --- FUNGSI TRYAUTOLOGIN (DIPERBARUI TOTAL) ---
@@ -334,12 +347,18 @@ class AuthProvider with ChangeNotifier {
   // Helper login ke Firebase
   Future<void> _loginToFirebase(String laravelToken) async {
     try {
+      // 1. Minta Custom Token ke Laravel (Isi token ini adalah ID Angka: "12")
       final firebaseToken = await _apiService.getFirebaseToken(laravelToken);
+
+      // 2. Login ulang ke Firebase pakai Token Angka tersebut
+      // Ini akan menimpa sesi Login Google yang UID-nya acak
       await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
-      debugPrint("Login Firebase berhasil!");
+
+      debugPrint(
+        "Login Firebase Custom Token berhasil! UID: ${FirebaseAuth.instance.currentUser?.uid}",
+      );
     } catch (e) {
       debugPrint("Gagal otentikasi dengan Firebase: $e");
-      // Tidak melempar error agar login utama tidak gagal
     }
   }
 

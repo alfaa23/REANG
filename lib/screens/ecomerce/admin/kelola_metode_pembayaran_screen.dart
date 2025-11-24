@@ -240,37 +240,71 @@ class _KelolaMetodePembayaranScreenState
   Widget _buildEmptyState(ThemeData theme) {
     return RefreshIndicator(
       onRefresh: _refreshData,
-      child: SingleChildScrollView(
+      child: ListView(
+        // Gunakan ListView agar bisa di-scroll/refresh
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.all(24),
-          child: Column(
+        padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),
+        children: [
+          Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                size: 80,
-                color: theme.hintColor.withOpacity(0.5),
+              // 1. Ikon Besar & Tidak Seram
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withOpacity(0.4),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.add_card_outlined, // Ikon kartu +
+                  size: 80,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 24),
+
+              // 2. Teks Judul
               Text(
                 'Belum Ada Metode Pembayaran',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 8),
+
+              // 3. Teks Penjelasan
               Text(
-                'Tambahkan rekening bank atau QRIS Anda agar pelanggan dapat melakukan pembayaran.',
-                style: TextStyle(color: theme.hintColor),
+                'Toko Anda belum bisa menerima pembayaran.\nTambahkan rekening atau QRIS sekarang.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
                 textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 32),
+
+              // 4. Tombol Aksi di Tengah (Opsional, tapi bagus untuk UX)
+              SizedBox(
+                width: 200,
+                child: ElevatedButton.icon(
+                  onPressed: () => _goToForm(metode: null),
+                  icon: const Icon(Icons.add),
+                  label: const Text("Tambah Metode"),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
