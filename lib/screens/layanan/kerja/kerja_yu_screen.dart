@@ -5,7 +5,7 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
 import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
 // --- PERUBAHAN: Mengimpor file view GLIK yang baru ---
-import 'package:reang_app/screens/layanan/kerja/glik_view.dart';
+import 'package:reang_app/screens/layanan/kerja/kerja_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:html_unescape/html_unescape.dart';
@@ -36,7 +36,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
     {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
-    {'label': 'GLIK', 'icon': Icons.public_outlined},
+    {'label': 'Kerja-Yu', 'icon': Icons.public_outlined},
   ];
 
   @override

@@ -7,6 +7,7 @@ import 'package:reang_app/screens/auth/register_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/auth/admin_login_screen.dart';
+import 'package:reang_app/screens/auth/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;
@@ -266,7 +267,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      // TODO: lupa password
+                      // --- NAVIGASI KE FORGOT PASSWORD ---
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordScreen(),
+                        ),
+                      );
                     },
                     child: Text(
                       'lupa password?',

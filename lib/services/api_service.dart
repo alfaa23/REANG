@@ -44,7 +44,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://71b2178973fe.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://d74886337b9f.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -798,6 +798,11 @@ class ApiService {
           'phone': phone,
           'noKtp': noKtp,
         },
+        options: Options(
+          headers: {
+            'Accept': 'application/json', // Wajib agar tidak 302 Redirect
+          },
+        ),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -2889,6 +2894,29 @@ class ApiService {
       throw Exception(
         'Gagal detail toko: ${e.response?.data['message'] ?? e.message}',
       );
+    }
+  }
+
+  // =======================================================================
+  // API LUPA PASSWORD
+  // =======================================================================
+  Future<Map<String, dynamic>> sendResetLink(String email) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/auth/forgot-password',
+        data: {'email': email},
+        options: Options(headers: {'Accept': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Gagal mengirim link reset.');
+      }
+    } on DioException catch (e) {
+      // Ambil pesan error dari Laravel (misal: "Kami tidak dapat menemukan pengguna dengan alamat email tersebut.")
+      final msg = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan.';
+      throw Exception(msg);
     }
   }
 }

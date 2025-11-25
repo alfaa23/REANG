@@ -94,15 +94,55 @@ class _UmkmChatListScreenState extends State<UmkmChatListScreen> {
           }
 
           // 4. List Chat Data
-          final docs = snapshot.data!.docs;
+          // 4. List Chat Data (DENGAN FILTER SELF-CHAT)
+          final chatDocs = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final List<dynamic> participants = data['participants'] ?? [];
+
+            // Cek apakah Chat ke Diri Sendiri?
+            // Logikanya: Jika peserta 1 dan peserta 2 adalah ORANG YANG SAMA (ID-nya sama)
+            // Maka sembunyikan chat ini.
+            if (participants.length >= 2 &&
+                participants[0] == participants[1]) {
+              return false; // Sembunyikan (Skip)
+            }
+
+            return true; // Tampilkan chat normal
+          }).toList();
+
+          // Cek lagi kalau setelah difilter jadi kosong
+          if (chatDocs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 80,
+                    color: theme.hintColor.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Belum ada percakapan",
+                    style: TextStyle(color: theme.hintColor, fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          }
 
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 10),
-            itemCount: docs.length,
+            itemCount: chatDocs.length, // <-- Pakai chatDocs
             separatorBuilder: (ctx, index) =>
                 const Divider(height: 1, indent: 82),
             itemBuilder: (context, index) {
-              return _buildChatItem(context, docs[index], myId, theme);
+              return _buildChatItem(
+                context,
+                chatDocs[index],
+                myId,
+                theme,
+              ); // <-- Pakai chatDocs
             },
           );
         },

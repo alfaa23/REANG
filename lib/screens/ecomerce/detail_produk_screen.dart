@@ -9,6 +9,9 @@ import 'package:reang_app/providers/auth_provider.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
+import 'package:reang_app/models/toko_model.dart';
+import 'package:reang_app/screens/auth/login_screen.dart';
 
 class DetailProdukScreen extends StatefulWidget {
   // [PERBAIKAN] Terima ProdukModel, bukan Map
@@ -134,6 +137,61 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
           ? theme.colorScheme.error
           : Colors.black.withOpacity(0.8),
     );
+  }
+
+  // --- FUNGSI CHAT PENJUAL (LOGIC CERDAS) ---
+  Future<void> _handleChatPenjual() async {
+    final authProvider = context.read<AuthProvider>();
+
+    // 1. Cek Login Laravel
+    if (!authProvider.isLoggedIn || authProvider.user == null) {
+      // Arahkan ke Login, lalu kembali lagi
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      ).then((_) {
+        if (mounted) setState(() {}); // Refresh UI setelah login
+      });
+      return;
+    }
+
+    // 2. Tampilkan Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 3. Pastikan Login Firebase (Tukar Token untuk User Email)
+      await authProvider.ensureFirebaseLoggedIn();
+
+      // 4. Ambil Data Toko (Kita butuh ID User Pemilik Toko)
+      final TokoModel tokoTarget = await _apiService.fetchDetailToko(
+        idToko: widget.product.idToko, // Ambil ID Toko dari Produk
+        token: authProvider.token!,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+
+        // 5. Masuk ke Chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatUMKMScreen(toko: tokoTarget),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup Loading
+        _showToast(
+          'Gagal membuka chat: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
+    }
   }
 
   // Helper yang dibutuhkan oleh _buildSimilarProductList
@@ -416,45 +474,101 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     );
   }
 
+  // --- BOTTOM BAR (BACKGROUND ORANYE - TEKS PUTIH) ---
+  // --- BOTTOM BAR FINAL (CHAT/CART OREN, BELI BIRU) ---
   Widget _buildActionButtons(BuildContext context, ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => _showOptionsModal(context, isBuyNow: false),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.secondaryContainer,
-              foregroundColor: theme.colorScheme.onSecondaryContainer,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    // Definisi Warna Custom (Oranye Shopee)
+    const Color customOrange = Color(0xFFF08519);
+
+    return SizedBox(
+      height: 56,
+      child: Row(
+        children: [
+          // 1. TOMBOL CHAT (BACKGROUND ORANYE, ISI PUTIH)
+          Material(
+            color: customOrange,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: _handleChatPenjual,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 65,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.chat_outlined, color: Colors.white, size: 26),
+                    SizedBox(height: 2),
+                    Text(
+                      "Chat",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: const Text(
-              'Tambah ke Keranjang',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => _showOptionsModal(context, isBuyNow: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+
+          const SizedBox(width: 10), // Jarak
+          // 2. TOMBOL KERANJANG (BACKGROUND ORANYE, ISI PUTIH)
+          Material(
+            color: customOrange,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: () => _showOptionsModal(context, isBuyNow: false),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 65,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.add_shopping_cart,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "Cart",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: const Text(
-              'Beli Sekarang',
-              style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(width: 12), // Jarak ke tombol beli
+          // 3. TOMBOL BELI SEKARANG (BIRU / TEMA UTAMA)
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _showOptionsModal(context, isBuyNow: true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary, // <-- TETAP BIRU
+                foregroundColor: theme.colorScheme.onPrimary, // Teks Putih
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                minimumSize: const Size.fromHeight(56),
+              ),
+              child: const Text(
+                'Beli Sekarang',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

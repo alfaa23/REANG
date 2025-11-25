@@ -17,7 +17,7 @@ class _GlikViewState extends State<GlikView> {
   bool _hasError = false;
   String _errorMessage = '';
 
-  final String _url = 'https://glik.jabarprov.go.id/index.php';
+  final String _url = 'https://kerjayu.indramayukab.go.id/';
 
   Timer? _loadTimeout;
   static const Duration _timeoutDuration = Duration(seconds: 30);
