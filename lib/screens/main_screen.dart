@@ -9,6 +9,7 @@ import 'package:reang_app/screens/layanan/dumas/form_laporan_screen.dart';
 import 'package:reang_app/screens/auth/login_screen.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:reang_app/services/api_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -19,18 +20,51 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  int _notifCount = 0; // [BARU] Untuk menyimpan jumlah notif
+  final ApiService _apiService = ApiService(); // [BARU]
 
-  final List<Widget> _pages = <Widget>[
+  late final List<Widget> _pages = <Widget>[
     const HomeScreen(),
     const UmkmScreen(),
-    const NotifikasiScreen(),
+
+    // [PERBAIKAN] Masukkan fungsi refresh ke sini
+    NotifikasiScreen(
+      onRefreshBadge: () {
+        _fetchNotificationBadge(); // Panggil fungsi update badge di MainScreen
+      },
+    ),
+
     const ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchNotificationBadge();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Future<void> _fetchNotificationBadge() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isLoggedIn && auth.token != null) {
+      try {
+        // [PERBAIKAN] Panggil API khusus count (Ringan!)
+        final count = await _apiService.getUnreadNotificationCount(auth.token!);
+
+        if (mounted) {
+          setState(() {
+            _notifCount = count;
+          });
+        }
+      } catch (_) {
+        // Silent fail
+      }
+    }
   }
 
   // PERUBAHAN: Menambahkan parameter 'selectedIcon'
@@ -39,6 +73,7 @@ class _MainScreenState extends State<MainScreen> {
     required IconData selectedIcon,
     required String label,
     required int index,
+    int badgeCount = 0, // [BARU] Parameter badge
   }) {
     final theme = Theme.of(context);
     final bool isSelected = _selectedIndex == index;
@@ -48,7 +83,20 @@ class _MainScreenState extends State<MainScreen> {
 
     return Expanded(
       child: InkWell(
-        onTap: () => _onItemTapped(index),
+        onTap: () async {
+          // [TAMBAHKAN ASYNC]
+          if (index == 2) {
+            // [LOGIKA BARU]
+            // Pindah halaman dulu
+            _onItemTapped(index);
+
+            // Setelah user selesai melihat notifikasi (misal pindah tab lain),
+            // kita refresh badge-nya nanti (di onTap tab lain).
+            // Atau biarkan halaman NotifikasiScreen yang mengurus status 'read'.
+          } else {
+            _onItemTapped(index);
+          }
+        },
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -56,8 +104,43 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // PERUBAHAN: Menggunakan ikon yang berbeda saat terpilih
-              Icon(isSelected ? selectedIcon : icon, color: color, size: 28),
+              // [MODIFIKASI ICON DENGAN STACK]
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isSelected ? selectedIcon : icon,
+                    color: color,
+                    size: 28,
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            badgeCount > 99 ? '99+' : badgeCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               Text(
                 label,
                 style: TextStyle(
@@ -111,6 +194,7 @@ class _MainScreenState extends State<MainScreen> {
                 selectedIcon: Icons.notifications,
                 label: 'Notifikasi',
                 index: 2,
+                badgeCount: _notifCount, // [BARU] Kirim variabel state tadi
               ),
               _buildBottomNavItem(
                 icon: Icons.person_outline,

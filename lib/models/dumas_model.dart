@@ -12,6 +12,7 @@ class DumasModel {
   final String? buktiLaporan;
   final String status;
   final String? tanggapan;
+  final String? fotoTanggapan;
   final DateTime createdAt;
   final int? userRating;
   final String? userComment;
@@ -26,6 +27,7 @@ class DumasModel {
     this.buktiLaporan,
     required this.status,
     this.tanggapan,
+    this.fotoTanggapan,
     required this.createdAt,
     this.userRating,
     this.userComment,
@@ -94,6 +96,7 @@ class DumasModel {
       buktiLaporan: json['bukti_laporan'],
       status: (json['status'] as String?)?.capitalize() ?? 'Menunggu',
       tanggapan: json['tanggapan'],
+      fotoTanggapan: json['foto_tanggapan_url'],
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       userRating: json['user_rating'],
       userComment: json['user_comment'],

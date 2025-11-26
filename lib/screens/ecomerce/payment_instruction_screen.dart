@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:intl/intl.dart';
-import 'package:reang_app/screens/ecomerce/proses_order_screen.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:gal/gal.dart';
 import 'package:dio/dio.dart';
 import 'dart:typed_data';
-
+import 'package:reang_app/screens/ecomerce/proses_order_screen.dart';
 // --- [IMPOR BARU] ---
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -114,17 +113,28 @@ class PaymentInstructionScreen extends StatelessWidget {
               ),
             ),
             onPressed: () {
-              // (Logika ini tetap sama seperti permintaan Anda sebelumnya)
-              // Mengganti layar saat ini dengan ProsesOrderScreen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProsesOrderScreen(),
-                ),
-              );
+              // LOGIKA PINTAR:
+
+              // KASUS A: Datang dari "Pesanan Saya" (Bayar ulang)
+              // Kita gunakan callback khusus untuk refresh halaman belakang
+              if (onCustomClose != null) {
+                onCustomClose!();
+              }
+              // KASUS B: Datang dari "Checkout" (Beli baru)
+              // Kita harus pindah paksa ke halaman Pesanan Saya
+              else {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProsesOrderScreen(),
+                  ),
+                  (route) =>
+                      route.isFirst, // Hapus stack checkout, sisakan Home
+                );
+              }
             },
             child: const Text(
-              'Selesai & Lihat Pesanan Saya', // (Teks ini tetap sama)
+              'Lihat  Pesanan Saya',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),

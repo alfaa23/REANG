@@ -5,6 +5,7 @@ import 'package:reang_app/models/dumas_model.dart';
 import 'package:reang_app/providers/auth_provider.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:reang_app/screens/layanan/dumas/dumas_image_preview_screen.dart';
 
 class DetailLaporanScreen extends StatefulWidget {
   final int dumasId;
@@ -861,10 +862,11 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
       },
     ];
 
-    // Jika status ditolak -> khusus, tetap vertical
+    // --- BAGIAN 1: STATUS DITOLAK (Manual) ---
     if (currentStatus == 'ditolak') {
       return Column(
         children: [
+          // Kartu Menunggu (Pasti tidak ada foto/komen)
           _buildTimelineCard(
             theme,
             title: 'Menunggu',
@@ -875,6 +877,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
             time: timeago.format(data.createdAt, locale: 'id'),
           ),
           const SizedBox(height: 12),
+          // Kartu Ditolak (Pasti AKTIF, langsung pasang datanya)
           _buildTimelineCard(
             theme,
             title: 'Ditolak',
@@ -883,7 +886,8 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
             icon: Icons.block,
             active: true,
             time: timeago.format(data.createdAt, locale: 'id'),
-            comment: data.tanggapan,
+            comment: data.tanggapan, // Langsung ambil data (hapus isActive)
+            foto: data.fotoTanggapan, // Langsung ambil data (hapus isActive)
           ),
         ],
       );
@@ -900,11 +904,13 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
       );
     }
 
-    // Build vertical cards for each step up to current
+    // --- BAGIAN 2: STATUS NORMAL (Looping) ---
     final List<Widget> list = [];
     for (int i = 0; i <= currentStatusIndex; i++) {
       final step = timelineConfig[i];
+      // Definisi isActive ada di sini
       final bool isActive = i == currentStatusIndex;
+
       list.add(
         _buildTimelineCard(
           theme,
@@ -914,7 +920,9 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
           icon: step['icon'] as IconData,
           active: isActive,
           time: timeago.format(data.createdAt, locale: 'id'),
+          // Di sini BARU pakai isActive
           comment: isActive ? data.tanggapan : null,
+          foto: isActive ? data.fotoTanggapan : null,
         ),
       );
       if (i < currentStatusIndex) list.add(const SizedBox(height: 12));
@@ -933,6 +941,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
     required bool active,
     required String time,
     String? comment,
+    String? foto,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1002,6 +1011,7 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                 if (comment != null && comment.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceVariant,
@@ -1009,6 +1019,53 @@ class _DetailLaporanScreenState extends State<DetailLaporanScreen> {
                       border: Border.all(color: theme.dividerColor),
                     ),
                     child: Text(comment, style: theme.textTheme.bodyMedium),
+                  ),
+                ],
+
+                // --- 2. BLOK FOTO (Cek Foto Saja - TERPISAH) ---
+                // Ditaruh sejajar dengan blok komentar, bukan di dalamnya
+                if (foto != null && foto.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    // <--- 1. BUNGKUS DENGAN GESTURE DETECTOR
+                    onTap: () {
+                      // <--- 2. LOGIKA PINDAH HALAMAN
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DumasImagePreviewScreen(
+                            imageUrl: foto,
+                            caption:
+                                comment, // Kirim teks tanggapan juga biar muncul dibawah
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: theme.dividerColor),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.network(
+                          foto,
+                          height: 150,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 150,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: Icon(Icons.broken_image),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ],

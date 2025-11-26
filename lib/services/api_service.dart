@@ -35,6 +35,7 @@ import 'package:reang_app/models/detail_transaksi_response.dart';
 import 'package:reang_app/models/produk_varian_model.dart';
 import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/models/toko_model.dart';
+import 'package:reang_app/models/notification_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -44,7 +45,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://d74886337b9f.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://02e421a469bc.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -2917,6 +2918,85 @@ class ApiService {
       // Ambil pesan error dari Laravel (misal: "Kami tidak dapat menemukan pengguna dengan alamat email tersebut.")
       final msg = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan.';
       throw Exception(msg);
+    }
+  }
+
+  // =======================================================================
+  // ambil daftar notifikasi
+  // =======================================================================
+  Future<List<NotificationModel>> fetchNotifications(String token) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/notifications',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        // Pastikan key 'data' ada dan berupa List
+        if (response.data['data'] != null && response.data['data'] is List) {
+          final List data = response.data['data'];
+          return data.map((json) => NotificationModel.fromJson(json)).toList();
+        }
+      }
+      return []; // Kembalikan list kosong jika status bukan 200 atau format salah
+    } catch (e) {
+      debugPrint("API Error Notif: $e");
+      return []; // Kembalikan list kosong jika error koneksi (jangan throw)
+    }
+  }
+
+  // 2. Tandai Satu Dibaca (Saat diklik)
+  Future<void> markNotificationRead(String token, int id) async {
+    try {
+      await _dio.post(
+        '$_baseUrlBackend/notifications/read/$id',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } catch (e) {
+      // Silent error
+    }
+  }
+
+  // 3. Tandai Semua Dibaca
+  Future<bool> markAllNotificationsRead(String token) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/notifications/read-all',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // [FUNGSI BARU] Ambil jumlah notifikasi belum dibaca
+  Future<int> getUnreadNotificationCount(String token) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/notifications/unread-count',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data['count'] ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      return 0; // Jika error, anggap 0 agar tidak crash
+    }
+  }
+
+  // [BARU] Hapus Semua Notifikasi
+  Future<bool> deleteAllNotifications(String token) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrlBackend/notifications/delete-all',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 }

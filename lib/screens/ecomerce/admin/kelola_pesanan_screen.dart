@@ -374,7 +374,7 @@ class _OrderListTabState extends State<OrderListTab>
     // 3. Kosong
     if (_items.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _handleRefresh,
+        onRefresh: _handleRefresh, // Gunakan _handleRefresh
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
@@ -402,12 +402,17 @@ class _OrderListTabState extends State<OrderListTab>
 
     // 4. List Data (Infinite Scroll)
     return RefreshIndicator(
-      onRefresh: _handleRefresh,
+      onRefresh: _handleRefresh, // Gunakan _handleRefresh
       child: ListView.builder(
-        controller: _scrollController, // Controller Penting
-        padding: const EdgeInsets.all(16),
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+
+        // [PERBAIKAN: Hapus padding ganda]
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+
         // Tambah 1 item di bawah untuk indikator loading bawah
         itemCount: _items.length + 1,
+
         itemBuilder: (ctx, index) {
           // Jika di paling bawah
           if (index == _items.length) {
@@ -428,7 +433,7 @@ class _OrderListTabState extends State<OrderListTab>
           }
 
           return _PesananAdminCard(
-            pesanan: _items[index],
+            pesanan: _items[index], // Gunakan _items
             onActionSuccess: _handleRefresh, // Refresh list setelah aksi
           );
         },
@@ -484,10 +489,13 @@ class _PesananAdminCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => DetailPesananAdminScreen(
           noTransaksi: pesanan.noTransaksi,
-          onActionSuccess: onActionSuccess,
+          onActionSuccess: onActionSuccess, // Teruskan callback ke detail
         ),
       ),
-    );
+    ).then((_) {
+      // [PENTING] Panggil refresh saat kembali, siapa tahu data berubah di detail
+      onActionSuccess();
+    });
   }
 
   void _showSelesaiDialog(BuildContext context) {
