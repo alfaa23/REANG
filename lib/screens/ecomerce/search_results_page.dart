@@ -196,7 +196,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       'image': fotoUrl,
       'title': produk.nama,
       'subtitle': produk.deskripsi ?? produk.nama,
-      'rating': 4.5,
+      'rating': produk.rating == 0 ? 'Baru' : produk.rating.toStringAsFixed(1),
       'sold_text': '$totalStok Stok',
       'price_final': priceDisplay,
       'location': produk.lokasi ?? 'Indramayu',

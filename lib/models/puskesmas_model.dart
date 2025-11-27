@@ -8,6 +8,9 @@ class PuskesmasModel {
   final int? adminId; // Dibuat nullable, karena data Anda ada yg null
   final int dokterTersedia;
   List<DokterModel>? dokter; // Opsional, jika Anda ingin menampilkannya
+  final double? latitude;
+  final double? longitude;
+  double? distanceKm;
 
   PuskesmasModel({
     required this.id,
@@ -17,6 +20,9 @@ class PuskesmasModel {
     this.adminId,
     required this.dokterTersedia,
     this.dokter,
+    this.latitude,
+    this.longitude,
+    this.distanceKm,
   });
   Map<String, dynamic> toJson() {
     return {
@@ -44,6 +50,8 @@ class PuskesmasModel {
       jam: json['jam'] ?? '',
       adminId: _safeParseInt(json['admin_id']),
       dokterTersedia: _safeParseInt(json['dokter_tersedia']) ?? 0,
+      latitude: double.tryParse(json['latitude'].toString()),
+      longitude: double.tryParse(json['longitude'].toString()),
       // Jika API Anda menyertakan data dokter, Anda bisa parsing di sini
       // dokter: (json['dokter'] as List<dynamic>?)
       //     ?.map((d) => DokterModel.fromJson(d))

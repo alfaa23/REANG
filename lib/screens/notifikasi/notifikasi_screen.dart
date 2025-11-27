@@ -7,6 +7,7 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/ecomerce/detail_order_screen.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/layanan/dumas/detail_laporan_screen.dart';
+import 'package:reang_app/screens/layanan/renbang/detail_usulan_screen.dart';
 
 class NotifikasiScreen extends StatefulWidget {
   // [BARU] Tambahkan variable ini
@@ -141,14 +142,15 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   void _onTapNotification(NotificationModel notif) async {
     final auth = context.read<AuthProvider>();
 
-    // 1. Panggil API Read (di background)
+    // 1. TANDAI DIBACA (API & UI)
     if (!notif.alreadyRead && auth.token != null) {
+      // Panggil API di background
       _apiService.markNotificationRead(auth.token!, notif.id);
+      // Refresh badge di menu utama
       widget.onRefreshBadge?.call();
 
-      // Update UI lokal biar langsung berubah jadi putih (read)
+      // Update tampilan list secara lokal (biar cepat jadi putih)
       setState(() {
-        // Cari index dan update isRead
         int index = _notifikasiList.indexWhere((n) => n.id == notif.id);
         if (index != -1) {
           _notifikasiList[index] = NotificationModel(
@@ -158,41 +160,85 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
             type: notif.type,
             dataId: notif.dataId,
             createdAt: notif.createdAt,
-            isRead: 1, // Update jadi 1
+            isRead: 1, // Paksa jadi 1
           );
         }
       });
     }
 
-    // 2. Navigasi sesuai Tipe
-    if (notif.type == 'transaksi' && notif.dataId != null) {
-      // Buka Detail Pesanan
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DetailOrderScreen(noTransaksi: notif.dataId!),
-        ),
-      );
-    }
-    // --- [TAMBAHAN BARU MULAI SINI] ---
-    else if (notif.type == 'dumas' && notif.dataId != null) {
-      // Buka Detail Laporan Dumas
-      // Kita parsing dataId (string) ke int karena detail screen butuh int
-      int? idLaporan = int.tryParse(notif.dataId.toString());
-
-      if (idLaporan != null) {
+    // 2. NAVIGASI SESUAI TIPE
+    if (notif.dataId != null) {
+      // --- A. TIPE TRANSAKSI ---
+      if (notif.type == 'transaksi') {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DetailLaporanScreen(
-              dumasId: idLaporan,
-              isMyReport: true, // Set true karena ini notif personal
-            ),
+            builder: (context) => DetailOrderScreen(noTransaksi: notif.dataId!),
           ),
         );
       }
+      // --- B. TIPE DUMAS ---
+      else if (notif.type == 'dumas') {
+        // Parsing ID ke integer
+        int? idLaporan = int.tryParse(notif.dataId.toString());
+
+        if (idLaporan != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetailLaporanScreen(
+                dumasId: idLaporan,
+                isMyReport: true, // Tandai sebagai laporan milik user
+              ),
+            ),
+          );
+        }
+      }
+      // --- C. TIPE RENBANG ---
+      else if (notif.type == 'renbang') {
+        // 1. Tampilkan Loading
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator()),
+        );
+
+        try {
+          int? idUsulan = int.tryParse(notif.dataId.toString());
+
+          if (idUsulan != null && auth.token != null) {
+            // 2. Ambil Data Lengkap dari API
+            final usulanData = await _apiService.fetchRenbangDetailById(
+              idUsulan,
+              auth.token!,
+            );
+
+            // 3. Tutup Loading
+            if (mounted) Navigator.pop(context);
+
+            if (usulanData != null) {
+              // 4. Buka Layar Detail
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      DetailUsulanScreen(usulanData: usulanData),
+                ),
+              );
+            } else {
+              _showToast('Data usulan tidak ditemukan', isError: true);
+            }
+          } else {
+            if (mounted)
+              Navigator.pop(context); // Tutup loading jika ID/Token null
+          }
+        } catch (e) {
+          if (mounted)
+            Navigator.pop(context); // Tutup loading jika error koneksi
+          _showToast('Gagal memuat data: $e', isError: true);
+        }
+      }
     }
-    // Tambahkan 'else if' untuk tipe lain (dumas, renbang) nanti
   }
 
   // Helper Toast dengan Style Biasa Anda (Hijau/Merah + Animasi)

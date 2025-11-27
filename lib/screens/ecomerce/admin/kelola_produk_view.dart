@@ -253,27 +253,6 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
   // UI COMPONENTS (Tidak berubah)
   // ===========================================================
 
-  Widget _buildStatItem(ThemeData theme, String value, String label) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionButton({
     required String text,
     required IconData icon,
@@ -376,6 +355,47 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
           ),
         ),
       ),
+    );
+  }
+
+  // Helper baru agar tampilan Rapi, Lurus, dan Mendukung Icon
+  Widget _buildUnifiedStat(
+    ThemeData theme, {
+    required String label,
+    required String value,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+                fontSize: 14, // Ukuran font konsisten
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.hintColor,
+            fontSize: 11,
+          ),
+        ),
+      ],
     );
   }
 
@@ -507,24 +527,72 @@ class _KelolaProdukViewState extends State<KelolaProdukView>
                             horizontal: 16,
                             vertical: 12,
                           ),
-                          child: Row(
-                            children: [
-                              _buildStatItem(
-                                theme,
-                                _getPriceRange(produk.varians),
-                                "Harga",
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: IntrinsicHeight(
+                              // Agar garis pemisah tingginya pas
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // 1. HARGA
+                                  _buildUnifiedStat(
+                                    theme,
+                                    label: "Harga",
+                                    value: _getPriceRange(produk.varians),
+                                  ),
+
+                                  // Garis Pemisah Tipis
+                                  VerticalDivider(
+                                    width: 24, // Jarak total (kiri+kanan)
+                                    thickness: 1,
+                                    color: theme.dividerColor.withOpacity(0.5),
+                                    indent: 4,
+                                    endIndent: 4,
+                                  ),
+
+                                  // 2. STOK
+                                  _buildUnifiedStat(
+                                    theme,
+                                    label: "Stok",
+                                    value: _getTotalStok(produk.varians),
+                                  ),
+
+                                  VerticalDivider(
+                                    width: 24,
+                                    thickness: 1,
+                                    color: theme.dividerColor.withOpacity(0.5),
+                                    indent: 4,
+                                    endIndent: 4,
+                                  ),
+
+                                  // 3. TERJUAL
+                                  _buildUnifiedStat(
+                                    theme,
+                                    label: "Terjual",
+                                    value: produk.terjual.toString(),
+                                  ),
+
+                                  VerticalDivider(
+                                    width: 24,
+                                    thickness: 1,
+                                    color: theme.dividerColor.withOpacity(0.5),
+                                    indent: 4,
+                                    endIndent: 4,
+                                  ),
+
+                                  // 4. RATING (Ada Icon Bintang)
+                                  _buildUnifiedStat(
+                                    theme,
+                                    label: "Rating",
+                                    value: produk.rating == 0
+                                        ? "Baru"
+                                        : produk.rating.toStringAsFixed(1),
+                                    icon: Icons.star_rounded,
+                                    iconColor: Colors.amber,
+                                  ),
+                                ],
                               ),
-                              _buildStatItem(
-                                theme,
-                                _getTotalStok(produk.varians),
-                                "Total Stok",
-                              ),
-                              _buildStatItem(
-                                theme,
-                                produk.terjual.toString(),
-                                "Terjual",
-                              ),
-                            ],
+                            ),
                           ),
                         ),
 

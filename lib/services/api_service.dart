@@ -36,6 +36,7 @@ import 'package:reang_app/models/produk_varian_model.dart';
 import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/models/toko_model.dart';
 import 'package:reang_app/models/notification_model.dart';
+import 'package:reang_app/models/ulasan_produk_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -45,7 +46,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://02e421a469bc.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://c2fbc1e272fe.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -708,6 +709,27 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil kategori: $e');
+    }
+  }
+
+  // [TAMBAHAN] Ambil Detail Renbang by ID (Untuk Notifikasi)
+  Future<RenbangModel?> fetchRenbangDetailById(int id, String token) async {
+    try {
+      // Sesuaikan URL dengan route api.php Anda
+      final response = await _dio.get(
+        '$_baseUrlBackend/renbang/show/$id',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        // Sesuaikan parsing dengan format JSON backend
+        // Backend return: { "id":..., "judul":... } langsung atau di dalam data?
+        // Berdasarkan controller: return response()->json($formattedData, 200); (Langsung object)
+        return RenbangModel.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -2997,6 +3019,87 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  // =======================================================================
+  // kirim ulasan produk
+  // =======================================================================
+  Future<bool> kirimUlasan({
+    required String token,
+    required int idProduk,
+    required String noTransaksi,
+    required int rating,
+    String? komentar,
+    XFile? foto,
+  }) async {
+    try {
+      FormData formData = FormData.fromMap({
+        'id_produk': idProduk,
+        'no_transaksi': noTransaksi,
+        'rating': rating,
+        'komentar': komentar ?? '',
+      });
+
+      if (foto != null) {
+        formData.files.add(
+          MapEntry(
+            'foto',
+            await MultipartFile.fromFile(foto.path, filename: foto.name),
+          ),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/ulasan/store',
+        data: formData,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Gagal mengirim ulasan');
+    }
+  }
+
+  // Ambil Ulasan User per Transaksi
+  Future<Map<String, dynamic>?> fetchUlasanSaya({
+    required String token,
+    required String noTransaksi,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/ulasan/cek/$noTransaksi',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 && response.data['data'] != null) {
+        return response.data['data'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // [TAMBAHKAN INI] Ambil Ulasan Produk
+  Future<Map<String, dynamic>> getUlasanProduk({
+    required int idProduk,
+    int page = 1,
+  }) async {
+    try {
+      // Endpoint ini Public (tidak butuh token auth)
+      final response = await _dio.get(
+        '$_baseUrlBackend/ulasan/$idProduk?page=$page',
+      );
+
+      if (response.statusCode == 200) {
+        return response
+            .data; // Mengembalikan object pagination lengkap (data, total, dll)
+      }
+      return {};
+    } catch (e) {
+      return {};
     }
   }
 }

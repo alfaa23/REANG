@@ -12,6 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
 import 'package:reang_app/models/toko_model.dart';
 import 'package:reang_app/screens/auth/login_screen.dart';
+import 'package:reang_app/models/ulasan_produk_model.dart';
+import 'lihat_semua_ulasan_screen.dart';
 
 class DetailProdukScreen extends StatefulWidget {
   // [PERBAIKAN] Terima ProdukModel, bukan Map
@@ -26,6 +28,10 @@ class DetailProdukScreen extends StatefulWidget {
 class _DetailProdukScreenState extends State<DetailProdukScreen> {
   final ApiService _apiService = ApiService();
   final PageController _pageController = PageController();
+  // Di dalam _DetailProdukScreenState:
+  List<UlasanModel> _topReviews = []; // Cuma simpan 2
+  int _totalReviews = 0;
+  double _averageRating = 0.0;
 
   // [PERBAIKAN] List ini akan menampung GABUNGAN foto utama + galeri
   List<String> _productImages = [];
@@ -59,6 +65,39 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
     super.initState();
     _setupProductImages(); // <-- [PERBAIKAN DI SINI]
     _fetchSimilarProducts();
+    _fetchReviewsPreview();
+  }
+
+  // [FUNGSI BARU] Ambil data ulasan sekilas
+  void _fetchReviewsPreview() async {
+    try {
+      final response = await _apiService.getUlasanProduk(
+        idProduk: widget.product.id,
+        page: 1,
+      );
+
+      // Cek apakah data ulasan ada (response pagination laravel biasanya ada key 'data')
+      if (response['data'] != null) {
+        List data = response['data'];
+        setState(() {
+          // Ambil total
+          _totalReviews = response['total_reviews'] ?? response['total'] ?? 0;
+
+          // [PERBAIKAN] Ambil Rata-rata Rating dari API
+          // Gunakan tryParse agar aman jika null atau string
+          _averageRating =
+              double.tryParse(response['average_rating'].toString()) ?? 0.0;
+
+          // Ambil 2 ulasan teratas
+          _topReviews = data
+              .take(2)
+              .map((e) => UlasanModel.fromJson(e))
+              .toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Gagal load ulasan: $e");
+    }
   }
 
   @override
@@ -317,7 +356,8 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                       Icon(Icons.star, color: Colors.amber.shade700, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        '4.5 (Stok: ${data.stok})', // Menggunakan getter stok total
+                        // [PERBAIKAN] Tampilkan Rating Asli & Jumlah Ulasan
+                        '${data.rating == 0 ? "Baru" : data.rating.toStringAsFixed(1)} \u2022 ${data.jumlahUlasan} Ulasan \u2022 Stok: ${data.stok}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.hintColor,
                         ),
@@ -343,6 +383,117 @@ class _DetailProdukScreenState extends State<DetailProdukScreen> {
                 data.deskripsi ?? 'Deskripsi produk tidak tersedia.',
               ),
             ),
+
+            Divider(color: theme.dividerColor, thickness: 1),
+
+            // [BAGIAN BARU: ULASAN PEMBELI]
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 16.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. HEADER (Judul & Lihat Semua)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Penilaian Produk", // Ganti jadi Penilaian Produk biar mirip Shopee
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      // Tombol Lihat Semua hanya muncul jika ada ulasan
+                      if (_topReviews.isNotEmpty)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => LihatSemuaUlasanScreen(
+                                  idProduk: widget.product.id,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            "Lihat Semua",
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 2. LOGIKA ISI (KOSONG VS ADA)
+                  if (_topReviews.isEmpty) ...[
+                    // --- TAMPILAN KOSONG ---
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star_border_rounded,
+                          color: Colors.grey.shade400,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Belum ada penilaian",
+                          style: TextStyle(
+                            color: theme.hintColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    // --- TAMPILAN ADA DATA (Code Lama Anda) ---
+                    // Rating Summary
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 20),
+                        const SizedBox(width: 4),
+                        Text(
+                          _averageRating == 0
+                              ? "0.0"
+                              : _averageRating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "$_totalReviews ulasan",
+                          style: TextStyle(
+                            color: theme.hintColor,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // List 2 Ulasan Teratas
+                    ..._topReviews.map(
+                      (ulasan) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: UlasanItemCard(ulasan: ulasan),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
             Divider(color: theme.dividerColor, thickness: 8),
             Padding(
               padding: const EdgeInsets.only(

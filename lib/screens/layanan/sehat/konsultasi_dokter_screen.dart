@@ -9,6 +9,8 @@ import 'package:reang_app/screens/auth/login_screen.dart';
 import 'package:reang_app/screens/layanan/sehat/chat_screen.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:flutter_styled_toast/flutter_styled_toast.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart' as loc; // Untuk paksa nyalakan GPS
 
 // --- Debouncer (untuk pencarian) ---
 class Debouncer {
@@ -89,6 +91,7 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
         _puskesmasList = res['data'];
         _hasNextPage = res['last_page'] > _page;
       });
+      _calculateDistanceAndSort();
     } catch (err) {
       String friendlyMessage = 'Terjadi kesalahan.';
       if (err is DioException &&
@@ -229,6 +232,72 @@ class _KonsultasiDokterScreenState extends State<KonsultasiDokterScreen> {
           builder: (context) => ChatScreen(recipient: puskesmas),
         ),
       );
+    }
+  }
+  // --- LOGIKA HITUNG JARAK & SORTING ---
+
+  // 1. Fungsi untuk mendapatkan lokasi user (Mirip FormLaporanScreen)
+  Future<Position?> _getUserLocation() async {
+    try {
+      final loc.Location locationService = loc.Location();
+      bool serviceEnabled = await locationService.serviceEnabled();
+
+      // Paksa nyalakan GPS
+      if (!serviceEnabled) {
+        serviceEnabled = await locationService.requestService();
+        if (!serviceEnabled) return null;
+      }
+
+      // Cek Izin
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
+      }
+      if (permission == LocationPermission.deniedForever) return null;
+
+      // Ambil Posisi
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high, // Akurasi tinggi
+      );
+    } catch (e) {
+      debugPrint("Gagal ambil lokasi: $e");
+      return null;
+    }
+  }
+
+  // 2. Fungsi hitung jarak dan urutkan list
+  Future<void> _calculateDistanceAndSort() async {
+    // Ambil lokasi user
+    Position? userPos = await _getUserLocation();
+
+    if (userPos != null) {
+      setState(() {
+        // Loop setiap puskesmas untuk hitung jaraknya
+        for (var item in _puskesmasList) {
+          if (item.latitude != null && item.longitude != null) {
+            // Hitung jarak (dalam Meter)
+            double distanceInMeters = Geolocator.distanceBetween(
+              userPos.latitude,
+              userPos.longitude,
+              item.latitude!,
+              item.longitude!,
+            );
+
+            // Konversi ke KM dan simpan ke model
+            item.distanceKm = distanceInMeters / 1000;
+          }
+        }
+
+        // URUTKAN (Sorting) dari yang terkecil (terdekat)
+        _puskesmasList.sort((a, b) {
+          // Kalau data jarak kosong, taruh di paling bawah
+          if (a.distanceKm == null) return 1;
+          if (b.distanceKm == null) return -1;
+
+          return a.distanceKm!.compareTo(b.distanceKm!);
+        });
+      });
     }
   }
 
@@ -452,12 +521,60 @@ class _PuskesmasCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      puskesmas.nama,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // --- BAGIAN INI YANG DIUBAH (NAMA & JARAK) ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment
+                          .start, // Biar rapi kalau namanya panjang
+                      children: [
+                        // 1. Nama Puskesmas (Pakai Expanded biar kalau panjang dia turun ke bawah)
+                        Expanded(
+                          child: Text(
+                            puskesmas.nama,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
+                        // 2. Badge Jarak (Hanya muncul jika distanceKm ada isinya)
+                        if (puskesmas.distanceKm != null)
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(
+                                0.1,
+                              ), // Background hijau muda
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 12,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  // Tampilkan 1 angka desimal (contoh: 2.5 km)
+                                  '${puskesmas.distanceKm!.toStringAsFixed(1)} km',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
+
+                    // ---------------------------------------------
                     const SizedBox(height: 4),
                     Text(
                       puskesmas.alamat,
@@ -472,12 +589,6 @@ class _PuskesmasCard extends StatelessWidget {
                       theme,
                       Icons.access_time_outlined,
                       'Buka: ${puskesmas.jam}',
-                    ),
-                    const SizedBox(height: 4),
-                    _buildInfoRow(
-                      theme,
-                      Icons.person_outline,
-                      '${puskesmas.dokterTersedia} Dokter tersedia',
                     ),
                   ],
                 ),

@@ -299,7 +299,7 @@ class _UmkmScreenState extends State<UmkmScreen>
       'image': fotoUrl,
       'title': produk.nama,
       'subtitle': produk.deskripsi ?? produk.nama,
-      'rating': 4.5,
+      'rating': produk.rating == 0 ? 'Baru' : produk.rating.toStringAsFixed(1),
       'sold_text': '$totalStok Stok', // [PERBAIKAN] Tampilkan total stok
       'price_final':
           priceDisplay, // [PERBAIKAN] Tampilkan harga terendah/rentang
@@ -333,12 +333,12 @@ class _UmkmScreenState extends State<UmkmScreen>
   }
 
   void _navigateToOrderProcess() {
-    // [DIPERBARUI] Tambahkan .then() untuk me-refresh notif saat kembali
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
     ).then((_) {
-      _fetchUnpaidCount();
+      // [PERBAIKAN] Kode ini jalan saat user menekan Back dari halaman pesanan
+      _fetchUnpaidCount(); // Refresh Badge Notifikasi
     });
   }
 

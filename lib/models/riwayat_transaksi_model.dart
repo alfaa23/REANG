@@ -31,6 +31,7 @@ class RiwayatTransaksiModel {
   final String? namaProdukUtama;
   final String? buktiPembayaran;
   final String? nomorResi;
+  final bool isReviewed; // [BARU]
 
   RiwayatTransaksiModel({
     required this.id,
@@ -57,6 +58,7 @@ class RiwayatTransaksiModel {
     this.buktiPembayaran,
     this.nomorResi,
     this.noHpToko,
+    this.isReviewed = false,
   });
 
   factory RiwayatTransaksiModel.fromJson(Map<String, dynamic> json) {
@@ -99,6 +101,7 @@ class RiwayatTransaksiModel {
       buktiPembayaran: json['bukti_pembayaran'] as String?,
       nomorResi: json['nomor_resi'] as String?,
       noHpToko: json['no_hp_toko'] as String?,
+      isReviewed: (json['is_reviewed'] == 1 || json['is_reviewed'] == true),
     );
   }
 

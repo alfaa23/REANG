@@ -9,6 +9,7 @@ import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import 'package:reang_app/screens/ecomerce/detail_order_screen.dart';
 import 'package:reang_app/screens/ecomerce/chat_umkm_screen.dart';
 import 'package:reang_app/models/toko_model.dart';
+import 'package:reang_app/screens/ecomerce/add_review_screen.dart';
 
 // =============================================================================
 // PARENT WIDGET (Hanya mengurus Tab, Badge, dan PageView)
@@ -353,6 +354,7 @@ class _UserOrderListTabState extends State<UserOrderListTab>
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: _items.length + 1, // +1 untuk loading bawah
@@ -520,8 +522,60 @@ class OrderCard extends StatelessWidget {
     );
   }
 
-  void _goToReview(BuildContext context) {
-    _showToast(context, 'TODO: Buka halaman Beri Ulasan');
+  void _goToReview(BuildContext context) async {
+    final api = ApiService();
+    final auth = context.read<AuthProvider>();
+
+    try {
+      showDialog(
+        context: context,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // 1. Ambil Detail Transaksi (untuk tau produknya apa)
+      final detail = await api.fetchDetailTransaksi(
+        token: auth.token!,
+        noTransaksi: order.noTransaksi,
+      );
+
+      // 2. [BARU] Cek apakah sudah ada ulasan sebelumnya?
+      Map<String, dynamic>? ulasanLama;
+      if (order.isReviewed) {
+        ulasanLama = await api.fetchUlasanSaya(
+          token: auth.token!,
+          noTransaksi: order.noTransaksi,
+        );
+      }
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // Tutup loading
+
+      final itemToReview = detail.items.first;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddReviewScreen(
+            idProduk: itemToReview.idProduk,
+            namaProduk: itemToReview.namaProduk,
+            fotoProduk: itemToReview.foto,
+            noTransaksi: order.noTransaksi,
+
+            // [BARU] Kirim data lama (jika ada)
+            initialRating: ulasanLama?['rating'],
+            initialComment: ulasanLama?['komentar'],
+            initialPhotoUrl: ulasanLama?['foto'],
+          ),
+        ),
+      ).then((result) {
+        if (result == true) {
+          onPaymentSuccess();
+        }
+      });
+    } catch (e) {
+      Navigator.pop(context);
+      _showToast(context, "Gagal memuat data", isError: true);
+    }
   }
 
   void _goToChat(BuildContext context) async {
@@ -603,8 +657,15 @@ class OrderCard extends StatelessWidget {
     Color? secondaryTextColor;
 
     if (tabKategori == 'Selesai') {
-      secondaryAction = () => _goToReview(context);
-      secondaryText = 'Beri Ulasan';
+      // [PERBAIKAN] Cek apakah sudah diulas?
+      if (order.isReviewed) {
+        secondaryText = 'Edit Ulasan';
+        // Nanti di _goToReview kita perlu kirim tanda kalau ini edit
+        secondaryAction = () => _goToReview(context);
+      } else {
+        secondaryText = 'Beri Ulasan';
+        secondaryAction = () => _goToReview(context);
+      }
     } else if (tabKategori == 'Dikirim') {
       secondaryAction = () => _konfirmasiSelesai(context);
       secondaryText = 'Pesanan Diterima';

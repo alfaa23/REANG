@@ -50,6 +50,8 @@ class ProdukModel {
   final List<ProdukVarianModel> varians;
   final List<GaleriFotoModel> galeriFoto; // <-- [BARU] Menampung galeri
   final int terjual;
+  final double rating; // [BARU]
+  final int jumlahUlasan; // [BARU]
 
   ProdukModel({
     required this.id,
@@ -64,6 +66,8 @@ class ProdukModel {
     this.varians = const [],
     this.galeriFoto = const [], // <-- [BARU]
     this.terjual = 0,
+    this.rating = 0.0, // Default 0.0
+    this.jumlahUlasan = 0, // Default 0
   });
 
   // --- [Getter "Palsu" untuk UI Lama] ---
@@ -129,6 +133,14 @@ class ProdukModel {
       galeriFoto: parsedGaleri, // <-- [BARU]
       terjual: json['terjual'] != null
           ? (int.tryParse(json['terjual'].toString()) ?? 0)
+          : 0,
+      // [BARU] Ambil dari API
+      rating: json['rating_rata_rata'] != null
+          ? (double.tryParse(json['rating_rata_rata'].toString()) ?? 0.0)
+          : 0.0,
+
+      jumlahUlasan: json['jumlah_ulasan'] != null
+          ? (int.tryParse(json['jumlah_ulasan'].toString()) ?? 0)
           : 0,
     );
   }
