@@ -1,31 +1,119 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:reang_app/models/admin_analitik_model.dart';
+import 'package:reang_app/providers/auth_provider.dart';
+import 'package:reang_app/services/api_service.dart';
 
 /// ============================================================================
-///  UMKM ANALYTICS DASHBOARD (CONTENT ONLY)
-///  - Tidak menggunakan Scaffold, karena akan ditempatkan di halaman admin
-///  - Semua warna menggunakan ThemeData → mendukung dark/light mode
+///  UMKM ANALYTICS DASHBOARD (INTEGRATED API)
 /// ============================================================================
-class UMKMAnalyticsDashboardContent extends StatelessWidget {
+class UMKMAnalyticsDashboardContent extends StatefulWidget {
   const UMKMAnalyticsDashboardContent({super.key});
 
   @override
+  State<UMKMAnalyticsDashboardContent> createState() =>
+      _UMKMAnalyticsDashboardContentState();
+}
+
+class _UMKMAnalyticsDashboardContentState
+    extends State<UMKMAnalyticsDashboardContent>
+    with AutomaticKeepAliveClientMixin {
+  // Agar data tidak hilang saat geser tab
+  @override
+  bool get wantKeepAlive => true;
+
+  late Future<AdminAnalitikModel> _analitikFuture;
+  final ApiService _apiService = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isLoggedIn && auth.user?.idToko != null) {
+      _analitikFuture = _apiService.fetchAnalitik(
+        token: auth.token!,
+        idToko: auth.user!.idToko!,
+      );
+    } else {
+      _analitikFuture = Future.error("Data toko tidak ditemukan");
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loadData();
+    });
+    await _analitikFuture;
+  }
+
+  String _formatCurrency(int value) {
+    return NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    ).format(value);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Wajib untuk KeepAlive
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(theme),
-          const SizedBox(height: 24),
+    return FutureBuilder<AdminAnalitikModel>(
+      future: _analitikFuture,
+      builder: (context, snapshot) {
+        // 1. Loading State
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          _buildAnalyticSection(theme),
-          const SizedBox(height: 24),
+        // 2. Error State
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 60,
+                  color: theme.colorScheme.error,
+                ),
+                const SizedBox(height: 16),
+                Text("Gagal memuat data", style: theme.textTheme.titleMedium),
+                TextButton(onPressed: _refresh, child: const Text("Coba Lagi")),
+              ],
+            ),
+          );
+        }
 
-          _buildWeeklySalesChart(theme),
-        ],
-      ),
+        // 3. Success State
+        final data = snapshot.data!;
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(theme),
+                const SizedBox(height: 24),
+
+                _buildAnalyticSection(theme, data),
+                const SizedBox(height: 24),
+
+                _buildWeeklySalesChart(theme, data.grafik),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -42,15 +130,15 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  //  BAGIAN 2: KARTU ANALITIK (Seragam)
+  //  BAGIAN 2: KARTU ANALITIK (DATA DARI API)
   // ---------------------------------------------------------------------------
-  Widget _buildAnalyticSection(ThemeData theme) {
+  Widget _buildAnalyticSection(ThemeData theme, AdminAnalitikModel data) {
     return Column(
       children: [
         _buildAnalyticCard(
           theme: theme,
           title: 'Total Penjualan',
-          value: 'Rp 1.250.000',
+          value: _formatCurrency(data.totalPenjualan), // Data API
           icon: Icons.attach_money,
           iconColor: const Color(0xFF32CD32),
         ),
@@ -59,7 +147,7 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
         _buildAnalyticCard(
           theme: theme,
           title: 'Total Pesanan',
-          value: '156',
+          value: '${data.totalPesanan}', // Data API
           icon: Icons.shopping_bag_outlined,
           iconColor: const Color(0xFF42A5F5),
         ),
@@ -68,16 +156,17 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
         _buildAnalyticCard(
           theme: theme,
           title: 'Total Produk',
-          value: '23',
+          value: '${data.totalProduk}', // Data API
           icon: Icons.inventory_2_outlined,
           iconColor: const Color(0xFFFFB74D),
         ),
         const SizedBox(height: 18),
 
+        // (Data ini belum ada di backend, biarkan statis atau hitung manual nanti)
         _buildAnalyticCard(
           theme: theme,
           title: 'Pertumbuhan Bulanan',
-          value: '+15.2%',
+          value: '+0%', // Placeholder aman
           icon: Icons.trending_up,
           iconColor: Colors.green,
         ),
@@ -145,9 +234,18 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  //  BAGIAN 3: GRAFIK PENJUALAN MINGGUAN
+  //  BAGIAN 3: GRAFIK PENJUALAN MINGGUAN (DINAMIS)
   // ---------------------------------------------------------------------------
-  Widget _buildWeeklySalesChart(ThemeData theme) {
+  Widget _buildWeeklySalesChart(ThemeData theme, List<GrafikModel> grafikData) {
+    // 1. Cari nilai tertinggi untuk menentukan skala grafik (Normalisasi)
+    // Agar batang tertinggi selalu penuh, dan yang lain menyesuaikan
+    int maxVal = 0;
+    for (var item in grafikData) {
+      if (item.total > maxVal) maxVal = item.total;
+    }
+    // Hindari pembagian dengan 0
+    if (maxVal == 0) maxVal = 1;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -178,15 +276,14 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBar(theme, 'Sen', 0.50),
-                _buildBar(theme, 'Sel', 0.75),
-                _buildBar(theme, 'Rab', 0.95),
-                _buildBar(theme, 'Kam', 0.45),
-                _buildBar(theme, 'Jum', 1.00),
-                _buildBar(theme, 'Sab', 0.60),
-                _buildBar(theme, 'Min', 0.70),
-              ],
+              children: grafikData.map((item) {
+                // Hitung faktor tinggi (0.0 s/d 1.0) berdasarkan maxVal
+                double factor = item.total / maxVal;
+                // Sedikit trick: kalau 0, kasih sedikit tinggi biar kelihatan base-nya
+                if (factor == 0) factor = 0.02;
+
+                return _buildBar(theme, item.hari, factor);
+              }).toList(),
             ),
           ),
         ],
@@ -199,13 +296,22 @@ class UMKMAnalyticsDashboardContent extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Container(
-          width: 30,
-          height: 180 * factor,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(6),
-          ),
+        // Bar dengan animasi
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: factor),
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Container(
+              width: 30,
+              height: 180 * value, // Tinggi maksimal 180 pixel
+              decoration: BoxDecoration(
+                color:
+                    theme.colorScheme.primaryContainer, // Warna mengikuti tema
+                borderRadius: BorderRadius.circular(6),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         Text(

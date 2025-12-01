@@ -6,6 +6,9 @@ class TokoModel {
   final String alamat;
   final String noHp;
   final String? foto;
+  final String? emailToko;
+  final String? namaPemilik;
+  final String? tahunBerdiri;
 
   TokoModel({
     required this.id,
@@ -15,6 +18,9 @@ class TokoModel {
     required this.alamat,
     required this.noHp,
     this.foto,
+    this.emailToko,
+    this.namaPemilik,
+    this.tahunBerdiri,
   });
 
   factory TokoModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +35,9 @@ class TokoModel {
       alamat: json['alamat'] ?? '',
       noHp: json['no_hp'] ?? '',
       foto: json['foto'],
+      emailToko: json['email_toko'],
+      namaPemilik: json['nama_pemilik'],
+      tahunBerdiri: json['tahun_berdiri'],
     );
   }
 

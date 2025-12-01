@@ -36,7 +36,7 @@ import 'package:reang_app/models/produk_varian_model.dart';
 import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/models/toko_model.dart';
 import 'package:reang_app/models/notification_model.dart';
-import 'package:reang_app/models/ulasan_produk_model.dart';
+import 'package:reang_app/models/admin_analitik_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -46,7 +46,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://c2fbc1e272fe.ngrok-free.app/api';
+  final String _baseUrlBackend = 'https://e5da714343ad.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -858,6 +858,23 @@ class ApiService {
     }
   }
 
+  // Cek ketersediaan email
+  Future<bool> isEmailRegistered(String email) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/check-email',
+        queryParameters: {'email': email},
+      );
+
+      if (response.statusCode == 200) {
+        return response.data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false; // Anggap aman jika error, nanti dicek ulang saat submit final
+    }
+  }
+
   // =======================================================================
   // API UPDATE PROFILE (TAMBAHAN UNTUK GOOGLE LOGIN)
   // =======================================================================
@@ -900,7 +917,7 @@ class ApiService {
   }
 
   // =======================================================================
-  // API LOGIN (BARU)
+  // API LOGIN (UPDATE UNTUK MENANGKAP PESAN ERROR SPESIFIK)
   // =======================================================================
   Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -912,25 +929,31 @@ class ApiService {
         data: {'email': email, 'password': password},
       );
 
+      // Jika sukses (Status 200)
       if (response.statusCode == 200) {
-        // Mengembalikan seluruh data (termasuk token dan user) jika sukses
         return response.data;
       } else {
-        // Menangani status code lain yang tidak diharapkan
-        throw Exception('Gagal melakukan login.');
+        throw Exception('Login gagal.');
       }
     } on DioException catch (e) {
-      // Menangani error dari server (misal: email atau password salah)
-      if (e.response != null && e.response!.data is Map) {
-        final errorMessage =
-            e.response!.data['message'] ?? 'Terjadi kesalahan.';
-        throw Exception(errorMessage);
+      // --- [BAGIAN INI YANG PENTING] ---
+      // Menangkap respon 404 (Email salah) atau 401 (Password salah)
+      if (e.response != null) {
+        final errorData = e.response?.data;
+
+        // Cek apakah backend mengirim pesan error spesifik?
+        if (errorData != null &&
+            errorData is Map &&
+            errorData['message'] != null) {
+          // Ini akan melempar teks: "Email belum terdaftar" atau "Password salah"
+          throw Exception(errorData['message']);
+        }
       }
-      // Menangani error koneksi atau timeout
+
+      // Jika error koneksi / server mati
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi Anda.');
     } catch (e) {
-      // Menangani error tak terduga lainnya
-      throw Exception('Terjadi kesalahan yang tidak diketahui: $e');
+      throw Exception('Terjadi kesalahan: $e');
     }
   }
 
@@ -3100,6 +3123,71 @@ class ApiService {
       return {};
     } catch (e) {
       return {};
+    }
+  }
+
+  // Ambil Data Analitik Toko
+  Future<AdminAnalitikModel> fetchAnalitik({
+    required String token,
+    required int idToko,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrlBackend/admin/analitik/$idToko',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        // Parsing JSON ke Model
+        return AdminAnalitikModel.fromJson(response.data);
+      } else {
+        throw Exception('Gagal memuat data analitik');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Terjadi kesalahan koneksi',
+      );
+    }
+  }
+
+  // Update Profil Toko
+  Future<bool> updateToko({
+    required String token,
+    required String nama,
+    String? deskripsi,
+    String? alamat,
+    String? noHp,
+    String? emailToko,
+    String? namaPemilik,
+    String? tahunBerdiri,
+    File? foto,
+  }) async {
+    try {
+      FormData formData = FormData.fromMap({
+        'nama': nama,
+        'deskripsi': deskripsi ?? '',
+        'alamat': alamat ?? '',
+        'no_hp': noHp ?? '',
+        'email_toko': emailToko ?? '',
+        'nama_pemilik': namaPemilik ?? '',
+        'tahun_berdiri': tahunBerdiri ?? '',
+      });
+
+      if (foto != null) {
+        formData.files.add(
+          MapEntry('foto', await MultipartFile.fromFile(foto.path)),
+        );
+      }
+
+      final response = await _dio.post(
+        '$_baseUrlBackend/toko/update',
+        data: formData,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      throw Exception('Gagal update toko');
     }
   }
 }

@@ -106,17 +106,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _nextPage() {
+  // [PERBAIKAN] Ubah jadi async agar bisa await API
+  Future<void> _nextPage() async {
     bool isValid = false;
     if (_currentPage == 0) isValid = _nameFormKey.currentState!.validate();
     if (_currentPage == 1) isValid = _ktpFormKey.currentState!.validate();
     if (_currentPage == 2) isValid = _phoneFormKey.currentState!.validate();
     if (_currentPage == 3) isValid = _emailFormKey.currentState!.validate();
 
-    // Hapus validasi password jika user Google
+    // ... (validasi password tetap sama) ...
     if (_currentPage == 4) {
       if (widget.googleUser != null) {
-        isValid = true; // Anggap valid selalu
+        isValid = true;
       } else {
         isValid = _passwordFormKey.currentState!.validate();
       }
@@ -125,9 +126,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (isValid) {
       FocusScope.of(context).unfocus();
 
-      // --- LOGIKA SKIP PASSWORD ---
-      // Jika sekarang di halaman Email (index 3) DAN ini user Google,
-      // Lompat langsung ke Terms (index 5), lewati Password (index 4)
+      // [LOGIKA BARU: CEK EMAIL]
+      // Jika sedang di halaman Email (index 3) dan bukan user Google (karena Google pasti valid/autolink)
+      if (_currentPage == 3 && widget.googleUser == null) {
+        // Tampilkan loading sementara (opsional, atau pakai indikator tombol)
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => const Center(child: CircularProgressIndicator()),
+        );
+
+        try {
+          final api = ApiService();
+          final isRegistered = await api.isEmailRegistered(
+            _emailController.text.trim(),
+          );
+
+          if (!mounted) return;
+          Navigator.pop(context); // Tutup loading
+
+          if (isRegistered) {
+            showToast(
+              "Email sudah terdaftar. Gunakan email lain atau login.",
+              context: context,
+              backgroundColor: Colors.red,
+              // ... (style toast favorit Anda)
+              position: StyledToastPosition.bottom,
+              animation: StyledToastAnimation.scale,
+              reverseAnimation: StyledToastAnimation.fade,
+              animDuration: const Duration(milliseconds: 150),
+              duration: const Duration(seconds: 2),
+              borderRadius: BorderRadius.circular(25),
+              textStyle: const TextStyle(color: Colors.white),
+              curve: Curves.fastOutSlowIn,
+            );
+            return; // JANGAN LANJUT KE HALAMAN BERIKUTNYA
+          }
+        } catch (e) {
+          if (mounted) Navigator.pop(context); // Tutup loading jika error
+          // Lanjut saja jika error koneksi (nanti dicek lagi di akhir)
+        }
+      }
+      // [SELESAI LOGIKA CEK EMAIL]
+
+      // --- LOGIKA SKIP PASSWORD (TETAP SAMA) ---
       if (_currentPage == 3 && widget.googleUser != null) {
         _pageController.jumpToPage(5);
       } else {
