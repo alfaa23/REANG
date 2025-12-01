@@ -28,7 +28,15 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   @override
   void initState() {
     super.initState();
+    context.read<AuthProvider>().addListener(_fetchData);
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    // 3. Copot Listener saat halaman ditutup
+    context.read<AuthProvider>().removeListener(_fetchData);
+    super.dispose();
   }
 
   Future<void> _fetchData() async {

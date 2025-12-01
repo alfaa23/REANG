@@ -49,6 +49,7 @@ class _UmkmScreenState extends State<UmkmScreen>
   bool _isLoadingMore = false;
   bool _isOpeningChat = false;
   String? _apiError;
+  late AuthProvider _authProvider;
 
   // State Kategori
   final List<Map<String, dynamic>> categories = const [
@@ -67,6 +68,10 @@ class _UmkmScreenState extends State<UmkmScreen>
     _scrollController.addListener(_onScroll);
     _fetchUnpaidCount();
     _listenToAdminChats();
+    _authProvider = context.read<AuthProvider>();
+    // 2. Pasang listener. Setiap kali login/logout, fungsi _fetchUnpaidCount dipanggil
+    _authProvider.addListener(_fetchUnpaidCount);
+    _fetchUnpaidCount();
   }
 
   // --- Lifecycle untuk Auto-Refresh Notifikasi ---
@@ -83,6 +88,7 @@ class _UmkmScreenState extends State<UmkmScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _authProvider.removeListener(_fetchUnpaidCount);
     _adminChatSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();

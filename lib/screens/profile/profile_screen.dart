@@ -36,12 +36,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadNotificationPreference(); // <-- Ganti nama fungsi
+    context.read<AuthProvider>().addListener(_onAuthChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Copot listener
+    context.read<AuthProvider>().removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (mounted) {
+      setState(() {}); // Rebuild UI
+      _loadNotificationPreference(); // Cek notifikasi ulang
+    }
   }
 
   @override
@@ -237,6 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
+          scrollable: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -244,13 +255,20 @@ class _ProfileScreenState extends State<ProfileScreen>
             children: [
               Icon(Icons.logout, color: theme.colorScheme.primary),
               const SizedBox(width: 12),
-              const Text('Yakin ingin keluar?'),
+              // [PERBAIKAN 2] Bungkus Text dengan Expanded agar tidak nabrak kanan
+              const Expanded(
+                child: Text(
+                  'Yakin ingin keluar?',
+                  overflow: TextOverflow.clip, // Biarkan text turun ke bawah
+                ),
+              ),
             ],
           ),
           content: const Text(
             'Anda akan keluar dari akun ini dan kembali ke halaman utama.',
           ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actionsOverflowButtonSpacing: 8.0,
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -262,8 +280,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                Navigator.of(ctx).pop();
-                await authProvider.logout();
+                Navigator.of(ctx).pop(); // Tutup Dialog
+
+                // Matikan notifikasi di state lokal dulu sebelum logout
+                if (mounted) setState(() => _notificationEnabled = false);
+
+                await authProvider.logout(); // Logout sistem
 
                 if (!context.mounted) return;
                 _showCustomToast("Anda telah keluar.", Colors.black87);
@@ -322,13 +344,19 @@ class _ProfileScreenState extends State<ProfileScreen>
         icon: const Icon(Icons.login),
         label: const Text('Masuk'),
         onPressed: () async {
+          // 1. Tunggu sampai user selesai Login/Register dan kembali
           await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const LoginScreen(popOnSuccess: true),
             ),
           );
-          _loadNotificationPreference(); // <-- Ganti ke fungsi baru
+
+          // 2. Refresh Total saat kembali
+          if (mounted) {
+            setState(() {}); // <--- PENTING: Update Nama & Foto Profil
+            await _loadNotificationPreference(); // <--- PENTING: Cek Status Switch Notif User Tersebut
+          }
         },
       );
     }
@@ -465,18 +493,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Column(
             children: [
               _ListTileItem(
-                icon: Icons.policy_outlined,
-                label: 'Kebijakan dan Ketentuan',
-                onTap: () {},
-              ),
-              Divider(color: theme.dividerColor, height: 1, indent: 56),
-              _ListTileItem(
-                icon: Icons.help_outline,
-                label: 'Pusat Bantuan',
-                onTap: () {},
-              ),
-              Divider(color: theme.dividerColor, height: 1, indent: 56),
-              _ListTileItem(
                 icon: Icons.info_outline,
                 label: 'Versi Aplikasi',
                 trailing: Text('1.0.0', style: theme.textTheme.bodyMedium),
@@ -485,7 +501,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ],
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 25),
 
         SizedBox(width: double.infinity, child: actionButton),
         const SizedBox(height: 25),
