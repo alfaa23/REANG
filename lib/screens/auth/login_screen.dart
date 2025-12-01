@@ -23,7 +23,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isPasswordVisible = false;
-  bool _isLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isStandardLoading = false;
+
+  // Getter penggabung (Supaya TextField tetap mati kalau salah satu lagi loading)
+  bool get _isLoading => _isGoogleLoading || _isStandardLoading;
 
   @override
   void dispose() {
@@ -36,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _performGoogleLogin() async {
     if (_isLoading) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isGoogleLoading = true);
 
     try {
       // 1. Panggil Provider
@@ -46,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final UserModel? user = await authProvider.loginWithGoogle();
 
       if (user == null) {
-        setState(() => _isLoading = false);
+        setState(() => _isGoogleLoading = true);
         return;
       }
 
@@ -87,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _showToast("Gagal masuk dengan Google.", Colors.red);
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -100,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isStandardLoading = true);
 
     try {
       final apiService = ApiService();
@@ -127,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       _showToast(e.toString(), Colors.red);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isStandardLoading = false);
     }
   }
 
@@ -190,10 +194,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // --- TOMBOL GOOGLE (SUDAH DIAKTIFKAN) ---
                 ElevatedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : _performGoogleLogin, // Panggil fungsi baru
-                  icon: _isLoading
+                  onPressed: _isLoading ? null : _performGoogleLogin,
+                  icon: _isGoogleLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -286,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: _performLogin,
+                  onPressed: _isLoading ? null : _performLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade800,
                     foregroundColor: Colors.white,
@@ -295,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: _isLoading
+                  child: _isStandardLoading
                       ? const SizedBox(
                           height: 24,
                           width: 24,
