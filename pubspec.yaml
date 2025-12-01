@@ -111,7 +111,6 @@ flutter:
   assets:
     - assets/google_icon.webp
     - assets/wongreang.webp
-    - assets/coba.jpg
     - assets/konsultasi.webp
     #icon aplikasi
     - assets/icons/info_yu.png
@@ -138,14 +137,12 @@ flutter:
     - assets/logos/halodoc.webp
     - assets/logos/mobilejkn.webp
     - assets/icons/darurat.webp
-    - assets/baju.webp
     - assets/logos/ikd.webp
     - assets/logos/sipandan.webp
 
 
 
 
-    - assets/aktivitas_laporan.webp
                           
 
 
