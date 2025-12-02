@@ -83,13 +83,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Ambil tema saat ini (Light/Dark)
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      // Background ikut tema (Putih di Light, Hitam/Abu di Dark)
+      backgroundColor: theme.scaffoldBackgroundColor,
+
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: BackButton(color: Colors.black),
+        // Tombol back ikut warna teks tema
+        leading: BackButton(color: theme.iconTheme.color),
       ),
+
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Center(
@@ -101,32 +109,38 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    // Warna lingkaran menyesuaikan mode
+                    color: isDarkMode
+                        ? theme.colorScheme.surfaceContainerHighest
+                        : Colors.blue.shade50,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.lock_reset,
                     size: 80,
-                    color: Colors.blue.shade800,
+                    // Warna ikon ikut primary color
+                    color: theme.colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                const Text(
+                Text(
                   'Lupa Password?',
-                  style: TextStyle(
-                    fontSize: 28,
+                  style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Montserrat',
+                    // Warna teks otomatis ikut tema
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+
+                Text(
                   'Jangan khawatir! Masukkan email yang terdaftar, kami akan mengirimkan link untuk mereset password Anda.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme
+                        .hintColor, // Warna abu-abu yang aman di kedua mode
                     height: 1.5,
                   ),
                 ),
@@ -136,15 +150,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  // Style teks input (agar terlihat di mode gelap)
+                  style: TextStyle(color: theme.colorScheme.onSurface),
                   decoration: InputDecoration(
                     labelText: 'Email',
                     hintText: 'contoh@email.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                      color: theme.iconTheme.color?.withOpacity(0.7),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    // Warna isi field menyesuaikan mode
+                    fillColor: isDarkMode
+                        ? theme.colorScheme.surfaceContainerHighest
+                        : Colors.grey.shade50,
+                    // Warna label dan hint
+                    labelStyle: TextStyle(color: theme.hintColor),
+                    hintStyle: TextStyle(
+                      color: theme.hintColor.withOpacity(0.5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -156,19 +183,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade800,
-                      foregroundColor: Colors.white,
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 2,
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: theme.colorScheme.onPrimary,
                               strokeWidth: 2,
                             ),
                           )
