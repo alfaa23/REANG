@@ -387,13 +387,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     title: 'Alamat email kamu?',
                     child: TextFormField(
                       controller: _emailController,
-                      // Jika googleUser ada, jadikan ReadOnly (Gak bisa diedit)
+                      keyboardType: TextInputType.emailAddress,
+
+                      // Logic ReadOnly (Tetap dipertahankan)
                       readOnly: widget.googleUser != null,
+
+                      // --- PERBAIKAN STYLE ---
                       style: TextStyle(
-                        // Kasih warna abu-abu biar kelihatan kalau dikunci
                         color: widget.googleUser != null
-                            ? Colors.grey
-                            : Colors.black,
+                            ? theme
+                                  .disabledColor // Abu-abu jika dari Google
+                            : theme
+                                  .colorScheme
+                                  .onSurface, // Otomatis (Hitam/Putih) sesuai tema
+                      ),
+
+                      // -----------------------
+                      decoration: _buildInputDecoration(
+                        context: context,
+                        hintText: 'Email',
                       ),
                       validator: (value) {
                         if (value == null ||

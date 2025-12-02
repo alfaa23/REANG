@@ -201,11 +201,41 @@ class AuthProvider with ChangeNotifier {
     await _registerFcmToken();
   }
 
+  // =======================================================================
+  // FUNGSI BARU: Pastikan Firebase Login & UID Sesuai
+  // =======================================================================
   Future<void> ensureFirebaseLoggedIn() async {
-    // Jika User punya token Laravel TAPI belum connect Firebase
-    if (_token != null && FirebaseAuth.instance.currentUser == null) {
-      debugPrint("Lazy Login Firebase dimulai...");
-      await _loginToFirebase(_token!);
+    // Pastikan token Laravel ada
+    if (_token == null) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    // Ambil ID Laravel dari object user yang sedang login (bisa User atau Admin)
+    final laravelId = _currentUser is UserModel
+        ? (_currentUser as UserModel).id.toString()
+        : (_currentUser is AdminModel
+              ? (_currentUser as AdminModel).id.toString()
+              : '');
+
+    // KONDISI WAJIB TUKAR TOKEN:
+    // 1. Belum login Firebase sama sekali.
+    // 2. ATAU Sudah login, TAPI UID-nya beda dengan ID Laravel (Berarti masih pake akun Google asli/salah akun).
+    bool needSwap =
+        currentUser == null ||
+        (laravelId.isNotEmpty && currentUser.uid != laravelId);
+
+    if (needSwap) {
+      debugPrint(
+        "🔄 Mendeteksi UID tidak sesuai/belum login. Melakukan Tukar Token...",
+      );
+      try {
+        await _loginToFirebase(_token!);
+        debugPrint("✅ Tukar Token Berhasil!");
+      } catch (e) {
+        debugPrint("❌ Gagal Tukar Token: $e");
+      }
+    } else {
+      debugPrint("✅ UID Firebase sudah sesuai ($laravelId). Aman.");
     }
   }
 

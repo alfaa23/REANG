@@ -126,18 +126,16 @@ class _UmkmScreenState extends State<UmkmScreen>
           for (var doc in snapshot.docs) {
             final data = doc.data();
 
-            // FILTER: Ambil chat dimana SAYA ADALAH PENJUAL
-            // Artinya: userId (Pembeli) != myId (Saya)
             final chatUserId = data['userId'].toString();
             if (chatUserId == myId) continue; // Skip chat belanjaan sendiri
 
-            // Hitung unread
             final unreadMap = data['unreadCount'] as Map<String, dynamic>?;
             if (unreadMap != null) {
               unreadTotal += (unreadMap[myId] as int? ?? 0);
             }
           }
 
+          // [PENTING] Refresh UI agar badge muncul
           if (mounted) {
             setState(() {
               _adminChatCount = unreadTotal;
@@ -376,7 +374,7 @@ class _UmkmScreenState extends State<UmkmScreen>
                 ),
                 title: _buildNotificationBadge(
                   _adminOrderCount +
-                      _adminChatCount, // PENJUMLAHAN (Pesanan + Chat)
+                      _adminChatCount, // <-- Pastikan ini dijumlah
                   const Text(
                     'Toko Saya',
                     style: TextStyle(fontWeight: FontWeight.w600),
