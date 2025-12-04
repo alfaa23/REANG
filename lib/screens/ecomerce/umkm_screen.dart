@@ -66,12 +66,14 @@ class _UmkmScreenState extends State<UmkmScreen>
     WidgetsBinding.instance.addObserver(this);
     _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
-    _fetchUnpaidCount();
-    _listenToAdminChats();
+
     _authProvider = context.read<AuthProvider>();
-    // 2. Pasang listener. Setiap kali login/logout, fungsi _fetchUnpaidCount dipanggil
-    _authProvider.addListener(_fetchUnpaidCount);
-    _fetchUnpaidCount();
+
+    // [PERBAIKAN] Gunakan listener gabungan
+    _authProvider.addListener(_onAuthChanged);
+
+    // Panggil pertama kali manual
+    _onAuthChanged();
   }
 
   // --- Lifecycle untuk Auto-Refresh Notifikasi ---
@@ -88,7 +90,10 @@ class _UmkmScreenState extends State<UmkmScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _authProvider.removeListener(_fetchUnpaidCount);
+
+    // [PERBAIKAN] Remove listener yang benar
+    _authProvider.removeListener(_onAuthChanged);
+
     _adminChatSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -111,11 +116,21 @@ class _UmkmScreenState extends State<UmkmScreen>
   }
 
   void _listenToAdminChats() {
+    // [PENTING] Matikan pendengar lama dulu biar tidak numpuk/salah orang
+    _adminChatSubscription?.cancel();
+    _adminChatSubscription = null;
+
     final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn || auth.user == null) return;
+
+    // Kalau belum login, reset chat count jadi 0
+    if (!auth.isLoggedIn || auth.user == null) {
+      if (mounted) setState(() => _adminChatCount = 0);
+      return;
+    }
 
     final myId = auth.user!.id.toString();
 
+    // Mulai dengarkan dengan ID User yang BARU
     _adminChatSubscription = FirebaseFirestore.instance
         .collection('chats')
         .where('participants', arrayContains: myId)
@@ -126,8 +141,11 @@ class _UmkmScreenState extends State<UmkmScreen>
           for (var doc in snapshot.docs) {
             final data = doc.data();
 
+            // Pastikan konversi tipe data aman
             final chatUserId = data['userId'].toString();
-            if (chatUserId == myId) continue; // Skip chat belanjaan sendiri
+
+            // Filter: Skip chat punya sendiri
+            if (chatUserId == myId) continue;
 
             final unreadMap = data['unreadCount'] as Map<String, dynamic>?;
             if (unreadMap != null) {
@@ -135,7 +153,6 @@ class _UmkmScreenState extends State<UmkmScreen>
             }
           }
 
-          // [PENTING] Refresh UI agar badge muncul
           if (mounted) {
             setState(() {
               _adminChatCount = unreadTotal;
@@ -144,6 +161,11 @@ class _UmkmScreenState extends State<UmkmScreen>
         });
   }
 
+  // Fungsi ini dipanggil otomatis saat Login / Logout
+  void _onAuthChanged() {
+    _fetchUnpaidCount(); // Refresh Pesanan API
+    _listenToAdminChats(); // Refresh Chat Firebase (INI YANG KEMARIN KURANG)
+  }
   // =========================================================================
   // --- FUNGSI DATA & API ---
   // =========================================================================
@@ -336,19 +358,47 @@ class _UmkmScreenState extends State<UmkmScreen>
     _fetchInitialProducts();
   }
 
-  void _navigateToOrderProcess() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
-    ).then((_) {
-      // [PERBAIKAN] Kode ini jalan saat user menekan Back dari halaman pesanan
-      _fetchUnpaidCount(); // Refresh Badge Notifikasi
-    });
+  // GANTI FUNGSI LAMA DENGAN INI
+  Future<void> _navigateToOrderProcess() async {
+    final auth = context.read<AuthProvider>();
+
+    // SKENARIO 1: SUDAH LOGIN
+    // Langsung masuk ke halaman pesanan
+    if (auth.isLoggedIn && auth.user != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
+      );
+      // Saat kembali (Back), refresh notifikasi
+      _fetchUnpaidCount();
+    }
+    // SKENARIO 2: BELUM LOGIN
+    // Arahkan ke Login dulu
+    else {
+      final bool? loginSuccess = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          // popOnSuccess: true -> Agar setelah login sukses, dia 'Pop' (balik ke sini) membawa nilai true
+          builder: (context) => const LoginScreen(popOnSuccess: true),
+        ),
+      );
+
+      // Jika user berhasil login (loginSuccess == true)
+      if (loginSuccess == true && mounted) {
+        // Otomatis lanjutkan buka halaman pesanan
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ProsesOrderScreen()),
+        );
+        _fetchUnpaidCount(); // Refresh notifikasi setelah selesai
+      }
+    }
   }
 
   void _showFabMenu() {
     final authProvider = context.read<AuthProvider>();
     final theme = Theme.of(context);
+    final myId = authProvider.user?.id.toString() ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -356,7 +406,6 @@ class _UmkmScreenState extends State<UmkmScreen>
       useSafeArea: true,
       builder: (ctx) {
         return Container(
-          // [PERBAIKAN] Padding untuk menaikkan menu
           padding: EdgeInsets.only(
             top: 16,
             left: 16,
@@ -366,21 +415,58 @@ class _UmkmScreenState extends State<UmkmScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // --- OPSI 1: TOKO SAYA ---
+              // --- OPSI 1: TOKO SAYA (DENGAN LIVE STREAM) ---
               ListTile(
                 leading: Icon(
                   Icons.store_outlined,
                   color: theme.colorScheme.primary,
                 ),
-                title: _buildNotificationBadge(
-                  _adminOrderCount +
-                      _adminChatCount, // <-- Pastikan ini dijumlah
-                  const Text(
-                    'Toko Saya',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  isDense: true,
-                ),
+                title: authProvider.isLoggedIn && authProvider.isUmkm
+                    ? StreamBuilder<QuerySnapshot>(
+                        // 1. PASANG STREAM LANGSUNG DI SINI
+                        stream: FirebaseFirestore.instance
+                            .collection('chats')
+                            .where('participants', arrayContains: myId)
+                            .where('isUmkmChat', isEqualTo: true)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          int unreadChat = 0;
+
+                          // 2. HITUNG CHAT UNREAD SECARA LIVE
+                          if (snapshot.hasData) {
+                            for (var doc in snapshot.data!.docs) {
+                              final data = doc.data() as Map<String, dynamic>;
+                              final chatUserId = data['userId'].toString();
+
+                              // Filter: Skip chat belanjaan sendiri
+                              if (chatUserId == myId) continue;
+
+                              final unreadMap =
+                                  data['unreadCount'] as Map<String, dynamic>?;
+                              if (unreadMap != null) {
+                                unreadChat += (unreadMap[myId] as int? ?? 0);
+                              }
+                            }
+                          }
+
+                          // 3. GABUNGKAN DENGAN ORDER COUNT
+                          final totalNotif = _adminOrderCount + unreadChat;
+
+                          return _buildNotificationBadge(
+                            totalNotif,
+                            const Text(
+                              'Toko Saya',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            isDense: true,
+                          );
+                        },
+                      )
+                    // Kalau belum login/bukan UMKM, tampilkan teks biasa
+                    : const Text(
+                        'Toko Saya',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                 subtitle: Text(
                   authProvider.isLoggedIn
                       ? (authProvider.isUmkm
@@ -416,14 +502,15 @@ class _UmkmScreenState extends State<UmkmScreen>
                   }
                 },
               ),
-              // --- OPSI 2: PESANAN SAYA ---
+
+              // --- OPSI 2: PESANAN SAYA (User Biasa) ---
               ListTile(
                 leading: Icon(
                   Icons.receipt_long_outlined,
                   color: theme.hintColor,
                 ),
                 title: _buildNotificationBadge(
-                  _userUnpaidCount, // Gunakan count user
+                  _userUnpaidCount,
                   const Text('Pesanan Saya'),
                   isDense: true,
                 ),
@@ -439,6 +526,7 @@ class _UmkmScreenState extends State<UmkmScreen>
       },
     );
 
+    // Tetap panggil fetch untuk update data order API
     _fetchUnpaidCount();
   }
 
