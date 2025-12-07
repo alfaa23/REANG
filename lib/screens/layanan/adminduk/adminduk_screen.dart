@@ -55,6 +55,23 @@ class _AdmindukScreenState extends State<AdmindukScreen> {
     _servicesFuture = ApiService().fetchInfoAdminduk();
   }
 
+  Future<void> _onRefresh() async {
+    // 1. Simpan future baru ke variabel sementara
+    final newFuture = ApiService().fetchInfoAdminduk();
+
+    // 2. Update state agar UI dibangun ulang dengan Future baru
+    setState(() {
+      _servicesFuture = newFuture;
+    });
+
+    // 3. Tunggu future selesai (sukses/gagal) agar loading spinner hilang
+    try {
+      await newFuture;
+    } catch (_) {
+      // Error akan ditangani oleh FutureBuilder di tampilan, jadi di sini diabaikan saja
+    }
+  }
+
   void _reloadData() {
     setState(() {
       _servicesFuture = ApiService().fetchInfoAdminduk();
@@ -117,123 +134,128 @@ class _AdmindukScreenState extends State<AdmindukScreen> {
           ],
         ),
       ),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Layanan Dokumen Kependudukan',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        onRefresh: _onRefresh, // Panggil fungsi refresh di sini
+        child: CustomScrollView(
+          // --- [BARU] GANTI PHYSICS ---
+          // Pakai AlwaysScrollableScrollPhysics supaya bisa ditarik walau kontennya sedikit
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Layanan Dokumen Kependudukan',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Buat dan urus dokumen kependudukan Anda dengan mudah dan cepat',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.hintColor,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Buat dan urus dokumen kependudukan Anda dengan mudah dan cepat',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.hintColor,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          FutureBuilder<List<InfoAdmindukModel>>(
-            future: _servicesFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverToBoxAdapter(
-                  child: Center(
-                    heightFactor: 5,
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-              if (snapshot.hasError) {
-                return SliverToBoxAdapter(child: _buildErrorView(context));
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Center(child: Text('Tidak ada layanan tersedia.')),
-                );
-              }
-
-              final services = snapshot.data!;
-              return SliverList(
-                delegate: SliverChildBuilderDelegate((context, i) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _ServiceCard(data: services[i]),
+            FutureBuilder<List<InfoAdmindukModel>>(
+              future: _servicesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SliverToBoxAdapter(
+                    child: Center(
+                      heightFactor: 5,
+                      child: CircularProgressIndicator(),
+                    ),
                   );
-                }, childCount: services.length),
-              );
-            },
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-              child: Text(
-                'Rekomendasi Aplikasi',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+                }
+                if (snapshot.hasError) {
+                  return SliverToBoxAdapter(child: _buildErrorView(context));
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: Center(child: Text('Tidak ada layanan tersedia.')),
+                  );
+                }
+
+                final services = snapshot.data!;
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate((context, i) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _ServiceCard(data: services[i]),
+                    );
+                  }, childCount: services.length),
+                );
+              },
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Text(
+                  'Rekomendasi Aplikasi',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  _RecommendationCard(
-                    title: 'Identitas Kependudukan Digital',
-                    logoPath: 'assets/logos/ikd.webp',
-                    logoBackgroundColor: Colors.blue.shade800,
-                    onTap: () => openAppLink('IKD', context),
-                  ),
-                  const SizedBox(height: 12),
-                  _RecommendationCard(
-                    title: 'Sipandan Ayu',
-                    logoPath: 'assets/logos/sipandan.webp',
-                    logoBackgroundColor: Colors.blue.shade800,
-                    onTap: () => openAppLink('Si Pandan Ayu', context),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-              child: Text(
-                'Informasi Layanan',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    _RecommendationCard(
+                      title: 'Identitas Kependudukan Digital',
+                      logoPath: 'assets/logos/ikd.webp',
+                      logoBackgroundColor: Colors.blue.shade800,
+                      onTap: () => openAppLink('IKD', context),
+                    ),
+                    const SizedBox(height: 12),
+                    _RecommendationCard(
+                      title: 'Sipandan Ayu',
+                      logoPath: 'assets/logos/sipandan.webp',
+                      logoBackgroundColor: Colors.blue.shade800,
+                      onTap: () => openAppLink('Si Pandan Ayu', context),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.9,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, i) => _InfoCard(data: _infoItems[i]),
-                childCount: _infoItems.length,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Text(
+                  'Informasi Layanan',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.9,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _InfoCard(data: _infoItems[i]),
+                  childCount: _infoItems.length,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

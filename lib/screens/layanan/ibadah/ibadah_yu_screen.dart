@@ -151,6 +151,7 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
     {"nama": "Masjid", "jenis": "Masjid"},
     {"nama": "Gereja", "jenis": "Gereja"},
     {"nama": "Vihara", "jenis": "Vihara"},
+    {"nama": "Kelenteng", "jenis": "Kelenteng"},
     {"nama": "Pura", "jenis": "Pura"},
   ];
 
@@ -387,10 +388,10 @@ class _TempatIbadahViewState extends State<_TempatIbadahView> {
                 onTap: () => _openMap(context, 'Vihara', 'Peta Vihara'),
               ),
               _IbadahCard(
-                title: "Pura Terdekat",
-                emoji: "🛕",
-                color: Colors.pink,
-                onTap: () => _openMap(context, 'Pura', 'Peta Pura'),
+                title: "Kelenteng Terdekat",
+                emoji: "🏮", // Bisa pakai emoji lampion atau kuil ⛩️
+                color: Colors.redAccent, // Pilih warna yang sesuai
+                onTap: () => _openMap(context, 'Kelenteng', 'Peta Kelenteng'),
               ),
             ],
           ),

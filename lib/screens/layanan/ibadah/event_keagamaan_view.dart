@@ -36,6 +36,7 @@ class _EventKeagamaanViewState extends State<EventKeagamaanView> {
     "Kristen",
     "Buddha",
     "Hindu",
+    "Konghucu",
   ];
 
   final TextEditingController _searchController = TextEditingController();
