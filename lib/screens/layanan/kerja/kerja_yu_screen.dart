@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:reang_app/models/info_kerja_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/kerja/detail_lowongan_screen.dart';
-import 'package:reang_app/screens/layanan/kerja/silelakerja_view.dart';
+import 'package:reang_app/screens/layanan/kerja/nyari_gawe.dart';
 // --- PERUBAHAN: Mengimpor file view GLIK yang baru ---
 import 'package:reang_app/screens/layanan/kerja/kerja_view.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -35,7 +35,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
   // --- PERUBAHAN: Menambahkan tab 'GLIK' ---
   final List<Map<String, dynamic>> _mainTabs = const [
     {'label': 'Beranda', 'icon': Icons.home_outlined},
-    {'label': 'Silelakerja', 'icon': Icons.location_city_outlined},
+    {'label': 'Nyari Gawe', 'icon': Icons.location_city_outlined},
     {'label': 'Kerja-Yu', 'icon': Icons.public_outlined},
   ];
 
@@ -89,11 +89,7 @@ class _KerjaYuScreenState extends State<KerjaYuScreen> {
                 children: [
                   const _BerandaKerjaView(),
                   _isSilelakerjaInitiated
-                      ? SilelakerjaView(
-                          onWebViewCreated: (controller) {
-                            _silelakerjaController = controller;
-                          },
-                        )
+                      ? const SilelakerjaView() // <--- Cukup panggil begini saja
                       : Container(),
                   // --- PERUBAHAN: Menambahkan GlikView ke IndexedStack ---
                   _isGlikInitiated
