@@ -516,7 +516,7 @@ class _PuskesmasCard extends StatelessWidget {
                 backgroundColor: theme.colorScheme.primaryContainer,
                 child: Icon(Icons.local_hospital, color: Colors.red),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,10 +610,21 @@ class _PuskesmasCard extends StatelessWidget {
 
   Widget _buildInfoRow(ThemeData theme, IconData icon, String text) {
     return Row(
+      // 1. Tambahkan ini biar icon tetap di atas kalau teksnya panjang (kebawah)
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: theme.hintColor),
         const SizedBox(width: 8),
-        Text(text, style: theme.textTheme.bodyMedium),
+
+        // 2. Bungkus Text dengan Expanded
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodyMedium,
+            // Opsional: Batasi maks baris kalau mau (misal maxLines: 2)
+            // Kalau dihapus maxLines-nya, dia bakal turun terus ke bawah sepuasnya
+          ),
+        ),
       ],
     );
   }
