@@ -46,7 +46,7 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
+  final String _baseUrlBackend = 'https://4feb32134635.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -3188,6 +3188,25 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       throw Exception('Gagal update toko');
+    }
+  }
+
+  /// Ambil Data Jasa Pengiriman
+  Future<List<String>> fetchJasaPengiriman() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/jasa-pengiriman');
+
+      if (response.statusCode == 200) {
+        // Ambil array 'data' dari JSON
+        final List<dynamic> rawData = response.data['data'];
+
+        // Mapping: Ambil field 'nama' saja dan jadikan List<String>
+        return rawData.map((item) => item['nama'].toString()).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Gagal ambil jasa pengiriman: $e");
+      return []; // Return list kosong jika error
     }
   }
 }

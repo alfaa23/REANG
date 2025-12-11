@@ -34,18 +34,8 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
 
   final TextEditingController _resiController = TextEditingController();
   final TextEditingController _jasaKirimController = TextEditingController();
-  final List<String> _listKurir = [
-    'JNE',
-    'J&T Express',
-    'SiCepat',
-    'AnterAja',
-    'Pos Indonesia',
-    'Tiki',
-    'GoSend',
-    'GrabExpress',
-    'Kurir Toko (Internal)',
-    'Lainnya',
-  ];
+  List<String> _listKurir = [];
+  bool _isLoadingKurir = true;
 
   // [BARU] Variabel untuk menyimpan pilihan
   String? _selectedKurir;
@@ -60,6 +50,7 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
     _authProvider = context.read<AuthProvider>();
     _token = _authProvider.token ?? '';
     _loadDetails();
+    _loadJasaKirim();
 
     // Listener untuk update UI saat Jasa Kirim diketik (untuk buka/tutup akses Resi)
     _jasaKirimController.addListener(() {
@@ -79,6 +70,18 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
       token: _token,
       noTransaksi: widget.noTransaksi,
     );
+  }
+
+  Future<void> _loadJasaKirim() async {
+    final listDariApi = await _apiService.fetchJasaPengiriman();
+
+    if (mounted) {
+      setState(() {
+        _listKurir = listDariApi;
+
+        _isLoadingKurir = false;
+      });
+    }
   }
 
   // Mengisi data otomatis (Hanya dipanggil jika Anda ingin pre-fill dari pilihan user)
@@ -491,8 +494,14 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
   }
 
   Widget _buildInputResiCard(ThemeData theme) {
-    // Cek apakah jasa kirim diisi
     bool isJasaKirimFilled = _jasaKirimController.text.trim().isNotEmpty;
+
+    // 1. Definisikan teks opsi batal di sini biar konsisten
+    const String opsiBatal = "- Batalkan Pilihan -";
+
+    // 2. Gabungkan opsi batal ke dalam list
+    // Opsi ini akan SELALU ADA di dalam list dropdown
+    final List<String> itemsTampil = [opsiBatal, ..._listKurir];
 
     return Card(
       elevation: 2,
@@ -521,10 +530,35 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Input Jasa Pengiriman (Opsional di Backend, tapi kunci untuk UI Resi)
             DropdownButtonFormField<String>(
+              // Value ini yang menentukan apa yang tampil di kotak
+              // Jika null -> Tampil Hint
+              // Jika ada isi -> Tampil Teks
               value: _selectedKurir,
-              hint: const Text('Pilih Jasa Pengiriman'),
+
+              hint: Text(
+                _isLoadingKurir ? 'Memuat data...' : 'Pilih Jasa Pengiriman',
+              ),
+
+              // [BAGIAN KRUSIAL] Logika reset ada di sini
+              onChanged: _isLoadingKurir
+                  ? null
+                  : (newValue) {
+                      setState(() {
+                        // Cek apakah yang dipilih adalah opsi batal?
+                        if (newValue == opsiBatal) {
+                          // JANGAN simpan teksnya. PAKSA jadi NULL.
+                          // Dengan jadi null, Dropdown akan otomatis menampilkan Hint Text lagi.
+                          _selectedKurir = null;
+                          _jasaKirimController.clear();
+                        } else {
+                          // Kalau bukan batal, baru simpan nilainya
+                          _selectedKurir = newValue;
+                          _jasaKirimController.text = newValue ?? "";
+                        }
+                      });
+                    },
+
               decoration: InputDecoration(
                 labelText: 'Jasa Pengiriman (Opsional)',
                 labelStyle: TextStyle(color: Colors.blue.shade800),
@@ -543,27 +577,32 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                   vertical: 14,
                 ),
               ),
-              items: _listKurir.map((String value) {
+
+              // Tampilan item saat dropdown dibuka
+              items: itemsTampil.map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
-                  child: Text(value),
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      // Merah jika itu tombol batal
+                      color: value == opsiBatal ? Colors.red : Colors.black,
+                      // Tebal jika itu tombol batal
+                      fontWeight: value == opsiBatal
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
                 );
               }).toList(),
-              onChanged: (newValue) {
-                setState(() {
-                  _selectedKurir = newValue;
-                  // Update controller juga agar logika backend sebelumnya tetap jalan (opsional)
-                  _jasaKirimController.text = newValue ?? "";
-                });
-              },
             ),
 
             const SizedBox(height: 12),
 
-            // Input Nomor Resi (Hanya aktif jika Jasa Kirim terisi)
+            // TextField Resi (Logika Enable/Disable)
             TextField(
               controller: _resiController,
-              enabled: isJasaKirimFilled, // <-- Terkunci jika Jasa Kirim kosong
+              enabled: isJasaKirimFilled,
               decoration: InputDecoration(
                 labelText: 'Nomor Resi (Opsional)',
                 labelStyle: TextStyle(
@@ -571,7 +610,7 @@ class _DetailPesananAdminScreenState extends State<DetailPesananAdminScreen> {
                 ),
                 hintText: isJasaKirimFilled
                     ? 'Masukkan nomor resi...'
-                    : 'Isi Jasa Pengiriman dulu untuk input resi', // Hint jelas
+                    : 'Isi Jasa Pengiriman dulu untuk input resi',
                 filled: true,
                 fillColor: isJasaKirimFilled
                     ? Colors.white
