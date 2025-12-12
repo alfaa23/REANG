@@ -964,7 +964,7 @@ class ApiService {
     try {
       // Mengirim ID Token ke Laravel
       final response = await _dio.post(
-        '$_baseUrlBackend/auth/google-callback', // Route yang Mas buat di Laravel
+        '$_baseUrlBackend/auth/google-callback', // Route buat di Laravel
         data: {'id_token': idToken},
         options: Options(headers: {'Accept': 'application/json'}),
       );
