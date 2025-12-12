@@ -107,7 +107,7 @@ class AuthProvider with ChangeNotifier {
   Future<UserModel?> loginWithGoogle() async {
     try {
       // ============================================================
-      // [PENTING] PAKSA KELUAR DULU AGAR MUNCUL PILIHAN AKUN
+      // PAKSA KELUAR DULU AGAR MUNCUL PILIHAN AKUN
       // ============================================================
       await _googleSignIn.signOut();
       // ============================================================
@@ -162,7 +162,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // --- FUNGSI LOGIN (Sama seperti kode Anda, tapi di-refactor) ---
+  // --- FUNGSI LOGIN
   Future<void> login(
     Object userObject,
     String laravelToken, {
