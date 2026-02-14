@@ -202,7 +202,7 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
                         }),
                       ),
                       _buildTabItem(
-                        label: 'Laporan',
+                        label: 'Laporan Saya',
                         icon: Icons.assignment_rounded,
                         isSelected: !isBerandaSelected && !_isAnalyticsSelected,
                         onTap: () => setState(() {
