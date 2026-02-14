@@ -37,6 +37,7 @@ import 'package:reang_app/models/admin_pesanan_model.dart';
 import 'package:reang_app/models/toko_model.dart';
 import 'package:reang_app/models/notification_model.dart';
 import 'package:reang_app/models/admin_analitik_model.dart';
+import 'package:reang_app/models/dumas_analitik_model.dart';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
@@ -46,7 +47,8 @@ class ApiService {
   // KONFIGURASI BASE URL
   // =======================================================================
   // Backend lokal
-  final String _baseUrlBackend = 'https://wongreang.indramayukab.go.id/api';
+  final String _baseUrlBackend =
+      'https://31c4-103-47-132-21.ngrok-free.app/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
@@ -3207,6 +3209,24 @@ class ApiService {
     } catch (e) {
       debugPrint("Gagal ambil jasa pengiriman: $e");
       return []; // Return list kosong jika error
+    }
+  }
+
+  // =======================================================================
+  // API ANALITIK DUMAS (UPDATE MENGGUNAKAN MODEL BARU)
+  // =======================================================================
+  Future<DumasAnalitikModel> fetchStatistikDumas() async {
+    try {
+      final response = await _dio.get('$_baseUrlBackend/statistik-dumas');
+
+      if (response.statusCode == 200) {
+        // Parsing JSON ke Model DumasAnalitikModel
+        return DumasAnalitikModel.fromJson(response.data);
+      } else {
+        throw Exception('Gagal memuat statistik pengaduan');
+      }
+    } catch (e) {
+      throw Exception('Terjadi error saat mengambil statistik: $e');
     }
   }
 }
