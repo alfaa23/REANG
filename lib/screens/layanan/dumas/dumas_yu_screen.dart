@@ -110,6 +110,67 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
     );
   }
 
+  Widget _buildTabItem({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Warna Teks: Kalau dipilih warna Primary/Putih, kalau enggak Abu-abu
+    final Color selectedColor = isDark
+        ? Colors.white
+        : theme.colorScheme.primary;
+    final Color unselectedColor = theme.hintColor;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque, // Biar bisa diklik area kosongnya
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animasi Warna Icon
+              TweenAnimationBuilder<Color?>(
+                duration: const Duration(milliseconds: 200),
+                tween: ColorTween(
+                  begin: unselectedColor,
+                  end: isSelected ? selectedColor : unselectedColor,
+                ),
+                builder: (context, color, child) =>
+                    Icon(icon, size: 18, color: color),
+              ),
+              const SizedBox(width: 8),
+              // Animasi Warna Teks
+              Flexible(
+                // Pakai Flexible biar aman di layar kecil
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                    color: isSelected ? selectedColor : unselectedColor,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -150,50 +211,87 @@ class DumasYuHomeScreenState extends State<DumasYuHomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
-              width: double.infinity,
-              // --- WADAH ABU-ABU (SEPERTI FOTO) ---
+              height: 50, // Tinggi total menu
               decoration: BoxDecoration(
-                // Warna abu-abu muda banget (seperti track background)
+                // Warna Track Abu-abu
                 color: theme.brightness == Brightness.dark
                     ? const Color(0xFF303030)
                     : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(16), // Rounded luar
+                borderRadius: BorderRadius.circular(16), // Radius Luar
               ),
-              padding: const EdgeInsets.all(4), // Padding dalam wadah
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Stack(
                 children: [
-                  // TOMBOL 1: BERANDA
-                  _buildNavChip(
-                    label: 'Beranda',
-                    icon: Icons.home_rounded,
-                    isSelected: isBerandaSelected && !_isAnalyticsSelected,
-                    onTap: () => setState(() {
-                      isBerandaSelected = true;
-                      _isAnalyticsSelected = false;
-                    }),
+                  // --- LAYER 1: KOTAK PUTIH YANG GESER (SLIDING INDICATOR) ---
+                  AnimatedAlign(
+                    duration: const Duration(
+                      milliseconds: 250,
+                    ), // Kecepatan geser
+                    curve: Curves.easeOutCubic, // Efek geser yang smooth
+                    // LOGIKA POSISI:
+                    // -1.0 = Kiri (Beranda)
+                    //  0.0 = Tengah (Laporan)
+                    //  1.0 = Kanan (Statistik)
+                    alignment: _isAnalyticsSelected
+                        ? Alignment.centerRight
+                        : (!isBerandaSelected
+                              ? Alignment.center
+                              : Alignment.centerLeft),
+
+                    child: FractionallySizedBox(
+                      widthFactor:
+                          0.33, // Lebar kotak putih = 1/3 dari total lebar
+                      heightFactor: 1.0, // Tinggi full
+                      child: Container(
+                        margin: const EdgeInsets.all(4), // Jarak padding dalam
+                        decoration: BoxDecoration(
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFF424242)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(
+                            12,
+                          ), // Radius Dalam (Lebih kecil dari luar)
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
 
-                  // TOMBOL 2: LAPORAN SAYA
-                  _buildNavChip(
-                    label: 'Laporan',
-                    icon: Icons.assignment_rounded,
-                    isSelected: !isBerandaSelected && !_isAnalyticsSelected,
-                    onTap: () {
-                      setState(() {
-                        isBerandaSelected = false;
-                        _isAnalyticsSelected = false;
-                        _isLaporanSayaInitiated = true;
-                      });
-                    },
-                  ),
-
-                  // TOMBOL 3: STATISTIK
-                  _buildNavChip(
-                    label: 'Statistik',
-                    icon: Icons.bar_chart_rounded,
-                    isSelected: _isAnalyticsSelected,
-                    onTap: () => setState(() => _isAnalyticsSelected = true),
+                  // --- LAYER 2: TEKS & ICON (TOMBOLNYA) ---
+                  Row(
+                    children: [
+                      _buildTabItem(
+                        label: 'Beranda',
+                        icon: Icons.home_rounded,
+                        isSelected: isBerandaSelected && !_isAnalyticsSelected,
+                        onTap: () => setState(() {
+                          isBerandaSelected = true;
+                          _isAnalyticsSelected = false;
+                        }),
+                      ),
+                      _buildTabItem(
+                        label: 'Laporan',
+                        icon: Icons.assignment_rounded,
+                        isSelected: !isBerandaSelected && !_isAnalyticsSelected,
+                        onTap: () => setState(() {
+                          isBerandaSelected = false;
+                          _isAnalyticsSelected = false;
+                          _isLaporanSayaInitiated = true;
+                        }),
+                      ),
+                      _buildTabItem(
+                        label: 'Statistik',
+                        icon: Icons.bar_chart_rounded,
+                        isSelected: _isAnalyticsSelected,
+                        onTap: () =>
+                            setState(() => _isAnalyticsSelected = true),
+                      ),
+                    ],
                   ),
                 ],
               ),
