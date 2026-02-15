@@ -29,6 +29,7 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
   final _deskripsiController = TextEditingController();
 
   List<String> _kategoriList = [];
+  List<String> _filteredKategoriList = [];
   bool _isKategoriLoading = true;
   String? _selectedKategori;
 
@@ -63,10 +64,13 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
 
   Future<void> _fetchKategori() async {
     try {
-      final kategori = await _apiService.fetchDumasKategori();
+      // Ambil data murni dari API
+      final List<String> kategori = await _apiService.fetchDumasKategori();
+
       if (mounted) {
         setState(() {
           _kategoriList = kategori;
+          _filteredKategoriList = kategori; // Awalnya sama dengan master
           _isKategoriLoading = false;
         });
       }
@@ -165,6 +169,240 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
         );
       }
     }
+  }
+
+  void _showKategoriModal(BuildContext context) {
+    // Reset filter setiap kali modal dibuka
+    _filteredKategoriList = List.from(_kategoriList);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Biar bisa full screen kalau perlu
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7, // Tinggi awal 70% layar
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // --- 1. HEADER (Garis & Judul) ---
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Pilih Kategori Laporan',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // --- 2. WRAPPER CONTENT (Biar Search Bar-nya jalan) ---
+                  Expanded(
+                    child: StatefulBuilder(
+                      builder: (context, setModalState) {
+                        return Column(
+                          children: [
+                            // --- A. TOMBOL ALOKASIKAN OTOMATIS (MAGIC BUTTON) ---
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    // PENTING: Value ini yang dikirim ke Laravel buat trigger AI
+                                    _selectedKategori = 'Alokasikan Otomatis';
+                                    _isKategoriEmpty = false;
+                                  });
+                                  Navigator.pop(context); // Tutup modal
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    // Gradient biar kelihatan spesial/AI
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(context).colorScheme.primary,
+                                        Theme.of(context).colorScheme.secondary,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(
+                                        Icons.auto_awesome,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        '✨ Alokasikan Otomatis (Rekomendasi AI)',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // --- B. SEARCH BAR ---
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: TextField(
+                                onChanged: (value) {
+                                  // Update list real-time saat ngetik
+                                  setModalState(() {
+                                    _filteredKategoriList = _kategoriList
+                                        .where(
+                                          (item) => item.toLowerCase().contains(
+                                            value.toLowerCase(),
+                                          ),
+                                        )
+                                        .toList();
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Cari kategori manual...',
+                                  prefixIcon: const Icon(Icons.search),
+                                  filled: true,
+                                  fillColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceVariant.withOpacity(0.5),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 0,
+                                    horizontal: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+
+                            // --- C. LIST KATEGORI (SCROLLABLE) ---
+                            Expanded(
+                              child: _filteredKategoriList.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        'Kategori tidak ditemukan',
+                                        style: TextStyle(
+                                          color: Theme.of(context).hintColor,
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.separated(
+                                      controller:
+                                          scrollController, // Biar scroll-nya enak sama sheet
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      itemCount: _filteredKategoriList.length,
+                                      separatorBuilder: (_, __) =>
+                                          const Divider(
+                                            height: 1,
+                                            indent: 16,
+                                            endIndent: 16,
+                                          ),
+                                      itemBuilder: (context, index) {
+                                        final item =
+                                            _filteredKategoriList[index];
+                                        final isSelected =
+                                            item == _selectedKategori;
+
+                                        return ListTile(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 20,
+                                                vertical: 4,
+                                              ),
+                                          title: Text(
+                                            item,
+                                            style: TextStyle(
+                                              fontWeight: isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                              color: isSelected
+                                                  ? Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary
+                                                  : null,
+                                            ),
+                                          ),
+                                          trailing: isSelected
+                                              ? Icon(
+                                                  Icons.check_circle,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                )
+                                              : null,
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedKategori = item;
+                                              _isKategoriEmpty = false;
+                                            });
+                                            Navigator.pop(
+                                              context,
+                                            ); // Tutup modal
+                                          },
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showCustomToast(String msg, Color bgColor) {
@@ -439,43 +677,62 @@ class _FormLaporanScreenState extends State<FormLaporanScreen> {
               // --- KATEGORI ---
               Text('Kategori', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
-              Container(
-                decoration: _getBoxDecoration(theme, _isKategoriEmpty),
-                child: DropdownMenu<String>(
-                  initialSelection: _selectedKategori,
-                  onSelected: (String? value) {
-                    _unfocusGlobal();
-                    setState(() {
-                      _selectedKategori = value;
-                      _isKategoriEmpty = false; // Hapus error
-                    });
-                  },
-                  expandedInsets: EdgeInsets.zero,
-                  hintText: _isKategoriLoading
-                      ? 'Memuat kategori...'
-                      : 'Pilih kategori',
-                  inputDecorationTheme: InputDecorationTheme(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    filled: true,
-                    fillColor: Colors.transparent,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    hintStyle: TextStyle(
-                      color: theme.hintColor.withOpacity(0.5),
-                    ),
+
+              // GANTI CONTAINER DROPDOWN YANG LAMA DENGAN INI:
+              GestureDetector(
+                onTap: _isKategoriLoading
+                    ? null
+                    : () => _showKategoriModal(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
                   ),
-                  dropdownMenuEntries: _kategoriList
-                      .map<DropdownMenuEntry<String>>(
-                        (String value) => DropdownMenuEntry<String>(
-                          value: value,
-                          label: value,
+                  decoration: _getBoxDecoration(theme, _isKategoriEmpty),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _selectedKategori ?? 'Pilih Kategori',
+                          style: TextStyle(
+                            fontSize: 16,
+                            // Kalau belum pilih / loading warnanya abu, kalau udah hitam/putih
+                            color: _selectedKategori == null
+                                ? theme.hintColor.withOpacity(0.5)
+                                : (_selectedKategori == 'Alokasikan Otomatis'
+                                      ? theme
+                                            .colorScheme
+                                            .primary // Biar warna beda kalau otomatis
+                                      : theme.textTheme.bodyLarge?.color),
+                            fontWeight:
+                                _selectedKategori == 'Alokasikan Otomatis'
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      )
-                      .toList(),
+                      ),
+
+                      // Icon di ujung kanan
+                      if (_isKategoriLoading)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else if (_selectedKategori == 'Alokasikan Otomatis')
+                        Icon(
+                          Icons.auto_awesome,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        )
+                      else
+                        Icon(Icons.arrow_drop_down, color: theme.hintColor),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

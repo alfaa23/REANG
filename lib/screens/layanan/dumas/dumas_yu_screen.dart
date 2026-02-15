@@ -346,51 +346,65 @@ class _BerandaDumasViewState extends State<_BerandaDumasView> {
     final theme = Theme.of(context);
 
     // --- PERBAIKAN: Tampilkan error view jika ada error dan list kosong ---
-    if (_hasError && _dumasList.isEmpty) {
-      return _ErrorView(onRetry: _loadInitialData);
-    }
 
     return RefreshIndicator(
       onRefresh: _loadInitialData,
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : CustomScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
+      child: CustomScrollView(
+        // Langsung return CustomScrollView agar Header selalu dimuat
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          // 1. HEADER (SELALU MUNCUL PALING ATAS)
+          SliverToBoxAdapter(child: _buildBerandaHeader(theme)),
+
+          // 2. LOGIKA KONTEN DI BAWAH HEADER
+
+          // KONDISI A: SEDANG LOADING AWAL
+          if (_isLoading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          // KONDISI B: ERROR DAN DATA KOSONG
+          else if (_hasError && _dumasList.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _ErrorView(onRetry: _loadInitialData),
+            )
+          // KONDISI C: DATA KOSONG (SUKSES LOAD TAPI TIDAK ADA ISINYA)
+          else if (_dumasList.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _buildEmptyState(
+                theme,
+                'Belum ada laporan terbaru dari masyarakat.',
               ),
-              slivers: [
-                SliverToBoxAdapter(child: _buildBerandaHeader(theme)),
-                if (_dumasList.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildEmptyState(
-                      theme,
-                      'Belum ada laporan terbaru dari masyarakat.',
-                    ),
-                  )
-                else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      if (index == _dumasList.length) {
-                        return _isLoadingMore
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16.0),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : const SizedBox.shrink();
-                      }
-                      final dumas = _dumasList[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: _ReportCard(data: dumas),
-                      );
-                    }, childCount: _dumasList.length + (_hasMore ? 1 : 0)),
-                  ),
-              ],
+            )
+          // KONDISI D: ADA DATANYA (LIST LAPORAN)
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                // Loader untuk Infinite Scroll (Load More)
+                if (index == _dumasList.length) {
+                  return _isLoadingMore
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : const SizedBox.shrink();
+                }
+
+                final dumas = _dumasList[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: _ReportCard(data: dumas),
+                );
+              }, childCount: _dumasList.length + (_hasMore ? 1 : 0)),
             ),
+        ],
+      ),
     );
   }
 
