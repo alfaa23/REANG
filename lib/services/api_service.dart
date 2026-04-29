@@ -48,7 +48,7 @@ class ApiService {
   // =======================================================================
   // Backend lokal
   final String _baseUrlBackend =
-      'https://cbb8-103-47-132-21.ngrok-free.app/api';
+      'https://obsessed-pang-overbite.ngrok-free.dev/api';
 
   // =======================================================================
   // API BERITA (EKSTERNAL)
