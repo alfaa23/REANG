@@ -4,6 +4,8 @@ import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/plesir/detail_plesir_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/pesan_tiket_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/info_wisata_screen.dart';
+import 'package:reang_app/screens/layanan/plesir/form_mitra_plesir_screen.dart';
+import 'package:reang_app/screens/layanan/plesir/tiket_saya_screen.dart'; // <-- Pastikan path import ini sesuai dengan lokasi file TiketSayaScreen kamu
 
 class _CachedPlesirData {
   List<PlesirModel> items = [];
@@ -43,19 +45,6 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
       longitude: "108.3247",
       kategori: "Pantai",
     ),
-    PlesirModel(
-      id: 2,
-      judul: "Pulau Biawak",
-      alamat: "Kepulauan Indramayu",
-      rating: 4.9,
-      foto:
-          "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=500",
-      deskripsi:
-          "Pulau eksotis dengan mercusuar bersejarah peninggalan Belanda dan habitat asli biawak.",
-      latitude: "-5.9325",
-      longitude: "108.3750",
-      kategori: "Pulau",
-    ),
   ];
 
   @override
@@ -69,6 +58,103 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // --- MODIFIKASI FUNGSI MENU PINTAS ---
+  void _showShortcutMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 25),
+            const Text(
+              "Menu Ekosistem Pariwisata",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 25),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildShortcutCard(
+                  icon: Icons.confirmation_number_outlined,
+                  label: "Tiket Saya",
+                  color: Colors.blue,
+                  onTap: () {
+                    // --- BERPINDAH KE HALAMAN TIKET SAYA SCREEN ---
+                    Navigator.pop(context); // Tutup bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TiketSayaScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildShortcutCard(
+                  icon: Icons.storefront_outlined,
+                  label: "Mitra Wisata/Event",
+                  color: Colors.orange,
+                  onTap: () {
+                    Navigator.pop(context); // Tutup bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FormMitraPlesirScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShortcutCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: color, size: 30),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _initializeData() async {
@@ -152,7 +238,6 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
-        // Bagian Tombol Kembali dengan jarak sesuai gambar referensi
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: IconButton(
@@ -160,26 +245,48 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        titleSpacing:
-            0, // Mengurangi spasi default agar title dekat dengan leading
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Plesir-Yu',
               style: TextStyle(
-                color: Colors
-                    .black, // Warna diubah menjadi hitam sesuai permintaan
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 26,
               ),
             ),
             Text(
-              'Layanan Pesona Indramayu', // Menyesuaikan gaya teks sub-header di gambar
+              'Layanan Pesona Indramayu',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
           ],
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: GestureDetector(
+              onTap: () => _showShortcutMenu(),
+              child: Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F3F4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.dashboard_customize_outlined,
+                    color: Color(0xFF1E62DF),
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(70),
           child: SingleChildScrollView(
@@ -412,7 +519,6 @@ class DestinationCard extends StatelessWidget {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,
-                            color: Colors.black,
                           ),
                         ),
                       ),
@@ -449,15 +555,6 @@ class DestinationCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Lihat selengkapnya",
-                    style: TextStyle(
-                      color: Color(0xFF1E62DF),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -487,7 +584,6 @@ class _TabItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
@@ -500,7 +596,6 @@ class _TabItem extends StatelessWidget {
             style: TextStyle(
               color: isActive ? const Color(0xFF1E62DF) : Colors.grey[600],
               fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 16,
             ),
           ),
         ],

@@ -38,10 +38,14 @@ import 'package:reang_app/models/toko_model.dart';
 import 'package:reang_app/models/notification_model.dart';
 import 'package:reang_app/models/admin_analitik_model.dart';
 import 'package:reang_app/models/dumas_analitik_model.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 /// Kelas ini bertanggung jawab untuk semua komunikasi dengan API eksternal.
 class ApiService {
   final Dio _dio = Dio();
+  final String baseUrl =
+      "https://obsessed-pang-overbite.ngrok-free.dev"; // contoh
 
   // =======================================================================
   // KONFIGURASI BASE URL
@@ -3227,6 +3231,78 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Terjadi error saat mengambil statistik: $e');
+    }
+  }
+
+  //fungsi untuk mengirim data pendaftaran mitra ke backend
+  Future<bool> registerMitraPlesir({
+    required String token,
+    required String nama,
+    required String alamat,
+    required String deskripsi,
+    required String kontak,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(
+          '$baseUrl/plesir/register-mitra',
+        ), // Sesuaikan dengan endpoint Laravel Anda
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+        body: {
+          'nama_wisata': nama,
+          'alamat': alamat,
+          'deskripsi': deskripsi,
+          'kontak': kontak,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        throw Exception('Gagal mendaftar mitra');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> registerMitraWisata({
+    required String token,
+    required String nama,
+    required String alamat,
+    required String kontak,
+    required String deskripsi,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(
+          '$baseUrl/api/mitra-wisata',
+        ), // Sesuaikan endpoint route Laravel-mu
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'nama': nama,
+          'alamat': alamat,
+          'kontak':
+              kontak, // Di laravel akan ditangkap sebagai $request->kontak
+          'deskripsi': deskripsi,
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Gagal mendaftar mitra');
+      }
+    } catch (e) {
+      throw Exception('Koneksi Error: ${e.toString()}');
     }
   }
 }
