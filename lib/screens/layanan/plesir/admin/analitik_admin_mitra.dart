@@ -109,26 +109,6 @@ class ProviderAnalyticsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // --- SECTION 3: RINGKASAN DATA (BOOKING & EVENT) ---
-              Row(
-                children: [
-                  _buildSummaryCard(
-                    icon: Icons.calendar_today_outlined,
-                    iconColor: Colors.black87,
-                    bgColor: const Color(0xFFF1F5F9),
-                    title: 'Total Booking',
-                    value: '45 Pesanan',
-                  ),
-                  const SizedBox(width: 14),
-                  _buildSummaryCard(
-                    icon: Icons.date_range_outlined,
-                    iconColor: const Color(0xFF1A73E8),
-                    bgColor: const Color(0xFFE8F0FE),
-                    title: 'Total Event',
-                    value: '12 Aktif',
-                  ),
-                ],
-              ),
               const SizedBox(height: 24),
 
               // --- SECTION 4: CHART STATISTIK MINGGUAN ---

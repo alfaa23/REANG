@@ -56,6 +56,11 @@ class _FormMitraPlesirScreenState extends State<FormMitraPlesirScreen> {
 
       // JIKA API BERHASIL, PINDAH KE DASHBOARD DI SINI
       if (mounted) {
+        // [PERUBAHAN LOGIKA DI SINI]:
+        // Update status pendaftaran mitra di AuthProvider / Local Storage Anda agar aplikasi ingat
+        // Contoh jika di AuthProvider Anda ada fungsi setMitraStatus:
+        // authProvider.setMitraStatus(true);
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(

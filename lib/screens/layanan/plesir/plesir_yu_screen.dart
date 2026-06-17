@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // <-- Ditambahkan untuk membaca status lokal HP
+import 'package:provider/provider.dart'; // <-- Ditambahkan untuk berinteraksi dengan AuthProvider
+import 'package:reang_app/providers/auth_provider.dart'; // <-- Ditambahkan untuk cek token login
 import 'package:reang_app/models/plesir_model.dart';
 import 'package:reang_app/services/api_service.dart';
 import 'package:reang_app/screens/layanan/plesir/detail_plesir_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/pesan_tiket_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/info_wisata_screen.dart';
 import 'package:reang_app/screens/layanan/plesir/form_mitra_plesir_screen.dart';
-import 'package:reang_app/screens/layanan/plesir/tiket_saya_screen.dart'; // <-- Pastikan path import ini sesuai dengan lokasi file TiketSayaScreen kamu
+import 'package:reang_app/screens/layanan/plesir/admin/home_admin_plesir_screen.dart'; // <-- Ditambahkan untuk bypass langsung ke Home Admin
+import 'package:reang_app/screens/layanan/plesir/tiket_saya_screen.dart';
 
 class _CachedPlesirData {
   List<PlesirModel> items = [];
@@ -60,6 +64,48 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
     super.dispose();
   }
 
+  // --- LOGIKA GERBANG PENGECEKAN STATUS MITRA ---
+  void _aksesMenuMitra() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.token;
+
+    // 1. Cek apakah sudah login aplikasi utama
+    if (token == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fitur layanan memerlukan login terlebih dahulu.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 2. Cek status kemitraan lokal di HP
+    final prefs = await SharedPreferences.getInstance();
+    bool sudahDaftarMitra = prefs.getBool('is_mitra_plesir') ?? false;
+
+    if (mounted) {
+      if (sudahDaftarMitra) {
+        // JIKA SUDAH DAFTAR: Langsung bypass ke Home Admin
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeAdminPlesirScreen(),
+          ),
+        );
+      } else {
+        // JIKA BELUM DAFTAR: Arahkan ke Form Pendaftaran
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const FormMitraPlesirScreen(),
+          ),
+        );
+      }
+    }
+  }
+
   // --- MODIFIKASI FUNGSI MENU PINTAS ---
   void _showShortcutMenu() {
     showModalBottomSheet(
@@ -96,7 +142,6 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
                   label: "Tiket Saya",
                   color: Colors.blue,
                   onTap: () {
-                    // --- BERPINDAH KE HALAMAN TIKET SAYA SCREEN ---
                     Navigator.pop(context); // Tutup bottom sheet
                     Navigator.push(
                       context,
@@ -112,12 +157,7 @@ class _PlesirYuScreenState extends State<PlesirYuScreen> {
                   color: Colors.orange,
                   onTap: () {
                     Navigator.pop(context); // Tutup bottom sheet
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const FormMitraPlesirScreen(),
-                      ),
-                    );
+                    _aksesMenuMitra(); // Menggunakan fungsi gerbang pengecekan
                   },
                 ),
               ],

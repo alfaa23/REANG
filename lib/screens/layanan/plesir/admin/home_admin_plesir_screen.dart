@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-// Silakan sesuaikan lokasi import di bawah ini dengan struktur foldermu
-import 'provider_profile_admin_mitra_screen.dart';
-import 'kelola_tiket_dan_pesanan.dart';
+import 'halaman_profile_admin_mitra_screen.dart';
+import 'kelola_tiket.dart';
+import 'kelola_pesanan.dart'; // 1. MENAMBAHKAN IMPORT FILE KELOLA PESANAN YANG BARU
 import 'analitik_admin_mitra.dart';
-import 'provider_settings_screen.dart'; // Menambahkan import file pengaturan baru
+import 'halaman_settings_screen.dart'; // Menambahkan import file pengaturan baru
 
 class HomeAdminPlesirScreen extends StatelessWidget {
   const HomeAdminPlesirScreen({super.key});
@@ -11,51 +11,50 @@ class HomeAdminPlesirScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5, // DIUBAH menjadi 5 karena tab dipisah
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Dashboard Pengelola Wisata'),
-          backgroundColor: const Color(
-            0xFF005691,
-          ), // Mengubah menjadi Biru menyesuaikan profil & kelola
+          backgroundColor: const Color(0xFF005691),
           foregroundColor: Colors.white,
+          // Tombol aksi di pojok kanan (dari saran sebelumnya)
+          actions: [
+            IconButton(icon: const Icon(Icons.notifications), onPressed: () {}),
+          ],
           bottom: const TabBar(
-            // Diubah menjadi true agar teks panjang seperti 'Kelola Tiket & Pesanan'
-            // memiliki ruang yang cukup dan tidak terpotong/saling menumpuk
             isScrollable: true,
-            tabAlignment:
-                TabAlignment.start, // Memulai susunan tab dari kiri agar rapi
-            labelColor: Color.fromARGB(
-              255,
-              15,
-              15,
-              15,
-            ), // Warna teks aktif menjadi putih agar kontras dengan latar biru
-            unselectedLabelColor: Colors.white70, // Warna teks tidak aktif
-            indicatorColor: Colors.white, // Garis bawah indikator menjadi putih
+            tabAlignment: TabAlignment.start,
+            labelColor: Color.fromARGB(255, 15, 15, 15),
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
             indicatorWeight: 3,
             labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
             tabs: [
               Tab(text: 'Profil'),
-              Tab(text: 'Kelola Tiket & Pesanan'),
-              Tab(text: 'Analitik'), // Mengganti 'Events' menjadi 'Analitik'
-              Tab(text: 'Setting'), // Mengganti 'Analytics' menjadi 'Setting'
+              Tab(text: 'Kelola Tiket'), // DIPISAH
+              Tab(text: 'Pesanan'), // DIPISAH
+              Tab(text: 'Analitik'),
+              Tab(text: 'Setting'),
             ],
           ),
         ),
         body: const TabBarView(
           children: [
-            // MENAMPILKAN PROFIL ADMIN: Memanggil class dari file terpisah
+            // 1. PROFIL
             ProviderProfileScreen(),
 
-            // MENAMPILKAN HALAMAN KELOLA: Memanggil class dari file terpisah tanpa mengubah kodenya
+            // 2. KELOLA TIKET
             ManageEventScreen(),
 
-            // MENAMPILKAN HALAMAN ANALITIK: Memanggil class dari file terpisah
+            // 3. PESANAN
+            // 2. SEKARANG SUDAH DIUBAH KE KELOLA PESANAN AGAR TAMPILAN BERUBAH SESUAI GAMBAR
+            ManageOrderScreen(),
+
+            // 4. ANALITIK
             ProviderAnalyticsScreen(),
 
-            // MENAMPILKAN HALAMAN PENGATURAN: Memanggil class dari file provider_settings_screen.dart
+            // 5. SETTING
             ProviderSettingsScreen(),
           ],
         ),

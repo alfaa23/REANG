@@ -8,123 +8,49 @@ class ManageEventScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
-          title: const Text(
-            'Kelola Tiket & Pesanan',
-            style: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      // AppBar dihapus total agar tidak menumpuk dengan AppBar biru Dashboard utama Anda
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- KONTEN ATAS: Judul & Subjudul (Sama persis dengan Pesanan Masuk) ---
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 20.0,
+              right: 20.0,
+              top: 24.0,
+              bottom: 8.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Kelola Tiket',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22, // Ukuran font diperbesar agar konsisten
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Kelola semua event atau destinasi pariwisata Anda di sini',
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+              ],
             ),
           ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(60),
-            child: Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 8.0),
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.black54,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  color: const Color(0xFF1B4E7E),
-                ),
-                dividerColor: Colors.transparent,
-                splashBorderRadius: BorderRadius.circular(24),
-                tabs: [
-                  Tab(
-                    height: 38,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.payment_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Menunggu Pembayaran'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    height: 38,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.gavel_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Menunggu Verifikasi'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    height: 38,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.cancel_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Ditolak'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    height: 38,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.confirmation_number_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Tiket Aktif'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    height: 38,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.task_alt_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Sudah Digunakan'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildEmptyStateContent(context),
-            _buildEmptyStateContent(context),
-            _buildEmptyStateContent(context),
-            _buildEmptyStateContent(context),
-            _buildEmptyStateContent(context),
-          ],
-        ),
+          const SizedBox(height: 12),
+
+          // --- KONTEN BAWAH: Halaman Empty State Lingkaran Abu-Abu ---
+          Expanded(child: _buildEmptyStateContent(context)),
+        ],
       ),
     );
   }
 
+  // Widget pembentuk struktur empty state (Menggunakan style lingkaran abu-abu yang konsisten)
   Widget _buildEmptyStateContent(BuildContext context) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -133,86 +59,49 @@ class ManageEventScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 40),
+            const SizedBox(height: 60),
             Center(
               child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                width: 130,
+                height: 130,
+                decoration: const BoxDecoration(
+                  color: Color(
+                    0xFFF1F5F9,
+                  ), // Lingkaran background abu-abu tipis
+                  shape: BoxShape.circle,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 56,
-                      color: Color(0xFF005691),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.black12,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 18,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF74A2CD),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.black12,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: const Center(
+                  child: Icon(
+                    Icons
+                        .inventory_2_outlined, // Icon box minimalis agar serasi
+                    size: 48,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 28),
             const Text(
-              'Belum ada event/pariwisata terdaftar',
+              'Belum Ada Tiket Terdaftar',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              padding: EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
-                'Mulailah mengelola event atau pariwisata Anda di Indramayu dengan membuat publikasi pertama Anda.',
+                'Tiket pariwisata atau event yang telah Anda publikasikan akan muncul di halaman ini.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
+
+            // Tombol Tambah Tiket Utama
             SizedBox(
               width: 200,
               height: 48,
@@ -237,6 +126,8 @@ class ManageEventScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
+
+            // Kotak Komponen Tips Edukasi Event di bagian bawah
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -340,7 +231,6 @@ class ManageEventScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Pilihan 1: Tiket Wisata
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -371,7 +261,6 @@ class ManageEventScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      // ⚠️ GANTI 'FormInputWisataAsli' dengan nama class di file form_input_wisata.dart kamu
                       builder: (context) => const FormInputWisata(),
                     ),
                   );
@@ -379,7 +268,6 @@ class ManageEventScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Pilihan 2: Tiket Event
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -410,7 +298,6 @@ class ManageEventScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      // ⚠️ GANTI 'FormInputEventAsli' dengan nama class di file form_input_event.dart kamu
                       builder: (context) => const FormInputEvent(),
                     ),
                   );
