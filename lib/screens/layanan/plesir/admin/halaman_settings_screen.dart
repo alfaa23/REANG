@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:reang_app/screens/layanan/plesir/admin/halaman_metode_instruksi_pembayaran.dart';
-import 'halaman_metode_pembayaran.dart.dart';
+import 'package:reang_app/screens/layanan/plesir/admin/metode_instruksi_pembayaran.dart';
+import 'metode_pembayaran.dart.dart';
 
 class ProviderSettingsScreen extends StatelessWidget {
   const ProviderSettingsScreen({super.key});

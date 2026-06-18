@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'halaman_profile_admin_mitra_screen.dart';
+import 'profile_admin_mitra_screen.dart';
 import 'kelola_tiket.dart';
 import 'kelola_pesanan.dart'; // 1. MENAMBAHKAN IMPORT FILE KELOLA PESANAN YANG BARU
 import 'analitik_admin_mitra.dart';

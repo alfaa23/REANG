@@ -1,7 +1,7 @@
 // File: lib/screens/layanan/plesir/admin/halaman_tambah_metode.dart
 
 import 'package:flutter/material.dart';
-import 'halaman_metode_instruksi_pembayaran.dart'; // Import untuk menggunakan class TransaksiPembayaran
+import 'metode_instruksi_pembayaran.dart'; // Import untuk menggunakan class TransaksiPembayaran
 
 class HalamanTambahMetode extends StatefulWidget {
   const HalamanTambahMetode({super.key});

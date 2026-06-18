@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'halaman_metode_pembayaran.dart.dart'; // Perbaikan ekstensi file import (.dart.dart -> .dart)
+import 'metode_pembayaran.dart.dart'; // Perbaikan ekstensi file import (.dart.dart -> .dart)
 
 class TransaksiPembayaran {
   final String totalPembayaran;
